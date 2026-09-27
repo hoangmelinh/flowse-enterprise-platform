@@ -1,0 +1,93 @@
+{
+  "sidebar": {
+    "home": "Trang chủ",
+    "inbox": "Hộp thư",
+    "timeTracking": "Theo dõi thời gian",
+    "ai": "Flowise AI",
+    "spaces": "Spaces",
+    "invitePeople": "Mời thành viên",
+    "settings": "Cài đặt",
+    "logout": "Đăng xuất",
+    "menu": "Menu",
+    "brand": "Flowise PM"
+  },
+  "buttons": {
+    "save": "Lưu thay đổi",
+    "cancel": "Huỷ",
+    "create": "Tạo mới",
+    "delete": "Xoá",
+    "edit": "Chỉnh sửa",
+    "saving": "Đang lưu…",
+    "retry": "Thử lại",
+    "confirm": "Xác nhận",
+    "back": "Quay lại",
+    "next": "Tiếp theo",
+    "close": "Đóng",
+    "submit": "Gửi"
+  },
+  "onboarding": {
+    "next": "Tiếp theo",
+    "prev": "Quay lại",
+    "done": "Hoàn tất",
+    "step1": {
+      "title": "Thanh điều hướng",
+      "desc": "Đây là sidebar chính — nơi bạn truy cập nhanh tất cả các tính năng: Trang chủ, Hộp thư, Theo dõi thời gian, và AI."
+    },
+    "step2": {
+      "title": "Quản lý Spaces",
+      "desc": "Tổ chức dự án theo Spaces. Mỗi Space chứa Folders, Lists, và Tasks — giúp bạn quản lý công việc có hệ thống."
+    },
+    "step3": {
+      "title": "Khu vực làm việc",
+      "desc": "Đây là khu vực chính để xem và quản lý tasks, boards, sprints. Tất cả nội dung sẽ hiển thị ở đây."
+    },
+    "step4": {
+      "title": "Trợ lý AI",
+      "desc": "Flowise AI giúp bạn tạo tasks, thống kê, và gợi ý thông minh bằng ngôn ngữ tự nhiên."
+    },
+    "step5": {
+      "title": "Cài đặt",
+      "desc": "Tùy chỉnh hồ sơ, giao diện, ngôn ngữ, và bảo mật tại đây. Bạn có thể chuyển sang Tiếng Anh bất cứ lúc nào!"
+    },
+    "restartTour": "Xem lại hướng dẫn"
+  },
+  "workspace": {
+    "noWorkspace": "Chưa có workspace. Tạo mới bên dưới.",
+    "createNew": "Tạo workspace mới…"
+  },
+  "search": {
+    "clearSearch": "Xoá tìm kiếm",
+    "placeholder": "Tìm kiếm..."
+  },
+  "members": {
+    "workspaceMembers": "Thành viên Workspace"
+  },
+  "errors": {
+    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại."
+  },
+  "pageHeader": {
+    "askAI": "Hỏi AI",
+    "share": "Chia sẻ",
+    "overview": "Tổng quan",
+    "list": "Danh sách",
+    "board": "Bảng"
+  },
+  "ai": {
+    "newConversation": "Cuộc trò chuyện mới",
+    "recentChats": "Trò chuyện gần đây",
+    "askOrCreate": "Hỏi hoặc Tạo",
+    "newChat": "Cuộc trò chuyện mới",
+    "thinking": "Flowise đang suy nghĩ...",
+    "inputPlaceholder": "Đặt câu hỏi, nhận gợi ý và ý tưởng ngay.",
+    "inputPlaceholder2": "Nói với AI bước tiếp theo",
+    "allSources": "Tất cả nguồn",
+    "createTask": "Tạo Task",
+    "createTaskDesc": "Thêm hành động mới",
+    "setReminder": "Đặt nhắc nhở",
+    "setReminderDesc": "Nhắc về task",
+    "brainstorm": "Brainstorm Ý tưởng",
+    "brainstormDesc": "Tạo ra các khái niệm mới",
+    "findTasks": "Tìm Tasks",
+    "findTasksDesc": "Tìm kiếm task quá hạn"
+  }
+}

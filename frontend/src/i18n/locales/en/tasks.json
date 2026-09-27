@@ -1,0 +1,113 @@
+{
+  "create": {
+    "title": "Create New Task",
+    "createTask": "Create task",
+    "createMilestone": "Create Milestone",
+    "createMilestoneNew": "Create New Milestone",
+    "createFailed": "Failed to create task",
+    "createSuccess": "Task created successfully!",
+    "save": "Save ↵"
+  },
+  "sprint": {
+    "create": "Create Sprint",
+    "cancelled": "Cancelled"
+  },
+  "myTasks": {
+    "title": "My Tasks",
+    "active": "active",
+    "dueToday": "due today",
+    "assigned": "Assigned to me",
+    "mentions": "Mentions",
+    "hideCompleted": "Hide Completed",
+    "showCompleted": "Show Completed",
+    "nameCol": "Name",
+    "assigneeCol": "Assignee",
+    "dueDateCol": "Due date",
+    "priorityCol": "Priority",
+    "noProject": "No Project",
+    "emptyAssignedTitle": "No tasks assigned to you",
+    "emptyAssignedDesc": "Tasks that are assigned to you will appear here.",
+    "emptyCreatedTitle": "You haven't created any tasks",
+    "emptyCreatedDesc": "Tasks that you create will appear here."
+  },
+  "detail": {
+    "description": "Description",
+    "attachments": "Attachments",
+    "dropFiles": "Drag & drop files or click to upload",
+    "comments": "Comments",
+    "activity": "Activity",
+    "unsavedChanges": "You have unsaved changes",
+    "update": "Update",
+    "writeComment": "Write a comment...",
+    "noComments": "No comments yet.",
+    "noActivity": "No activity yet.",
+    "taskName": "Task name",
+    "assignee": "Assignee",
+    "dueDate": "Due Date",
+    "priority": "Priority",
+    "assignPlaceholder": "Assign",
+    "setDate": "Set date",
+    "clearDate": "Clear date",
+    "minimize": "Minimize",
+    "maximize": "Maximize"
+  },
+  "share": {
+    "title": "Share Task",
+    "subtitle": "Share task with members",
+    "clearSearch": "Clear search",
+    "allAssigned": "All members have already been assigned to this task",
+    "noResult": "No members found matching your search",
+    "selectedCount": "{{count}} member(s) selected",
+    "selectPrompt": "Select members to share",
+    "success": "Shared!",
+    "sharing": "Sharing...",
+    "submit": "Share"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Get notified when you are assigned a new task or there are updates.",
+    "unread": "unread",
+    "markAllRead": "Mark all as read",
+    "emptyTitle": "No notifications yet",
+    "emptyDesc": "Notifications for task assignments and upcoming deadlines will appear here.",
+    "by": "By"
+  },
+  "priority": {
+    "urgent": "Urgent",
+    "high": "High",
+    "normal": "Normal",
+    "low": "Low",
+    "clear": "Clear",
+    "label": "Priority"
+  },
+  "addTask": "Add Task",
+  "dashboard": "Dashboard",
+  "buttons": {
+    "delete": "Delete"
+  },
+  "activity": {
+    "created": "created the task",
+    "updated": "updated the task",
+    "deleted": "deleted the task",
+    "statusChanged": "changed the status",
+    "priorityChanged": "changed the priority",
+    "assigned": "assigned the task to",
+    "unassigned": "unassigned the task from",
+    "commented": "commented",
+    "attachmentAdded": "added an attachment",
+    "attachmentRemoved": "removed an attachment",
+    "dueDateChanged": "changed the due date",
+    "startDateChanged": "changed the start date",
+    "moved": "moved the task",
+    "archived": "archived the task",
+    "restored": "restored the task",
+    "timerStarted": "started the timer",
+    "timerStopped": "stopped the timer",
+    "sprintAssigned": "assigned to sprint",
+    "milestoneAssigned": "assigned a milestone",
+    "tagAdded": "added a tag",
+    "tagRemoved": "removed a tag",
+    "subtaskAdded": "added a subtask",
+    "storyPointsChanged": "changed story points"
+  }
+}

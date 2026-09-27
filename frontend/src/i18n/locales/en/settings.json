@@ -1,0 +1,68 @@
+{
+  "title": "Settings",
+  "tabs": {
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "appearance": "Appearance",
+    "security": "Security",
+    "workspace": "Workspace"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "subtitle": "Manage your personal information",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "Enter your full name...",
+    "email": "Email",
+    "emailReadonly": "Email cannot be changed as it is linked to your account.",
+    "phone": "Phone number",
+    "phonePlaceholder": "Enter your phone number...",
+    "role": "Workspace role",
+    "changeAvatar": "Change avatar (coming soon)",
+    "updateSuccess": "Profile updated successfully!",
+    "updateFailed": "Update failed. Please try again.",
+    "notFound": "User information not found."
+  },
+  "notifications": {
+    "title": "Notification Preferences",
+    "subtitle": "Choose how you want to receive notifications",
+    "email": "Email notifications",
+    "emailDesc": "Receive emails for important updates",
+    "mention": "Mention alerts",
+    "mentionDesc": "Get notified when someone @mentions you",
+    "taskUpdate": "Task status updates",
+    "taskUpdateDesc": "Get alerts when tasks you follow change status"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Customize appearance and language",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "language": "Language",
+    "languageDesc": "Choose the display language for the application"
+  },
+  "security": {
+    "title": "Security",
+    "subtitle": "Manage your account security",
+    "currentPassword": "Current password",
+    "currentPasswordPlaceholder": "Enter current password",
+    "newPassword": "New password",
+    "newPasswordPlaceholder": "Enter new password (at least 6 characters)",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordPlaceholder": "Re-enter new password",
+    "sendOtp": "Send verification code via email",
+    "sendingOtp": "Sending verification code...",
+    "otpSent": "Check your email",
+    "otpSentDesc": "A 6-digit OTP code has been sent to {{email}}",
+    "enterOtp": "Enter OTP code",
+    "verifying": "Verifying...",
+    "confirmChange": "Confirm & Change Password",
+    "resendOtp": "Resend code",
+    "fillAllFields": "Please fill in all fields",
+    "minLength": "New password must be at least 6 characters",
+    "mismatch": "New password and confirmation do not match",
+    "changeSuccess": "Password updated successfully!"
+  },
+  "restartTour": "Restart guided tour",
+  "restartTourDesc": "Replay the step-by-step onboarding tour from the beginning. Useful when you want to revisit the main features."
+}

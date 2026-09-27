@@ -1,0 +1,25 @@
+{
+  "nav": {
+    "features": "Features",
+    "howItWorks": "How It Works",
+    "login": "Login",
+    "register": "Register"
+  },
+  "hero": {
+    "title": "Centralized Project Management",
+    "subtitle": "An efficient platform for project and team task management",
+    "cta": "Sign up now"
+  },
+  "features": {
+    "smartNotifications": "Smart Notifications",
+    "memberManagement": "Member Management"
+  },
+  "howItWorks": {
+    "createProject": "Create Project",
+    "visualDashboard": "Visual dashboard for tracking progress"
+  },
+  "footer": {
+    "products": "Products",
+    "features": "Features"
+  }
+}

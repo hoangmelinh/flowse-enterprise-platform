@@ -1,0 +1,107 @@
+/* ═══════════════════════════════════════════════
+   Design Token Palette — Single Source of Truth
+   ═══════════════════════════════════════════════ */
+
+:root {
+    /* ─── Surface & Background ─── */
+    --color-surface-bright: #f9f9ff;
+    --color-surface: #f9f9ff;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f1f3ff;
+    --color-surface-container: #e9edff;
+    --color-surface-container-high: #e1e8fd;
+    --color-surface-container-highest: #dce2f7;
+    --color-surface-variant: #dce2f7;
+    --color-surface-subtle: #f8f9fa;
+    --color-surface-hover: #f0f2f5;
+    --color-background: #f9f9ff;
+
+    /* ─── Text ─── */
+    --color-on-surface: #141b2b;
+    --color-on-surface-variant: #424754;
+    --color-text-secondary: #5f6368;
+    --color-text-tertiary: #9aa0a6;
+    --color-on-primary: #ffffff;
+
+    /* ─── Primary ─── */
+    --color-primary: #0058be;
+    --color-primary-hover: #004aab;
+    --color-primary-alt: #1a73e8;
+    --color-primary-container: #2170e4;
+    --color-primary-bg: #f0f4ff;
+    --color-primary-fixed: #d8e2ff;
+    --color-primary-fixed-dim: #adc6ff;
+
+    /* ─── Secondary ─── */
+    --color-secondary: #006c49;
+    --color-secondary-container: #6cf8bb;
+    --color-secondary-fixed: #6ffbbe;
+    --color-secondary-fixed-dim: #4edea3;
+
+    /* ─── Tertiary ─── */
+    --color-tertiary: #825100;
+    --color-tertiary-container: #a36700;
+    --color-tertiary-fixed: #ffddb8;
+    --color-tertiary-fixed-dim: #ffb95f;
+
+    /* ─── Accent (Purple) ─── */
+    --color-accent: #7c5cfc;
+    --color-accent-hover: #6b4ce0;
+
+    /* ─── Error / Danger ─── */
+    --color-error: #ba1a1a;
+    --color-success: #059669;
+    --color-success-bg: #f0fdf4;
+    --color-warning: #d97706;
+    --color-warning-bg: #fffbeb;
+
+    /* ─── Border / Outline ─── */
+    --color-border: #c2c6d6;
+    --color-border-light: #eef0f5;
+    --color-primary-border: rgba(0,88,190,0.2);
+    --color-outline: #727785;
+    --color-outline-variant: #c2c6d6;
+
+    /* ─── Misc ─── */
+    --color-inverse-surface: #293040;
+
+    /* ═══════════════════════════════════════════════
+       Typography Scale — Standardized
+       ═══════════════════════════════════════════════ */
+    --text-display: 1.75rem;       /* 28px */
+    --text-h1: 1.5rem;             /* 24px */
+    --text-h2: 1.25rem;            /* 20px */
+    --text-h3: 1.0625rem;          /* 17px */
+    --text-h4: 0.9375rem;          /* 15px */
+    --text-body-lg: 0.9375rem;     /* 15px */
+    --text-body: 0.875rem;         /* 14px */
+    --text-body-sm: 0.8125rem;     /* 13px */
+    --text-caption: 0.75rem;       /* 12px */
+    --text-overline: 0.6875rem;    /* 11px */
+    --text-micro: 0.625rem;        /* 10px */
+
+    /* ─── Font Weights ─── */
+    --font-regular: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    --font-extrabold: 800;
+
+    /* ─── Spacing Scale ─── */
+    --space-xs: 0.25rem;     /* 4px  */
+    --space-sm: 0.5rem;      /* 8px  */
+    --space-md: 0.75rem;     /* 12px */
+    --space-lg: 1rem;        /* 16px */
+    --space-xl: 1.5rem;      /* 24px */
+    --space-2xl: 2rem;       /* 32px */
+    --space-3xl: 3rem;       /* 48px */
+
+    /* ─── Sidebar ─── */
+    --sidebar-width: 16.25rem;          /* 260px */
+    --sidebar-collapsed-width: 4rem;    /* 64px  */
+
+    /* ─── Transition ─── */
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    --transition-slow: 350ms ease;
+}

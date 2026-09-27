@@ -1,0 +1,34 @@
+{
+  "settings": {
+    "title": "Workspace Settings",
+    "subtitle": "Configure workspace information",
+    "name": "Workspace Name",
+    "namePlaceholder": "Enter workspace name...",
+    "description": "Description",
+    "descriptionPlaceholder": "Enter description...",
+    "updateSuccess": "Workspace updated successfully!",
+    "noWorkspace": "No workspace selected."
+  },
+  "create": {
+    "title": "Create new workspace",
+    "creating": "Creating…",
+    "submit": "Create workspace"
+  },
+  "invite": {
+    "title": "Invite Members"
+  },
+  "space": {
+    "create": "Create New Space",
+    "createChat": "Create chat for Spaces"
+  },
+  "folder": {
+    "create": "Create New Folder"
+  },
+  "list": {
+    "create": "Create New List"
+  },
+  "channel": {
+    "createNew": "Create new channel",
+    "create": "Create channel"
+  }
+}

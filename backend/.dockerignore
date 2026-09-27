@@ -1,0 +1,32 @@
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+
+# VCS and editor
+.git
+.gitignore
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker / docs / local metadata not needed in image
+docker-compose*.yml
+Dockerfile*
+README.md
+
+# Runtime / test artifacts
+coverage
+dist
+build
+*.pid
+*.seed
+*.log

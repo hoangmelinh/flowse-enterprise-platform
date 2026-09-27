@@ -1,0 +1,68 @@
+{
+  "title": "Cài đặt",
+  "tabs": {
+    "profile": "Hồ sơ",
+    "notifications": "Thông báo",
+    "appearance": "Giao diện",
+    "security": "Bảo mật",
+    "workspace": "Workspace"
+  },
+  "profile": {
+    "title": "Cài đặt Hồ sơ",
+    "subtitle": "Quản lý thông tin cá nhân",
+    "fullName": "Họ và tên",
+    "fullNamePlaceholder": "Nhập họ và tên...",
+    "email": "Email",
+    "emailReadonly": "Email không thể thay đổi vì được liên kết với tài khoản của bạn.",
+    "phone": "Số điện thoại",
+    "phonePlaceholder": "Nhập số điện thoại...",
+    "role": "Vai trò trong workspace",
+    "changeAvatar": "Đổi ảnh đại diện (tính năng sắp ra mắt)",
+    "updateSuccess": "Thông tin cá nhân đã được cập nhật thành công!",
+    "updateFailed": "Cập nhật thất bại. Vui lòng thử lại.",
+    "notFound": "Không tìm thấy thông tin người dùng."
+  },
+  "notifications": {
+    "title": "Tuỳ chọn thông báo",
+    "subtitle": "Chọn cách bạn muốn nhận thông báo",
+    "email": "Thông báo qua email",
+    "emailDesc": "Nhận email cho các cập nhật quan trọng",
+    "mention": "Cảnh báo khi được nhắc đến",
+    "mentionDesc": "Nhận thông báo khi ai đó @nhắc bạn",
+    "taskUpdate": "Cập nhật trạng thái task",
+    "taskUpdateDesc": "Cảnh báo khi task bạn theo dõi thay đổi trạng thái"
+  },
+  "appearance": {
+    "title": "Giao diện",
+    "subtitle": "Tuỳ chỉnh giao diện và ngôn ngữ",
+    "light": "Sáng",
+    "dark": "Tối",
+    "system": "Hệ thống",
+    "language": "Ngôn ngữ",
+    "languageDesc": "Chọn ngôn ngữ hiển thị cho ứng dụng"
+  },
+  "security": {
+    "title": "Bảo mật",
+    "subtitle": "Quản lý bảo mật tài khoản",
+    "currentPassword": "Mật khẩu hiện tại",
+    "currentPasswordPlaceholder": "Nhập mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "newPasswordPlaceholder": "Nhập mật khẩu mới (tối thiểu 6 ký tự)",
+    "confirmPassword": "Xác nhận mật khẩu",
+    "confirmPasswordPlaceholder": "Nhập lại mật khẩu mới",
+    "sendOtp": "Gửi mã xác thực qua email",
+    "sendingOtp": "Đang gửi mã xác thực...",
+    "otpSent": "Kiểm tra email của bạn",
+    "otpSentDesc": "Mã OTP 6 số đã được gửi tới {{email}}",
+    "enterOtp": "Nhập mã OTP",
+    "verifying": "Đang xác thực...",
+    "confirmChange": "Xác nhận & Đổi mật khẩu",
+    "resendOtp": "Gửi lại mã",
+    "fillAllFields": "Vui lòng nhập đầy đủ các trường",
+    "minLength": "Mật khẩu mới phải có ít nhất 6 ký tự",
+    "mismatch": "Mật khẩu mới và xác nhận không khớp",
+    "changeSuccess": "Cập nhật mật khẩu thành công!"
+  },
+  "restartTour": "Xem lại hướng dẫn sử dụng",
+  "restartTourDesc": "Xem lại tour hướng dẫn từng bước từ đầu. Hữu ích khi bạn muốn ôn lại các tính năng chính."
+}

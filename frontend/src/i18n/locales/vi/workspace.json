@@ -1,0 +1,34 @@
+{
+  "settings": {
+    "title": "Cài đặt Workspace",
+    "subtitle": "Cấu hình thông tin cho workspace",
+    "name": "Tên Workspace",
+    "namePlaceholder": "Nhập tên workspace...",
+    "description": "Mô tả",
+    "descriptionPlaceholder": "Nhập mô tả...",
+    "updateSuccess": "Workspace đã được cập nhật thành công!",
+    "noWorkspace": "Chưa có workspace nào được chọn."
+  },
+  "create": {
+    "title": "Tạo workspace mới",
+    "creating": "Đang tạo…",
+    "submit": "Tạo workspace"
+  },
+  "invite": {
+    "title": "Mời thành viên"
+  },
+  "space": {
+    "create": "Tạo Space mới",
+    "createChat": "Tạo chat cho Spaces"
+  },
+  "folder": {
+    "create": "Tạo Folder mới"
+  },
+  "list": {
+    "create": "Tạo List mới"
+  },
+  "channel": {
+    "createNew": "Tạo kênh mới",
+    "create": "Tạo kênh"
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "sidebar": {
+    "home": "Home",
+    "inbox": "Inbox",
+    "timeTracking": "Time Tracking",
+    "ai": "Flowise AI",
+    "spaces": "Spaces",
+    "invitePeople": "Invite People",
+    "settings": "Settings",
+    "logout": "Logout",
+    "menu": "Menu",
+    "brand": "Flowise PM"
+  },
+  "buttons": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
+    "saving": "Saving…",
+    "retry": "Retry",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "submit": "Submit"
+  },
+  "onboarding": {
+    "next": "Next",
+    "prev": "Back",
+    "done": "Done",
+    "step1": {
+      "title": "Navigation Bar",
+      "desc": "This is the main sidebar — where you can quickly access all features: Home, Inbox, Time Tracking, and AI."
+    },
+    "step2": {
+      "title": "Manage Spaces",
+      "desc": "Organize projects by Spaces. Each Space contains Folders, Lists, and Tasks — helping you manage work systematically."
+    },
+    "step3": {
+      "title": "Workspace Area",
+      "desc": "This is the main area to view and manage tasks, boards, and sprints. All content will be displayed here."
+    },
+    "step4": {
+      "title": "AI Assistant",
+      "desc": "Flowise AI helps you create tasks, generate reports, and provide smart suggestions using natural language."
+    },
+    "step5": {
+      "title": "Settings",
+      "desc": "Customize your profile, appearance, language, and security here. You can switch to Vietnamese anytime!"
+    },
+    "restartTour": "Restart Tour"
+  },
+  "workspace": {
+    "noWorkspace": "No workspace yet. Create one below.",
+    "createNew": "Create new workspace…"
+  },
+  "search": {
+    "clearSearch": "Clear search",
+    "placeholder": "Search..."
+  },
+  "members": {
+    "workspaceMembers": "Workspace Members"
+  },
+  "errors": {
+    "genericError": "An error occurred. Please try again."
+  },
+  "pageHeader": {
+    "askAI": "Ask AI",
+    "share": "Share",
+    "overview": "Overview",
+    "list": "List",
+    "board": "Board"
+  },
+  "ai": {
+    "newConversation": "New Conversation",
+    "recentChats": "Recent Chats",
+    "askOrCreate": "Ask or Create",
+    "newChat": "New conversation",
+    "thinking": "Flowise thinking...",
+    "inputPlaceholder": "Get instant answers, insights, and ideas.",
+    "inputPlaceholder2": "Tell AI what to do next",
+    "allSources": "All sources",
+    "createTask": "Create Task",
+    "createTaskDesc": "Add new action item",
+    "setReminder": "Set Reminder",
+    "setReminderDesc": "Remind about task",
+    "brainstorm": "Brainstorm Ideas",
+    "brainstormDesc": "Generate new concepts",
+    "findTasks": "Find Tasks",
+    "findTasksDesc": "Search for overdue tasks"
+  }
+}

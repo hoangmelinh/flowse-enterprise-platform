@@ -1,0 +1,25 @@
+{
+  "nav": {
+    "features": "Tính năng",
+    "howItWorks": "Cách hoạt động",
+    "login": "Đăng nhập",
+    "register": "Đăng ký"
+  },
+  "hero": {
+    "title": "Quản lý dự án tập trung",
+    "subtitle": "Nền tảng quản lý dự án và công việc nhóm hiệu quả",
+    "cta": "Đăng ký ngay"
+  },
+  "features": {
+    "smartNotifications": "Thông báo thông minh",
+    "memberManagement": "Quản lý thành viên"
+  },
+  "howItWorks": {
+    "createProject": "Tạo dự án",
+    "visualDashboard": "Dashboard trực quan cho phép theo dõi tiến độ"
+  },
+  "footer": {
+    "products": "Sản phẩm",
+    "features": "Tính năng"
+  }
+}

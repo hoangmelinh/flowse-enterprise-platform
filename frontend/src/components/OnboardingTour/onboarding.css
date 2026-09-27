@@ -1,0 +1,130 @@
+/* ═══════════════════════════════════════════════════════════════
+   Onboarding Tour — Custom Popover Styles
+   Driver.js v1.4 + Dark Mode (design token-aware)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Base Popover ─────────────────────────────────────────── */
+.flowise-tour-popover {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  border-radius: 16px !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 88, 190, 0.1) !important;
+  padding: 20px 24px !important;
+  background: #ffffff !important;
+  border: 1px solid #eef0f5 !important;
+  max-width: 360px !important;
+}
+
+/* ── Popover Title ────────────────────────────────────────── */
+.flowise-tour-popover .driver-popover-title {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #141b2b !important;
+  margin-bottom: 8px !important;
+  line-height: 1.4 !important;
+}
+
+/* ── Popover Description ──────────────────────────────────── */
+.flowise-tour-popover .driver-popover-description {
+  font-size: 13.5px !important;
+  line-height: 1.65 !important;
+  color: #5f6368 !important;
+}
+
+/* ── Progress text ────────────────────────────────────────── */
+.flowise-tour-popover .driver-popover-progress-text {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #9aa0a6 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* ── Navigation Buttons Container ────────────────────────── */
+.flowise-tour-popover .driver-popover-navigation-btns {
+  gap: 8px !important;
+  margin-top: 16px !important;
+}
+
+/* ── Next / Done Button ───────────────────────────────────── */
+.flowise-tour-popover .driver-popover-next-btn {
+  background: linear-gradient(135deg, #0058be, #1a73e8) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 8px 20px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-shadow: none !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+.flowise-tour-popover .driver-popover-next-btn:hover {
+  background: linear-gradient(135deg, #004aab, #1557b0) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 88, 190, 0.3) !important;
+}
+.flowise-tour-popover .driver-popover-next-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* ── Previous Button ──────────────────────────────────────── */
+.flowise-tour-popover .driver-popover-prev-btn {
+  background: transparent !important;
+  color: #5f6368 !important;
+  border: 1px solid #c2c6d6 !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-shadow: none !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+.flowise-tour-popover .driver-popover-prev-btn:hover {
+  background: #f0f4ff !important;
+  border-color: #0058be !important;
+  color: #0058be !important;
+}
+
+/* ── Close (X) Button ─────────────────────────────────────── */
+.flowise-tour-popover .driver-popover-close-btn {
+  color: #9aa0a6 !important;
+  top: 14px !important;
+  right: 14px !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+.flowise-tour-popover .driver-popover-close-btn:hover {
+  background: #f0f2f5 !important;
+  color: #141b2b !important;
+}
+
+/* ── Arrow ────────────────────────────────────────────────── */
+.flowise-tour-popover .driver-popover-arrow {
+  opacity: 0.9 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DRIVER OVERLAY & HIGHLIGHT RING
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Overlay backdrop */
+.driver-overlay {
+  opacity: 0.65 !important;
+}
+
+/* Highlighted element ring */
+.driver-active-element {
+  outline: 2px solid #0058be !important;
+  outline-offset: 3px !important;
+  border-radius: 8px !important;
+}

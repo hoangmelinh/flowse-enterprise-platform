@@ -1,0 +1,113 @@
+{
+  "create": {
+    "title": "Tạo Task Mới",
+    "createTask": "Tạo công việc",
+    "createMilestone": "Tạo Milestone",
+    "createMilestoneNew": "Tạo Milestone Mới",
+    "createFailed": "Tạo task thất bại",
+    "createSuccess": "Đã tạo task thành công!",
+    "save": "Lưu ↵"
+  },
+  "sprint": {
+    "create": "Tạo Sprint",
+    "cancelled": "Đã huỷ"
+  },
+  "myTasks": {
+    "title": "Công việc của tôi",
+    "active": "đang hoạt động",
+    "dueToday": "đến hạn hôm nay",
+    "assigned": "Được giao cho tôi",
+    "mentions": "Đề cập",
+    "hideCompleted": "Ẩn đã hoàn thành",
+    "showCompleted": "Hiện đã hoàn thành",
+    "nameCol": "Tên",
+    "assigneeCol": "Người nhận",
+    "dueDateCol": "Ngày hạn",
+    "priorityCol": "Ưu tiên",
+    "noProject": "Không có dự án",
+    "emptyAssignedTitle": "Không có task nào được giao cho bạn",
+    "emptyAssignedDesc": "Các task được giao (assign) cho bạn sẽ xuất hiện ở đây.",
+    "emptyCreatedTitle": "Bạn chưa tạo task nào",
+    "emptyCreatedDesc": "Những task do bạn tạo sẽ xuất hiện ở đây."
+  },
+  "detail": {
+    "description": "Mô tả",
+    "attachments": "Tệp đính kèm",
+    "dropFiles": "Kéo thả file hoặc nhấp để tải lên",
+    "comments": "Bình luận",
+    "activity": "Hoạt động",
+    "unsavedChanges": "Bạn có thay đổi chưa lưu",
+    "update": "Cập nhật",
+    "writeComment": "Viết bình luận...",
+    "noComments": "Chưa có bình luận nào.",
+    "noActivity": "Chưa có hoạt động nào.",
+    "taskName": "Tên công việc",
+    "assignee": "Người nhận",
+    "dueDate": "Ngày hạn",
+    "priority": "Ưu tiên",
+    "assignPlaceholder": "Giao việc",
+    "setDate": "Đặt ngày",
+    "clearDate": "Xoá ngày",
+    "minimize": "Thu nhỏ",
+    "maximize": "Phóng to"
+  },
+  "share": {
+    "title": "Chia sẻ Task",
+    "subtitle": "Chia sẻ task với thành viên",
+    "clearSearch": "Xoá tìm kiếm",
+    "allAssigned": "Tất cả thành viên đã được gán vào task này",
+    "noResult": "Không tìm thấy thành viên phù hợp",
+    "selectedCount": "Đã chọn {{count}} thành viên",
+    "selectPrompt": "Chọn thành viên để chia sẻ",
+    "success": "Đã chia sẻ!",
+    "sharing": "Đang chia sẻ...",
+    "submit": "Chia sẻ"
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "description": "Thông báo khi bạn được giao task mới hoặc có cập nhật.",
+    "unread": "chưa đọc",
+    "markAllRead": "Đánh dấu tất cả đã đọc",
+    "emptyTitle": "Chưa có thông báo nào",
+    "emptyDesc": "Thông báo khi bạn được giao task hoặc task sắp đến hạn sẽ hiện ở đây.",
+    "by": "Bởi"
+  },
+  "priority": {
+    "urgent": "Khẩn cấp",
+    "high": "Cao",
+    "normal": "Bình thường",
+    "low": "Thấp",
+    "clear": "Xoá",
+    "label": "Độ ưu tiên"
+  },
+  "addTask": "Thêm Task",
+  "dashboard": "Tổng quan",
+  "buttons": {
+    "delete": "Xóa"
+  },
+  "activity": {
+    "created": "đã tạo task",
+    "updated": "đã cập nhật task",
+    "deleted": "đã xóa task",
+    "statusChanged": "đã thay đổi trạng thái",
+    "priorityChanged": "đã thay đổi độ ưu tiên",
+    "assigned": "đã giao cho",
+    "unassigned": "đã bỏ giao",
+    "commented": "đã bình luận",
+    "attachmentAdded": "đã thêm tệp đính kèm",
+    "attachmentRemoved": "đã xóa tệp đính kèm",
+    "dueDateChanged": "đã thay đổi hạn chót",
+    "startDateChanged": "đã thay đổi ngày bắt đầu",
+    "moved": "đã di chuyển task",
+    "archived": "đã lưu trữ task",
+    "restored": "đã khôi phục task",
+    "timerStarted": "đã bắt đầu tính giờ",
+    "timerStopped": "đã dừng tính giờ",
+    "sprintAssigned": "đã gắn vào sprint",
+    "milestoneAssigned": "đã gắn milestone",
+    "tagAdded": "đã thêm nhãn",
+    "tagRemoved": "đã xóa nhãn",
+    "subtaskAdded": "đã thêm công việc con",
+    "storyPointsChanged": "đã thay đổi story points"
+  }
+}

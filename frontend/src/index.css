@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+/* ═══════════════════════════════════════════════
+   Tailwind CSS v4 — Custom Theme Extension
+   ═══════════════════════════════════════════════ */
+@theme {
+    /* ─── Typography Scale (maps CSS vars → Tailwind utilities) ─── */
+    --font-size-display: var(--text-display);
+    --font-size-h1: var(--text-h1);
+    --font-size-h2: var(--text-h2);
+    --font-size-h3: var(--text-h3);
+    --font-size-h4: var(--text-h4);
+    --font-size-body-lg: var(--text-body-lg);
+    --font-size-body: var(--text-body);
+    --font-size-body-sm: var(--text-body-sm);
+    --font-size-caption: var(--text-caption);
+    --font-size-overline: var(--text-overline);
+    --font-size-micro: var(--text-micro);
+}
+
+@layer base {
+  html, body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: var(--text-body);
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+}
+
+@layer components {
+  /* ─── Override Antd shadows globally ─── */
+  .ant-btn {
+    box-shadow: none !important;
+  }
+
+  .ant-message {
+    left: auto !important;
+    right: 24px !important;
+    top: 24px !important;
+    width: min(420px, calc(100vw - 48px)) !important;
+  }
+
+  .ant-message .ant-message-notice-wrapper {
+    text-align: right !important;
+  }
+
+  .ant-message .ant-message-notice-content {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  @media (max-width: 640px) {
+    .ant-message {
+      right: 16px !important;
+      top: 16px !important;
+      width: calc(100vw - 32px) !important;
+    }
+  }
+
+  /* ─── Poster Card ─── */
+  .poster-card {
+    background-color: var(--color-surface-container-lowest);
+    border: 2px solid var(--color-surface-container);
+    transition: border-color var(--transition-fast);
+  }
+  .poster-card:hover {
+    border-color: var(--color-primary);
+  }
+
+  /* ─── Markdown AI Response Styles ─── */
+  .markdown-content p {
+    margin-bottom: 0.75rem;
+  }
+  .markdown-content p:last-child {
+    margin-bottom: 0;
+  }
+  .markdown-content ul, .markdown-content ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+  .markdown-content ul {
+    list-style-type: disc;
+  }
+  .markdown-content ol {
+    list-style-type: decimal;
+  }
+  .markdown-content li {
+    margin-bottom: 0.25rem;
+  }
+  .markdown-content strong {
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+  .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+    font-weight: 800;
+    color: var(--color-on-surface);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .markdown-content h1 { font-size: var(--text-h2); }
+  .markdown-content h2 { font-size: var(--text-h3); }
+  .markdown-content h3 { font-size: var(--text-h4); }
+  .markdown-content code {
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.875em;
+    font-family: 'Fira Code', 'Courier New', monospace;
+  }
+  .markdown-content pre {
+    background: var(--color-surface-container-high);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+  }
+  .markdown-content pre code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface);
+  }
+  .markdown-content blockquote {
+    border-left: 3px solid var(--color-accent);
+    padding-left: 1rem;
+    margin-left: 0;
+    color: var(--color-text-secondary);
+  }
+  .markdown-content a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+  .markdown-content hr {
+    border: none;
+    border-top: 1px solid var(--color-border-light);
+    margin: 1rem 0;
+  }
+  .markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+  }
+  .markdown-content th,
+  .markdown-content td {
+    border: 1px solid var(--color-border-light);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+  .markdown-content th {
+    background: var(--color-surface-container-low);
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+  .markdown-content tr:hover td {
+    background: var(--color-surface-hover);
+  }
+}

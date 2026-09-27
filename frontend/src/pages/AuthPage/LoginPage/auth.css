@@ -1,0 +1,264 @@
+/* Animation styles kept intentionally for AuthPage transitions. */
+
+.auth-page {
+	height: 100vh;
+	height: 100dvh;
+}
+
+.auth-brand-panel,
+.auth-form-panel {
+	height: 100vh;
+	height: 100dvh;
+}
+
+.slide-panel-wrapper {
+	position: relative;
+	width: 100%;
+	min-height: min(420px, calc(100dvh - 220px));
+}
+
+.slide-panel-content {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+	will-change: transform, opacity;
+}
+
+.slide-form-wrapper {
+	position: relative;
+	width: 100%;
+	min-height: min(520px, calc(100dvh - 152px));
+}
+
+.slide-form-wrapper-register {
+	min-height: min(620px, calc(100dvh - 136px));
+}
+
+.slide-form-content {
+	position: absolute;
+	inset: 0;
+	overflow: visible;
+	transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+	will-change: transform, opacity;
+}
+
+.slide-active {
+	transform: translateX(0) translateY(0);
+	opacity: 1;
+	pointer-events: auto;
+	z-index: 2;
+}
+
+.slide-exit-up {
+	transform: translateY(-40px);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.slide-exit-down {
+	transform: translateY(40px);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.slide-exit-left {
+	transform: translateX(-60px);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.slide-exit-right {
+	transform: translateX(60px);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.auth-register-form {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.auth-register-header {
+	margin-bottom: clamp(0.5rem, 1.5vh, 0.75rem);
+}
+
+.auth-register-fields {
+	display: flex;
+	flex-direction: column;
+	gap: clamp(0.35rem, 1vh, 0.75rem);
+}
+
+.auth-register-fields > * {
+	margin-top: 0 !important;
+}
+
+.auth-register-fields .space-y-1,
+.auth-register-fields .space-y-2 {
+	display: flex;
+	flex-direction: column;
+	gap: clamp(0.1875rem, 0.55vh, 0.5rem);
+}
+
+.auth-register-fields .space-y-1 > *,
+.auth-register-fields .space-y-2 > * {
+	margin-top: 0 !important;
+}
+
+.auth-register-form .ant-input-affix-wrapper,
+.auth-register-form .ant-btn {
+	min-height: 0 !important;
+}
+
+.auth-register-form .ant-input-affix-wrapper {
+	height: clamp(2.375rem, 5.8vh, 3rem) !important;
+}
+
+.auth-register-fields .ant-btn {
+	height: clamp(2.5rem, 5.8vh, 2.75rem) !important;
+}
+
+.auth-register-fields label,
+.auth-register-form p,
+.auth-register-form .ant-checkbox-wrapper {
+	line-height: 1.25;
+}
+
+.auth-register-social {
+	margin-top: clamp(0.45rem, 1.2vh, 1rem);
+	padding-top: clamp(0.45rem, 1.2vh, 0.75rem);
+}
+
+.auth-register-social p {
+	margin-bottom: clamp(0.35rem, 0.8vh, 0.5rem);
+}
+
+.auth-register-social .ant-btn {
+	height: clamp(2.375rem, 5.4vh, 2.5rem) !important;
+}
+
+@media (max-height: 760px) {
+	.auth-form-panel {
+		padding-top: 1.5rem !important;
+		padding-bottom: 1.5rem !important;
+	}
+
+	.auth-register-header h2 {
+		font-size: 1.375rem;
+		line-height: 1.12;
+	}
+
+	.auth-register-header p,
+	.auth-register-fields p {
+		font-size: 0.6875rem;
+	}
+}
+
+@media (max-height: 680px) {
+	.auth-form-panel {
+		padding-top: 1rem !important;
+		padding-bottom: 1rem !important;
+	}
+
+	.auth-form-panel > .flex.justify-end {
+		margin-bottom: 0.5rem !important;
+	}
+
+	.auth-register-fields p {
+		display: none;
+	}
+
+	.auth-register-form .ant-input-affix-wrapper {
+		height: 2.375rem !important;
+	}
+
+	.auth-register-fields .ant-btn,
+	.auth-register-social .ant-btn {
+		height: 2.375rem !important;
+	}
+}
+
+@media (max-height: 560px) {
+	.auth-register-header p,
+	.auth-register-social {
+		display: none;
+	}
+}
+
+@media (max-width: 767px) {
+	.auth-brand-panel {
+		height: auto;
+		min-height: 5.5rem;
+		flex: 0 0 auto;
+		padding: 1.25rem 1.5rem !important;
+	}
+
+	.auth-brand-content,
+	.auth-brand-footer {
+		display: none !important;
+	}
+
+	.auth-brand-panel .mb-8 {
+		margin-bottom: 0 !important;
+	}
+
+	.auth-form-panel {
+		flex: 1 1 auto;
+		height: auto;
+		min-height: 0;
+		padding: 1rem 1.5rem 1.25rem !important;
+	}
+
+	.slide-form-wrapper {
+		min-height: min(500px, calc(100dvh - 150px));
+	}
+
+	.slide-form-wrapper-register {
+		min-height: min(570px, calc(100dvh - 138px));
+	}
+}
+
+@media (max-width: 767px) and (max-height: 680px) {
+	.auth-brand-panel {
+		min-height: 4.25rem;
+		padding-top: 0.875rem !important;
+		padding-bottom: 0.875rem !important;
+	}
+
+	.auth-brand-panel a {
+		font-size: 1.25rem;
+	}
+
+	.auth-brand-panel .w-3 {
+		width: 0.5rem;
+		height: 0.5rem;
+	}
+
+	.auth-form-panel {
+		padding-top: 0.75rem !important;
+		padding-bottom: 0.875rem !important;
+	}
+
+	.slide-form-wrapper-register {
+		min-height: calc(100dvh - 108px);
+	}
+}
+
+@media (max-width: 767px) and (max-height: 560px) {
+	.auth-brand-panel {
+		display: none !important;
+	}
+
+	.slide-form-wrapper-register {
+		min-height: calc(100dvh - 76px);
+	}
+}
