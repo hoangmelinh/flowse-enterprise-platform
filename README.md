@@ -211,7 +211,12 @@ flowse-enterprise-platform/
 │   ├── flowise_1.0_baseline.sql         # Bộ cấu trúc 25 bảng cốt lõi
 │   └── 005_flowse_2.0_enterprise_core.sql # Migration mở rộng Workflow, SLA, Field, Asset, Sync
 │
-├── plan/                                # Tài liệu kỹ thuật & Đặc tả yêu cầu
+├── docs/                                # HỆ THỐNG ĐẶC TẢ NGHIỆP VỤ (DOCS-AS-CODE)
+│   ├── 00_overview/                     # Tầm nhìn 6 trụ cột & Kịch bản demo 12 bước
+│   ├── 01_business_domain/              # Đặc tả chi tiết 10 phân hệ nghiệp vụ Flowse 2.0
+│   └── 02_technical_contracts/          # Danh mục API contract và Database ERD mapping
+│
+├── plan/                                # Tài liệu đề xuất gốc & SRS tham chiếu
 │   ├── dev/FLOWSE_2.0_SRS_v1.1.docx     # SRS v1.1 chuẩn ISO/IEC/IEEE 29148
 │   └── docs/FLOWSE_2.0_De_xuat_de_tai_hoan_chinh.docx # Thuyết minh đề án chi tiết
 │

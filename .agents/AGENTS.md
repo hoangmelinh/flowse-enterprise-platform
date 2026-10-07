@@ -53,29 +53,32 @@ Flowse 2.0 **kế thừa các chức năng trên** và mở rộng sang:
 
 Khi có mâu thuẫn, ưu tiên theo thứ tự:
 
-1. **SRS Flowse 2.0 v1.1**
-2. Business rules đã được người dùng/giảng viên xác nhận sau SRS
+1. **Hệ thống tài liệu đặc tả chuẩn hóa trong thư mục [`docs/`](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/)** (Đã giải quyết trọn vẹn các điểm TBD và liên thông Hiện trường ↔ Văn phòng)
+   - [01_vision_and_pillars.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/00_overview/01_vision_and_pillars.md)
+   - [02_canonical_demo_flow.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/00_overview/02_canonical_demo_flow.md)
+   - [01_universal_work_item.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/01_universal_work_item.md)
+   - [02_workflow_state_machine.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/02_workflow_state_machine.md)
+   - [03_incident_management.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/03_incident_management.md)
+   - [04_inspection_checklist.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/04_inspection_checklist.md)
+   - [05_field_office_procurement.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/05_field_office_procurement.md)
+   - [06_sla_and_escalation.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/06_sla_and_escalation.md)
+   - [07_offline_first_boundary.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/07_offline_first_boundary.md)
+   - [08_asset_and_qr_context.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/08_asset_and_qr_context.md)
+   - [09_rbac_and_resource_scope.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/09_rbac_and_resource_scope.md)
+   - [10_ai_copilot_safety.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/10_ai_copilot_safety.md)
+   - [api_contract_matrix.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/02_technical_contracts/api_contract_matrix.md)
+   - [database_erd_mapping.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/02_technical_contracts/database_erd_mapping.md)
+2. **SRS Flowse 2.0 v1.1 & Proposal 1.0** (Nằm trong thư mục `plan/`)
 3. File này (`AGENT.md`)
 4. Kiến trúc và hành vi hiện có của Flowse 1.0
 5. Suy luận của agent
 
-### Không được tự bịa nghiệp vụ
-
-Một số nghiệp vụ sản xuất vẫn cần khảo sát thực tế, ví dụ:
-
-- Ai được quyền close/reopen Incident
-- Severity cụ thể gồm những mức nào
-- SLA bắt đầu, pause, resume trong trường hợp nào
-- Approval có bao nhiêu cấp
-- Transition nào được phép thực hiện offline
-- Ai được triage và reassignment
-- Khi thiếu vật tư thì luồng chuyển qua phòng ban nào
-
-Nếu chưa có yêu cầu rõ ràng:
-
-- **Không hard-code giả định.**
-- Ghi `TODO(BUSINESS-RULE)` hoặc hỏi lại trước khi triển khai logic khó đảo ngược.
-- Không dùng kiến thức chung để thay thế quy trình nghiệp vụ chưa được xác nhận.
+### Quy tắc nghiệp vụ đã được chuẩn hóa (Đóng toàn bộ các điểm TBD):
+- **Close / Reopen Incident:** Quản lý (`Manager/Admin`) đóng; Reopen trong 24h nếu máy tái phát lỗi (Chi tiết tại [03_incident_management.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/03_incident_management.md)).
+- **Bộ Severity chuẩn:** `CRITICAL (P1)`, `HIGH (P2)`, `MEDIUM (P3)`, `LOW (P4)`.
+- **SLA Start / Pause / Resume:** Bắt đầu khi tạo; Tạm dừng khi chuyển sang `ON_HOLD_PENDING_PARTS` chờ linh kiện; Tự kích hoạt lại khi nhận được linh kiện (`DELIVERED`) (Chi tiết tại [05_field_office_procurement.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/05_field_office_procurement.md) & [06_sla_and_escalation.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/06_sla_and_escalation.md)).
+- **Quyền Offline:** Xem cache, tick checklist, ghi chú, draft incident. Bắt buộc Online khi Duyệt chi phí, phân quyền hoặc đóng sự cố (Chi tiết tại [07_offline_first_boundary.md](file:///c:/Users/Vinh%20Nguyen/MOBILE/flowse-enterprise-platform/docs/01_business_domain/07_offline_first_boundary.md)).
+- **Cầu nối Hiện trường ↔ Văn phòng:** Kỹ thuật viên báo thiếu linh kiện $\rightarrow$ Sinh Work Item `REQUEST` $\rightarrow$ Quản lý duyệt trên Approval Center $\rightarrow$ Kho xuất linh kiện $\rightarrow$ Sự cố tiếp tục sửa chữa.
 
 ---
 
