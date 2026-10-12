@@ -51,6 +51,21 @@
     right: 24px !important;
     top: 24px !important;
     width: min(420px, calc(100vw - 48px)) !important;
+    z-index: 99999 !important;
+  }
+
+  .ant-notification {
+    z-index: 99999 !important;
+  }
+
+  .ant-modal-root,
+  .ant-modal-mask,
+  .ant-modal-wrap {
+    z-index: 2500 !important;
+  }
+
+  .ant-select-dropdown {
+    z-index: 2600 !important;
   }
 
   .ant-message .ant-message-notice-wrapper {

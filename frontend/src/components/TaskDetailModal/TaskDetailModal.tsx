@@ -210,7 +210,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, updateTask }: T
 
     return (
         <div
-            className="fixed inset-0 z-1500 flex items-center justify-center bg-[rgba(20,27,43,0.6)] backdrop-blur-sm"
+            className="fixed inset-0 z-[1200] flex items-center justify-center bg-[rgba(20,27,43,0.6)] backdrop-blur-sm"
             onClick={onClose}
         >
             <div

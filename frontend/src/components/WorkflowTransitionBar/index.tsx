@@ -66,7 +66,9 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
 
   useEffect(() => {
     fetchTransitions();
-  }, [fetchTransitions, currentStateCode]);
+    setModalOpen(false);
+    setActiveTransition(null);
+  }, [fetchTransitions, currentStateCode, taskId]);
 
   useEffect(() => {
     getWorkspaceMembers(1)
@@ -211,9 +213,9 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         ))}
       </Space>
 
-      {/* Modal xác nhận chuyển trạng thái: zIndex 2100 để luôn hiển thị phía trước TaskDetailModal (z-1500) */}
+      {/* Modal xác nhận chuyển trạng thái: zIndex 2500 để luôn hiển thị phía trước TaskDetailModal (z-[1200]) */}
       <Modal
-        zIndex={2100}
+        zIndex={2500}
         title={
           <div className="flex items-center gap-2">
             {activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" ? (
@@ -276,7 +278,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
               placeholder="Chọn kỹ thuật viên tiếp nhận..."
               value={selectedAssigneeId}
               onChange={(val) => setSelectedAssigneeId(val)}
-              dropdownStyle={{ zIndex: 2200 }}
+              dropdownStyle={{ zIndex: 2600 }}
               options={members.map((m: any) => ({
                 label: `${m.name || m.username || m.email} (${m.role_name || "Kỹ thuật viên"})`,
                 value: m.user_id,

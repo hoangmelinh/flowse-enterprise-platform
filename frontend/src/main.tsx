@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, message, notification } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import enUS from 'antd/locale/en_US'
 import { Provider } from 'react-redux'
@@ -10,6 +10,18 @@ import GlobalStyles from './components/GlobalStyles'
 import App from './App.tsx'
 import './i18n'
 import './index.css'
+
+// Đảm bảo toàn bộ Toast Message và Notification luôn hiển thị ở tầng trên cùng (trên cả Modal)
+message.config({
+    top: 24,
+    zIndex: 99999,
+});
+
+notification.config({
+    top: 24,
+    zIndex: 99999,
+    placement: 'topRight',
+});
 
 const antdLocaleMap: Record<string, typeof viVN> = {
     vi: viVN,
