@@ -146,7 +146,11 @@ async function runDualGateTest() {
       throw new Error("Cổng B Thất Bại: SLA deadline chưa được cộng dồn thời gian chờ");
     }
 
-    console.log(">>> [CỔNG B ĐẠT 100%]: Liên thông phê duyệt vật tư & bù giờ SLA hoạt động hoàn hảo!");
+    // Dọn dẹp bản ghi kiểm thử để SLA Worker không bị quét lặp
+    await con.query("UPDATE sla_instances SET status = 'COMPLETED' WHERE task_id IN ($1, $2)", [regIncident.task_id, featIncident.task_id]);
+    await con.query("UPDATE notifications SET is_read = TRUE WHERE entity_id IN ($1, $2)", [regIncident.task_id, featIncident.task_id]);
+
+    console.log(">>> [DỌN DẸP]: Đã đánh dấu hoàn tất SLA cho các bản ghi test để tránh rác thông báo.");
 
     console.log("\n==========================================================");
     console.log("🎉 TẤT CẢ 2 CỔNG ĐỀU ĐẠT CHUẨN 100% ZERO-REGRESSION!");
