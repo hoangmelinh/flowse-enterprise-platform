@@ -136,3 +136,39 @@ export const deleteNotification = async (req, res) => {
     res.status(500).json({ error: "Failed to delete notification" });
   }
 };
+
+// --- POST /test-email (Kiểm thử cấu hình Brevo Email) ---
+export const testBrevoEmail = async (req, res) => {
+  try {
+    const user = req.user;
+    const recipientEmail = req.body?.email || user?.email;
+
+    if (!recipientEmail) {
+      return res.status(400).json({ error: "Vui lòng cung cấp email nhận thử nghiệm" });
+    }
+
+    const { default: EmailService } = await import("../services/emailService.js");
+    const result = await EmailService.sendEmail({
+      toEmail: recipientEmail,
+      toName: user?.name || user?.username || "Thành viên Flowse",
+      subject: "[Flowse 2.0] Thử nghiệm cấu hình Brevo Email thành công!",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <h2 style="color: #2563eb;">🎉 Xin chào ${user?.name || user?.username || "bạn"},</h2>
+          <p>Hệ thống Flowse Enterprise đã kết nối và gửi email thành công qua <strong>Brevo API</strong>!</p>
+          <p>Thời gian gửi: ${new Date().toLocaleString("vi-VN")}</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({
+      message: result.mocked
+        ? "Đã mô phỏng gửi mail thành công (Cần cấu hình BREVO_API_KEY trong backend/.env để gửi mail thực tế)"
+        : "Đã gửi email thử nghiệm thành công qua Brevo!",
+      result,
+    });
+  } catch (error) {
+    console.error("Failed to send test email:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};

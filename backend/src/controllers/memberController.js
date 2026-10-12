@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 import { createInvitations, checkExistingInvitation, deleteInvitation, respondToInvitation } from "../models/Member.js";
 import jwt from 'jsonwebtoken';
 import { findWorkspaceById } from "../models/Workspaces.js";

@@ -1,4 +1,5 @@
 import con from "../config/connect.js";
+import NotificationService from "../services/notificationService.js";
 
 class Approval {
   /**
@@ -47,7 +48,49 @@ class Approval {
     if (res.rows.length === 0) {
       throw new Error("Approval record not found or already processed");
     }
-    return res.rows[0];
+
+    const appRecord = res.rows[0];
+
+    // Nếu duyệt thành công (APPROVED) và đây là yêu cầu cấp linh kiện cho Sự cố -> Tự động đưa Sự cố về IN_PROGRESS
+    if (status === "APPROVED" && appRecord.decision_note) {
+      const match = appRecord.decision_note.match(/sự cố #(\d+)/i);
+      if (match && match[1]) {
+        const incId = parseInt(match[1], 10);
+        await con.query(
+          `UPDATE tasks 
+           SET current_state_id = (
+             SELECT state_id FROM workflow_states 
+             WHERE code = 'IN_PROGRESS' 
+               AND workflow_id = (SELECT workflow_id FROM workflow_definitions WHERE code = 'INCIDENT_FLOW')
+           ),
+           updated_at = CURRENT_TIMESTAMP
+           WHERE task_id = (SELECT task_id FROM incidents WHERE incident_id = $1)`,
+          [incId]
+        );
+
+        // Bắn thông báo cho kỹ thuật viên
+        const incRes = await con.query(
+          `SELECT inc.incident_id, t.task_id, t.name as task_name, inc.reported_by 
+           FROM incidents inc 
+           JOIN tasks t ON inc.task_id = t.task_id 
+           WHERE inc.incident_id = $1`,
+          [incId]
+        );
+        if (incRes.rows.length > 0) {
+          const incRow = incRes.rows[0];
+          NotificationService.dispatchPartsApprovedNotification({
+            incidentId: incId,
+            taskId: incRow.task_id,
+            taskName: incRow.task_name,
+            partName: "Vật tư đã duyệt",
+            technicianUserId: incRow.reported_by,
+            actorId: approverId,
+          }).catch((err) => console.error("[Approval] Lỗi gửi thông báo vật tư duyệt:", err.message));
+        }
+      }
+    }
+
+    return appRecord;
   }
 }
 

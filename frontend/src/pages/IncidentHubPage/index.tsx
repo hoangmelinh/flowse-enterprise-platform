@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message } from "antd";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck } from "lucide-react";
 import { getIncidents, reportIncident, type IncidentItem } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
+import { SLABadge } from "@/components/SLABadge";
+import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
+import { RequestPartsModal } from "./components/RequestPartsModal";
 
 const IncidentHubPage: React.FC = () => {
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [partsModalOpen, setPartsModalOpen] = useState(false);
+  const [selectedIncidentForParts, setSelectedIncidentForParts] = useState<IncidentItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
@@ -89,6 +94,18 @@ const IncidentHubPage: React.FC = () => {
       ),
     },
     {
+      title: "Cam kết SLA",
+      key: "sla",
+      render: (_: any, record: IncidentItem) => (
+        <SLABadge
+          status={record.sla_status || "IN_SLA"}
+          stateCode={record.state_code}
+          deadlineAt={record.sla_deadline_at}
+          startedAt={record.sla_started_at}
+        />
+      ),
+    },
+    {
       title: "Người báo / Thời gian",
       key: "reporter",
       render: (_: any, record: IncidentItem) => (
@@ -98,8 +115,47 @@ const IncidentHubPage: React.FC = () => {
             <Clock className="w-3 h-3" />
             {new Date(record.reported_at).toLocaleString("vi-VN")}
           </div>
+          {record.assignee_name && (
+            <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <UserCheck size={11} className="text-purple-600" />
+              <span>KTV: {record.assignee_name}</span>
+            </div>
+          )}
         </div>
       ),
+    },
+    {
+      title: "Quy trình FSM & Thao tác",
+      key: "actions",
+      width: 320,
+      render: (_: any, record: IncidentItem) => {
+        const canRequestParts = record.state_code === "IN_PROGRESS";
+        return (
+          <div className="space-y-2">
+            <WorkflowTransitionBar
+              taskId={record.task_id}
+              currentStateCode={record.state_code}
+              onTransitionSuccess={fetchData}
+              size="small"
+            />
+            {canRequestParts && (
+              <div>
+                <Button
+                  size="small"
+                  className="inline-flex items-center text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-300 text-xs font-medium"
+                  icon={<PackagePlus size={13} className="mr-1 text-amber-600" />}
+                  onClick={() => {
+                    setSelectedIncidentForParts(record);
+                    setPartsModalOpen(true);
+                  }}
+                >
+                  Xin cấp vật tư (Tạm dừng SLA)
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -224,6 +280,14 @@ const IncidentHubPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Modal Request Spare Parts */}
+      <RequestPartsModal
+        open={partsModalOpen}
+        incident={selectedIncidentForParts}
+        onClose={() => setPartsModalOpen(false)}
+        onSuccess={fetchData}
+      />
     </div>
   );
 };

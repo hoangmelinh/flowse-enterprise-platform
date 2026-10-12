@@ -2,6 +2,7 @@ import { X, ChevronRight, Minimize2, Maximize2, MoreHorizontal } from 'lucide-re
 import { Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { StatusPicker } from '@/components/Pickers';
+import { WorkflowTransitionBar } from '@/components/WorkflowTransitionBar';
 import type { Task } from '@/types/tasks';
 
 interface TaskDetailHeaderProps {
@@ -42,6 +43,12 @@ export default function TaskDetailHeader({
                         value={task.status_id ?? 0}
                         options={statusOptions}
                         onChange={(newId) => updateTask(task.task_id, { status_id: newId })}
+                    />
+
+                    <WorkflowTransitionBar
+                        taskId={task.task_id}
+                        size="small"
+                        onTransitionSuccess={() => updateTask(task.task_id, {})}
                     />
                 </div>
 

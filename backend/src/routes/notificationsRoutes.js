@@ -5,9 +5,13 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
+  testBrevoEmail,
 } from "../controllers/notificationsController.js";
 
 const router = express.Router();
+
+// POST /api/v1/notifications/test-email — Kiểm thử cấu hình gửi email qua Brevo
+router.post("/test-email", testBrevoEmail);
 
 // GET /api/v1/notifications — toàn bộ thông báo (dùng cho bell icon)
 router.get("/", getNotifications);

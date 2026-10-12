@@ -30,3 +30,7 @@ export const markAllNotificationsAsRead = async (): Promise<void> => {
 export const deleteNotification = async (notificationId: number): Promise<void> => {
     return beApi.delete(`/notifications/${notificationId}`);
 };
+
+export const testBrevoEmailApi = async (email?: string): Promise<any> => {
+    return beApi.post(`/notifications/test-email`, { email });
+};

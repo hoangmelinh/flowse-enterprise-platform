@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Input, Modal, message } from "antd";
-import { Cpu, QrCode, Search, Wrench, MapPin } from "lucide-react";
+import { Table, Tag, Button, Input, Modal, message, Space } from "antd";
+import { Cpu, QrCode, Search, Wrench, MapPin, ClipboardCheck } from "lucide-react";
 import { getAssets, resolveQrContext, type Asset } from "@/api/assets";
+import { InspectionRunnerModal } from "./components/InspectionRunnerModal";
 
 const AssetManagementPage: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -11,6 +12,8 @@ const AssetManagementPage: React.FC = () => {
   const [qrContext, setQrContext] = useState<any>(null);
   const [resolving, setResolving] = useState(false);
   const [manualToken, setManualToken] = useState("");
+  const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+  const [selectedAssetForInspection, setSelectedAssetForInspection] = useState<Asset | null>(null);
 
   const fetchAssets = async () => {
     try {
@@ -94,16 +97,30 @@ const AssetManagementPage: React.FC = () => {
       ),
     },
     {
-      title: "QR Context",
-      key: "qr",
+      title: "Thao tác",
+      key: "actions",
       render: (_: any, record: Asset) => (
-        <Button
-          size="small"
-          icon={<QrCode className="w-3.5 h-3.5 inline mr-1" />}
-          onClick={() => handleInspectQr(record)}
-        >
-          Xem Ngữ cảnh QR
-        </Button>
+        <Space size="small">
+          <Button
+            size="small"
+            icon={<QrCode className="w-3.5 h-3.5 inline mr-1" />}
+            onClick={() => handleInspectQr(record)}
+          >
+            Ngữ cảnh QR
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            className="bg-indigo-600 hover:bg-indigo-500"
+            icon={<ClipboardCheck className="w-3.5 h-3.5 inline mr-1" />}
+            onClick={() => {
+              setSelectedAssetForInspection(record);
+              setInspectionModalOpen(true);
+            }}
+          >
+            Kiểm tra định kỳ
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -246,6 +263,14 @@ const AssetManagementPage: React.FC = () => {
           ) : null}
         </div>
       </Modal>
+
+      {/* Inspection Checklist Runner Modal */}
+      <InspectionRunnerModal
+        open={inspectionModalOpen}
+        asset={selectedAssetForInspection}
+        onClose={() => setInspectionModalOpen(false)}
+        onSuccess={fetchAssets}
+      />
     </div>
   );
 };

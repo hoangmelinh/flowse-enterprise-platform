@@ -16,6 +16,11 @@ export interface IncidentItem {
   asset_location: string;
   reporter_name: string;
   reported_at: string;
+  assignee_id?: number;
+  assignee_name?: string;
+  sla_status?: "IN_SLA" | "AT_RISK" | "BREACHED" | "COMPLETED";
+  sla_deadline_at?: string;
+  sla_started_at?: string;
 }
 
 export const getIncidents = async (): Promise<{ success: boolean; data: IncidentItem[] }> => {
@@ -30,4 +35,17 @@ export const reportIncident = async (payload: {
   evidence_urls?: string[];
 }) => {
   return beApi.post("/incidents", payload);
+};
+
+export const requestSpareParts = async (
+  incidentId: number | string,
+  payload: { partName: string; quantity?: number; reason?: string }
+): Promise<{ success: boolean; message: string; data: any }> => {
+  return beApi.post(`/incidents/${incidentId}/request-parts`, payload);
+};
+
+export const deleteIncident = async (
+  incidentId: number | string
+): Promise<{ success: boolean; message: string }> => {
+  return beApi.delete(`/incidents/${incidentId}`);
 };

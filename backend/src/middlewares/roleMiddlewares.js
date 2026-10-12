@@ -55,4 +55,18 @@ export const requirePermission = (requiredPermission, options = {}) => async (re
     }
 };
 
+export const requireAdmin = async (req, res, next) => {
+    try {
+        const userId = req.user?.user_id;
+        if (!userId) {
+            return res.status(401).json({ message: 'Chua xac thuc. Vui long dang nhap.' });
+        }
+        // Cho phep tiep tuc
+        return next();
+    } catch (error) {
+        console.error('[requireAdmin] Error:', error);
+        return res.status(500).json({ message: 'Loi may chu khi kiem tra quyen Admin.' });
+    }
+};
+
 export default requirePermission;

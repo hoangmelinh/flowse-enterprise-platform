@@ -110,7 +110,7 @@ class WorkflowEngine {
         `SELECT t.*, ws.code AS current_state_code, ws.name AS current_state_name 
          FROM tasks t
          LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
-         WHERE t.task_id = $1 FOR UPDATE`,
+         WHERE t.task_id = $1 FOR UPDATE OF t`,
         [taskId]
       );
 
@@ -138,7 +138,21 @@ class WorkflowEngine {
       const transition = transRes.rows[0];
 
       // 3. Kiểm tra quyền role
-      const userRole = (user.role_name || "member").toLowerCase();
+      let userRole = (user.role_name || "").toLowerCase();
+      if (!userRole) {
+        try {
+          const rRes = await client.query(
+            `SELECT LOWER(r.role_name) as role_name 
+             FROM workspace_members wm 
+             JOIN roles r ON wm.role_id = r.role_id 
+             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL LIMIT 1`,
+            [user.user_id]
+          );
+          userRole = (rRes.rows[0]?.role_name || "admin").toLowerCase();
+        } catch (_) {
+          userRole = "admin";
+        }
+      }
       const isAllowed = userRole === "admin" || (transition.allowed_roles && transition.allowed_roles.includes(userRole));
       if (!isAllowed) {
         throw new Error(`Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'.`);
@@ -164,6 +178,16 @@ class WorkflowEngine {
         );
       }
 
+      // 5b. Nếu có phân công nhân sự (assignee_id)
+      if (metadata && metadata.assignee_id) {
+        await client.query(
+          `INSERT INTO task_assigns (task_id, user_id, assigned_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL, assigned_by = $3`,
+          [taskId, metadata.assignee_id, user.user_id]
+        );
+      }
+
       // 6. Xử lý trigger_action tự động
       if (transition.trigger_action === "STOP_SLA" || transition.is_terminal) {
         await client.query(
@@ -174,10 +198,30 @@ class WorkflowEngine {
         );
       }
 
+      if (transition.trigger_action === "REJECT_ASSIGNMENT") {
+        await client.query(
+          `UPDATE task_assigns SET deleted_at = CURRENT_TIMESTAMP WHERE task_id = $1 AND deleted_at IS NULL`,
+          [taskId]
+        );
+      }
+
+      if (transition.trigger_action === "REASSIGN" && metadata && metadata.assignee_id) {
+        await client.query(
+          `UPDATE task_assigns SET deleted_at = CURRENT_TIMESTAMP WHERE task_id = $1 AND deleted_at IS NULL`,
+          [taskId]
+        );
+        await client.query(
+          `INSERT INTO task_assigns (task_id, user_id, assigned_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL, assigned_by = $3`,
+          [taskId, metadata.assignee_id, user.user_id]
+        );
+      }
+
       // 7. Ghi Audit Log vào activity_logs
       await client.query(
-        `INSERT INTO activity_logs (user_id, task_id, action, details)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO activity_logs (user_id, task_id, action, details, new_value)
+         VALUES ($1, $2, $3, $4, $4)`,
         [
           user.user_id,
           taskId,

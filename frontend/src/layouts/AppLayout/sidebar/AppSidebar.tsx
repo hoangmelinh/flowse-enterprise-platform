@@ -8,6 +8,7 @@ import {
     PanelLeftOpen, X, ShieldCheck, AlertTriangle, Cpu
 } from 'lucide-react';
 import WorkspaceSwitcher from '../workspace/WorkspaceSwitcher';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import { fetchSignOut } from '@/store/modules/auth';
 import type { AppDispatch, RootState } from '@/store/configureStore';
 import { useSpaceTree } from '../SpaceTreeContext';
@@ -102,8 +103,9 @@ export default function AppSidebar() {
                 <X size={16} />
             </button>
 
-            <div className="item-center gap-2.5 rounded-lg px-2 pb-3 pt-1 text-body font-bold text-[var(--color-on-surface)]">
-                {t('sidebar.brand')}
+            <div className="flex items-center justify-between gap-2.5 rounded-lg px-2 pb-3 pt-1 text-body font-bold text-[var(--color-on-surface)]">
+                <span>{t('sidebar.brand')}</span>
+                <NotificationCenter />
             </div>
             <div
                 className="mb-2 flex cursor-pointer items-center gap-2.5 rounded-lg px-2 pb-3 pt-1 border-b border-[var(--color-border-light)]"

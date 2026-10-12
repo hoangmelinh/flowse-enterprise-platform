@@ -32,26 +32,38 @@ const refreshCookieClearOptions = {
 
 export const signUp = async (req, res) => {
   try {
-    const { username, password, email, name } = req.body;
+    let { username, password, email, name } = req.body;
 
-    if (!username || !password || !email || !name) {
+    if (!password || !email || (!username && !name)) {
       return res.status(400).json({
         message: "Khong the thieu username, password, email hoac name",
       });
     }
 
-    const duplicateUsername = await findUserByUsername(username);
+    if (!name) name = username;
+    if (!username) username = email.split("@")[0];
+
+    // Cắt bớt nếu username quá 50 ký tự (users.username là VARCHAR(50))
+    let finalUsername = username.trim().substring(0, 50);
+
+    let duplicateUsername = await findUserByUsername(finalUsername);
     if (duplicateUsername) {
-      return res.status(409).json({ message: "Username da ton tai" });
+      const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+      finalUsername = `${finalUsername.substring(0, 44)}_${suffix}`;
     }
 
-    const duplicateEmail = await findUserByEmail(email);
+    const duplicateEmail = await findUserByEmail(email.trim().toLowerCase());
     if (duplicateEmail) {
-      return res.status(409).json({ message: "Email da ton tai" });
+      return res.status(409).json({ message: "Email đã tồn tại trong hệ thống" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await createUser(username, hashedPassword, email, name);
+    const newUser = await createUser(
+      finalUsername,
+      hashedPassword,
+      email.trim().toLowerCase(),
+      name.trim()
+    );
     return res.status(201).json({
       message: "Dang ky thanh cong",
       user: {

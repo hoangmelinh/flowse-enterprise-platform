@@ -14,7 +14,7 @@ import { createTaskForList } from "../models/Task.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
 const tools = [
     {
