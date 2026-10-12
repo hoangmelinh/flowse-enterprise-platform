@@ -359,6 +359,64 @@ class Incident {
       client.release();
     }
   }
+
+  /**
+   * Thống kê KPI Downtime và MTTR toàn phân xưởng (Giai đoạn 2)
+   */
+  static async getDowntimeAndMTTRStats() {
+    const statsQuery = `
+      SELECT 
+        COUNT(*)::int AS total_incidents,
+        COUNT(CASE WHEN inc.resolved_at IS NOT NULL THEN 1 END)::int AS resolved_incidents,
+        COUNT(CASE WHEN inc.resolved_at IS NULL THEN 1 END)::int AS open_incidents,
+        COALESCE(SUM(CASE WHEN inc.resolved_at IS NOT NULL THEN inc.downtime_minutes ELSE 0 END), 0)::int AS total_downtime_minutes,
+        COALESCE(ROUND(AVG(CASE WHEN inc.resolved_at IS NOT NULL THEN inc.downtime_minutes END)), 0)::int AS mttr_minutes,
+        COUNT(CASE WHEN si.status = 'COMPLETED' AND (si.breached_at IS NULL) THEN 1 END)::int AS sla_met_count,
+        COUNT(CASE WHEN si.status = 'BREACHED' OR (si.breached_at IS NOT NULL) THEN 1 END)::int AS sla_breached_count
+      FROM incidents inc
+      JOIN tasks t ON inc.task_id = t.task_id
+      LEFT JOIN sla_instances si ON inc.task_id = si.task_id
+    `;
+
+    const topAssetsQuery = `
+      SELECT 
+        a.asset_id,
+        a.name AS asset_name,
+        a.asset_code,
+        a.location,
+        COUNT(inc.incident_id)::int AS incident_count,
+        COALESCE(SUM(inc.downtime_minutes), 0)::int AS total_downtime_minutes
+      FROM assets a
+      JOIN incidents inc ON a.asset_id = inc.asset_id
+      WHERE inc.resolved_at IS NOT NULL
+      GROUP BY a.asset_id, a.name, a.asset_code, a.location
+      ORDER BY total_downtime_minutes DESC
+      LIMIT 5
+    `;
+
+    const [statsRes, topAssetsRes] = await Promise.all([
+      con.query(statsQuery),
+      con.query(topAssetsQuery),
+    ]);
+
+    const stats = statsRes.rows[0];
+    const totalDowntimeMinutes = parseInt(stats.total_downtime_minutes, 10) || 0;
+    const hours = Math.floor(totalDowntimeMinutes / 60);
+    const mins = totalDowntimeMinutes % 60;
+    const formattedTotalDowntime = hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`;
+
+    return {
+      totalIncidents: stats.total_incidents,
+      resolvedIncidents: stats.resolved_incidents,
+      openIncidents: stats.open_incidents,
+      totalDowntimeMinutes,
+      formattedTotalDowntime,
+      mttrMinutes: parseInt(stats.mttr_minutes, 10) || 0,
+      slaMetCount: stats.sla_met_count,
+      slaBreachedCount: stats.sla_breached_count,
+      topDowntimeAssets: topAssetsRes.rows,
+    };
+  }
 }
 
 export default Incident;

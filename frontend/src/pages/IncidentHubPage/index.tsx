@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message } from "antd";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck } from "lucide-react";
-import { getIncidents, reportIncident, type IncidentItem } from "@/api/incidents";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, ShieldAlert } from "lucide-react";
+import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
@@ -10,6 +10,7 @@ import { RequestPartsModal } from "./components/RequestPartsModal";
 const IncidentHubPage: React.FC = () => {
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [downtimeStats, setDowntimeStats] = useState<DowntimeStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [partsModalOpen, setPartsModalOpen] = useState(false);
@@ -20,9 +21,14 @@ const IncidentHubPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [incRes, assetRes] = await Promise.all([getIncidents(), getAssets()]);
+      const [incRes, assetRes, statsRes] = await Promise.all([
+        getIncidents(),
+        getAssets(),
+        getDowntimeStats().catch(() => null),
+      ]);
       if (incRes?.data) setIncidents(incRes.data);
       if (assetRes?.data) setAssets(assetRes.data);
+      if (statsRes?.data) setDowntimeStats(statsRes.data);
     } catch (err: any) {
       message.error(err?.message || "Lỗi khi tải dữ liệu sự cố");
     } finally {
@@ -125,6 +131,35 @@ const IncidentHubPage: React.FC = () => {
       ),
     },
     {
+      title: "Thời gian dừng máy (Downtime)",
+      key: "downtime",
+      render: (_: any, record: IncidentItem) => {
+        if (record.resolved_at && record.downtime_minutes != null) {
+          const hours = Math.floor(record.downtime_minutes / 60);
+          const mins = record.downtime_minutes % 60;
+          const label = hours > 0 ? `${hours}h ${mins}p` : `${mins} phút`;
+          return (
+            <div>
+              <Tag color="volcano" className="font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <Timer size={12} /> {label}
+              </Tag>
+              <div className="text-[10px] text-gray-400 mt-1">
+                Phục hồi: {new Date(record.resolved_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+          );
+        }
+        if (record.state_code === "RESOLVED" || record.state_code === "CLOSED") {
+          return <Tag color="green">Đã phục hồi</Tag>;
+        }
+        return (
+          <Tag color="processing" className="text-gray-500 inline-flex items-center gap-1">
+            <Clock size={11} /> Đang tính giờ...
+          </Tag>
+        );
+      },
+    },
+    {
       title: "Quy trình FSM & Thao tác",
       key: "actions",
       width: 320,
@@ -191,41 +226,73 @@ const IncidentHubPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-red-100 dark:bg-red-950/50 text-red-600">
-            <AlertTriangle className="w-5 h-5" />
+      {/* KPI Stats Cards (Downtime, MTTR & Hiệu suất FSM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Thẻ 1: Tổng thời gian dừng máy */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+            <Timer className="w-5 h-5" />
           </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {incidents.filter((i) => i.severity === "CRITICAL" || i.severity === "HIGH").length}
+          <div className="min-w-0">
+            <div className="text-xl font-extrabold text-gray-900 dark:text-gray-100 truncate">
+              {downtimeStats?.formattedTotalDowntime || "0 phút"}
             </div>
-            <div className="text-xs text-gray-500">Sự cố nghiêm trọng</div>
+            <div className="text-xs text-gray-500 font-medium">Tổng Downtime phân xưởng</div>
+            {downtimeStats?.topDowntimeAssets?.[0] && (
+              <div className="text-[10px] text-rose-500 truncate mt-0.5">
+                Top: {downtimeStats.topDowntimeAssets[0].asset_code} ({downtimeStats.topDowntimeAssets[0].total_downtime_minutes}p)
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-950/50 text-blue-600">
+        {/* Thẻ 2: Chỉ số MTTR */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+            <Gauge className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
+              {downtimeStats?.mttrMinutes || 0} <span className="text-xs font-normal text-gray-500">phút/sự cố</span>
+            </div>
+            <div className="text-xs text-gray-500 font-medium">MTTR (Khắc phục TB)</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">
+              Dựa trên {downtimeStats?.resolvedIncidents || 0} sự cố đã đóng
+            </div>
+          </div>
+        </div>
+
+        {/* Thẻ 3: Sự cố đang mở & khẩn cấp */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
             <Wrench className="w-5 h-5" />
           </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {incidents.filter((i) => i.state_code === "IN_PROGRESS").length}
+          <div className="min-w-0">
+            <div className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
+              {downtimeStats?.openIncidents ?? incidents.filter((i) => i.state_code !== "RESOLVED" && i.state_code !== "CLOSED").length}
             </div>
-            <div className="text-xs text-gray-500">Đang xử lý khắc phục</div>
+            <div className="text-xs text-gray-500 font-medium">Đang xử lý / Khắc phục</div>
+            <div className="text-[10px] text-red-500 font-medium mt-0.5">
+              {incidents.filter((i) => (i.severity === "CRITICAL" || i.severity === "HIGH") && i.state_code !== "RESOLVED").length} sự cố nguy cấp
+            </div>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600">
+        {/* Thẻ 4: Tỉ lệ đạt SLA */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {incidents.filter((i) => i.state_code === "RESOLVED").length}
+          <div className="min-w-0">
+            <div className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
+              {downtimeStats && (downtimeStats.slaMetCount + downtimeStats.slaBreachedCount > 0)
+                ? `${Math.round((downtimeStats.slaMetCount / (downtimeStats.slaMetCount + downtimeStats.slaBreachedCount)) * 100)}%`
+                : "100%"}
             </div>
-            <div className="text-xs text-gray-500">Đã giải quyết xong</div>
+            <div className="text-xs text-gray-500 font-medium">Tỉ lệ đạt hạn SLA</div>
+            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+              {downtimeStats?.slaMetCount || 0} đúng hạn / {downtimeStats?.slaBreachedCount || 0} trễ
+            </div>
           </div>
         </div>
       </div>

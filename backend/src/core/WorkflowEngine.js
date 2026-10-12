@@ -224,6 +224,17 @@ class WorkflowEngine {
         );
       }
 
+      // 6b. Tự động tính toán Thời gian dừng máy (Downtime) khi khắc phục xong sự cố (Giai đoạn 2)
+      if (incId && (transition.to_state_code === "RESOLVED" || transition.to_state_code === "CLOSED" || transition.is_terminal)) {
+        await client.query(
+          `UPDATE incidents
+           SET resolved_at = CURRENT_TIMESTAMP,
+               downtime_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 60))
+           WHERE incident_id = $1 AND resolved_at IS NULL`,
+          [incId]
+        );
+      }
+
       if (transition.trigger_action === "REJECT_ASSIGNMENT") {
         await client.query(
           `UPDATE task_assigns SET deleted_at = CURRENT_TIMESTAMP WHERE task_id = $1 AND deleted_at IS NULL`,

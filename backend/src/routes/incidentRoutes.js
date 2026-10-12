@@ -5,10 +5,12 @@ import {
   reportIncident,
   requestParts,
   deleteIncident,
+  getDowntimeStats,
 } from "../controllers/incidentController.js";
 
 const router = Router();
 
+router.get("/stats/downtime-mttr", getDowntimeStats);
 router.get("/", getIncidents);
 router.get("/:id", getIncidentById);
 router.post("/", reportIncident);

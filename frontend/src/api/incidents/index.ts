@@ -21,7 +21,32 @@ export interface IncidentItem {
   sla_status?: "IN_SLA" | "AT_RISK" | "BREACHED" | "COMPLETED";
   sla_deadline_at?: string;
   sla_started_at?: string;
+  resolved_at?: string;
+  downtime_minutes?: number;
 }
+
+export interface DowntimeStats {
+  totalIncidents: number;
+  resolvedIncidents: number;
+  openIncidents: number;
+  totalDowntimeMinutes: number;
+  formattedTotalDowntime: string;
+  mttrMinutes: number;
+  slaMetCount: number;
+  slaBreachedCount: number;
+  topDowntimeAssets: Array<{
+    asset_id: number;
+    asset_name: string;
+    asset_code: string;
+    location: string;
+    incident_count: number;
+    total_downtime_minutes: number;
+  }>;
+}
+
+export const getDowntimeStats = async (): Promise<{ success: boolean; data: DowntimeStats }> => {
+  return beApi.get("/incidents/stats/downtime-mttr");
+};
 
 export const getIncidents = async (): Promise<{ success: boolean; data: IncidentItem[] }> => {
   return beApi.get("/incidents");

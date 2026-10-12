@@ -89,3 +89,13 @@ export const deleteIncident = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getDowntimeStats = async (req, res, next) => {
+  try {
+    const stats = await Incident.getDowntimeAndMTTRStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    next(error);
+  }
+};
+
