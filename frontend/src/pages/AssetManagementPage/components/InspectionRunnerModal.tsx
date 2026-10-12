@@ -134,6 +134,7 @@ export const InspectionRunnerModal: React.FC<InspectionRunnerModalProps> = ({
 
   return (
     <Modal
+      zIndex={2100}
       title={
         <div className="flex items-center gap-2">
           <ClipboardCheck size={20} className="text-blue-600" />

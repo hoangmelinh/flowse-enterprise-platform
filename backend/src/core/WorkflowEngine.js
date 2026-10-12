@@ -1,4 +1,5 @@
 import con from "../config/connect.js";
+import NotificationService from "../services/notificationService.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -169,12 +170,28 @@ class WorkflowEngine {
         [toStateId, taskId]
       );
 
-      // 5. Nếu bước này yêu cầu Approval -> Tạo record approval
-      if (transition.requires_approval) {
+      // Lấy thông tin incident nếu có
+      let incId = null;
+      try {
+        const incRes = await client.query(
+          `SELECT incident_id, asset_id FROM incidents WHERE task_id = $1`,
+          [taskId]
+        );
+        if (incRes.rows.length > 0) {
+          incId = incRes.rows[0].incident_id;
+        }
+      } catch (_) {}
+
+      // 5. Nếu bước này yêu cầu Approval HOẶC chuyển sang ON_HOLD_PENDING_PARTS -> Tạo record approval
+      if (transition.requires_approval || transition.to_state_code === "ON_HOLD_PENDING_PARTS") {
+        const requestNote = (metadata && metadata.partName)
+          ? `Đề xuất linh kiện cho sự cố #${incId || taskId}: ${metadata.partName} x ${metadata.quantity || 1}. ${metadata.reason || note || ''}`
+          : (note || "Chờ cấp quản lý phê duyệt");
+
         await client.query(
-          `INSERT INTO approvals (task_id, approver_id, status, decision_note)
-           VALUES ($1, $2, 'PENDING', $3)`,
-          [taskId, null, note || "Chờ cấp quản lý phê duyệt"]
+          `INSERT INTO approvals (task_id, approver_id, status, request_note, decision_note, incident_id)
+           VALUES ($1, $2, 'PENDING', $3, $3, $4)`,
+          [taskId, null, requestNote, incId]
         );
       }
 
@@ -188,7 +205,16 @@ class WorkflowEngine {
         );
       }
 
-      // 6. Xử lý trigger_action tự động
+      // 6. Xử lý trigger_action tự động & Đóng băng SLA nếu chờ vật tư
+      if (transition.to_state_code === "ON_HOLD_PENDING_PARTS") {
+        await client.query(
+          `UPDATE sla_instances 
+           SET status = 'PAUSED', paused_at = CURRENT_TIMESTAMP 
+           WHERE task_id = $1 AND status IN ('IN_SLA', 'AT_RISK')`,
+          [taskId]
+        );
+      }
+
       if (transition.trigger_action === "STOP_SLA" || transition.is_terminal) {
         await client.query(
           `UPDATE sla_instances 
@@ -239,6 +265,20 @@ class WorkflowEngine {
       );
 
       await client.query("COMMIT");
+
+      // Bắn thông báo ngoài transaction nếu xin vật tư
+      if (transition.to_state_code === "ON_HOLD_PENDING_PARTS" && metadata && metadata.partName) {
+        NotificationService.dispatchProcurementRequestAlert({
+          incidentId: incId,
+          taskId: taskId,
+          taskName: task.name,
+          partName: metadata.partName,
+          quantity: metadata.quantity || 1,
+          reason: metadata.reason || note,
+          requesterName: user.name || "Kỹ thuật viên",
+          actorId: user.user_id,
+        }).catch((err) => console.error("[WorkflowEngine] Lỗi thông báo vật tư:", err.message));
+      }
 
       return {
         success: true,
