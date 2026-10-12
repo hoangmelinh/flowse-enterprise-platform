@@ -8,9 +8,9 @@ import EmailService from "./emailService.js";
 class NotificationService {
   /**
    * Kiểm tra và ghi nhận Throttling (Anti-Spam).
-   * Mặc định: 15 phút chỉ cho phép gửi 1 lần đối với cùng một throttleKey.
+   * Mặc định: 60 phút chỉ cho phép gửi 1 lần đối với cùng một throttleKey.
    */
-  static async checkAndRecordThrottle(throttleKey, intervalMinutes = 15) {
+  static async checkAndRecordThrottle(throttleKey, intervalMinutes = 60) {
     try {
       const selectRes = await con.query(
         `SELECT last_sent_at, sent_count FROM notification_throttles WHERE throttle_key = $1`,
@@ -134,8 +134,8 @@ class NotificationService {
     const isCriticalOrHigh = severity === "CRITICAL" || severity === "HIGH" || priority === "URGENT";
     const throttleKey = `ALERT_${type}_INCIDENT_${incidentId}`;
 
-    // Kiểm tra chống spam với chu kỳ 15 phút
-    const throttleCheck = await this.checkAndRecordThrottle(throttleKey, 15);
+    // Kiểm tra chống spam với chu kỳ 60 phút
+    const throttleCheck = await this.checkAndRecordThrottle(throttleKey, 60);
     if (!throttleCheck.allowed) {
       console.log(
         `[NotificationService] Bỏ qua gửi cảnh báo cho ${throttleKey} (Chặn spam: còn ${throttleCheck.remainingMinutes} phút giãn cách)`

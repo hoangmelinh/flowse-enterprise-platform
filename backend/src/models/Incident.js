@@ -139,14 +139,25 @@ class Incident {
       const workflowId = wfRes.rows[0]?.workflow_id || null;
       const initialStateId = wfRes.rows[0]?.state_id || null;
 
+      // Tìm status_id mặc định của space/list (TO DO / DEFAULT) để thẻ không bị No Status
+      const statusRes = await client.query(
+        `SELECT ts.status_id 
+         FROM task_status ts
+         JOIN lists l ON ts.space_id = l.space_id
+         WHERE l.list_id = $1 AND (ts.is_default = TRUE OR ts.position = 0)
+         ORDER BY ts.position ASC LIMIT 1`,
+        [targetListId]
+      );
+      const defaultStatusId = statusRes.rows[0]?.status_id || null;
+
       // 1. Tạo Work Item trong bảng tasks
       const taskRes = await client.query(
         `INSERT INTO tasks (
           name, description, list_id, created_by, priority, 
-          work_item_type, workflow_id, current_state_id
-        ) VALUES ($1, $2, $3, $4, $5, 'INCIDENT', $6, $7)
+          work_item_type, workflow_id, current_state_id, status_id
+        ) VALUES ($1, $2, $3, $4, $5, 'INCIDENT', $6, $7, $8)
         RETURNING *`,
-        [title, symptom, targetListId, reported_by, severity === "CRITICAL" ? "Urgent" : "High", workflowId, initialStateId]
+        [title, symptom, targetListId, reported_by, severity === "CRITICAL" ? "Urgent" : "High", workflowId, initialStateId, defaultStatusId]
       );
       const task = taskRes.rows[0];
 

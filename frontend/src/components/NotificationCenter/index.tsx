@@ -41,6 +41,7 @@ export const NotificationCenter: React.FC = () => {
   const [testEmailInput, setTestEmailInput] = useState("");
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const notifiedIdsRef = useRef<Set<number>>(new Set());
+  const isInitialLoadRef = useRef(true);
 
   const navigate = useNavigate();
 
@@ -54,29 +55,45 @@ export const NotificationCenter: React.FC = () => {
         setNotifications(list);
         setUnreadCount(res.unreadCount || 0);
 
-        // Kiểm tra xem có thông báo URGENT/HIGH mới chưa đọc để bật Toast thời gian thực
-        list.forEach((n) => {
-          if (!n.is_read && (n.priority === "URGENT" || n.priority === "HIGH")) {
-            if (!notifiedIdsRef.current.has(n.notification_id)) {
-              notifiedIdsRef.current.add(n.notification_id);
-              antNotification.warning({
-                message: (
-                  <div className="flex items-center gap-1.5 font-bold text-rose-600">
-                    <ShieldAlert size={18} />
-                    {n.priority === "URGENT" ? "BÁO ĐỘNG ĐỎ VỠ SLA" : "CẢNH BÁO SẮP HẾT HẠN"}
-                  </div>
-                ),
-                description: (
-                  <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">
-                    {n.content}
-                  </div>
-                ),
-                duration: 8,
-                placement: "topRight",
-              });
-            }
+        if (isInitialLoadRef.current) {
+          // Lần đầu tải trang: Nạp toàn bộ ID vào Set để KHÔNG nổ Toast hàng loạt gây rác màn hình
+          list.forEach((n) => notifiedIdsRef.current.add(n.notification_id));
+          isInitialLoadRef.current = false;
+        } else {
+          // Chỉ nổ Toast cho thông báo MỚI phát sinh trong khi đang mở tab (polling nền)
+          const newAlerts = list.filter(
+            (n) =>
+              !n.is_read &&
+              (n.priority === "URGENT" || n.priority === "HIGH") &&
+              !notifiedIdsRef.current.has(n.notification_id)
+          );
+
+          if (newAlerts.length > 0) {
+            newAlerts.forEach((n) => notifiedIdsRef.current.add(n.notification_id));
+            const latest = newAlerts[0];
+            antNotification.warning({
+              message: (
+                <div className="flex items-center gap-1.5 font-bold text-rose-600">
+                  <ShieldAlert size={18} />
+                  {newAlerts.length > 1
+                    ? `CÓ ${newAlerts.length} CẢNH BÁO MỚI PHÁT SINH`
+                    : latest.priority === "URGENT"
+                    ? "BÁO ĐỘNG ĐỎ VỠ SLA"
+                    : "CẢNH BÁO SẮP HẾT HẠN"}
+                </div>
+              ),
+              description: (
+                <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+                  {newAlerts.length > 1
+                    ? `${latest.content} (và ${newAlerts.length - 1} thông báo khác)`
+                    : latest.content}
+                </div>
+              ),
+              duration: 4,
+              placement: "topRight",
+            });
           }
-        });
+        }
       }
     } catch (err: any) {
       // Bỏ qua lỗi token hết hạn khi chưa đăng nhập
