@@ -58,6 +58,11 @@
     z-index: 99999 !important;
   }
 
+  .ant-tooltip,
+  .ant-popover {
+    z-index: 99999 !important;
+  }
+
   .ant-modal-root,
   .ant-modal-mask,
   .ant-modal-wrap {

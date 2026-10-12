@@ -35,6 +35,7 @@ const baseTokens = {
     boxShadow: 'none',
     boxShadowSecondary: 'none',
     boxShadowTertiary: 'none',
+    zIndexPopupBase: 3000,
     // ── Typography Scale — mirror của CSS vars trong GlobalStyles.css ──
     fontSize: 14,
     fontSizeSM: 13,

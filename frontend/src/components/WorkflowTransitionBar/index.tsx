@@ -199,7 +199,11 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
           Thao tác FSM:
         </span>
         {transitions.map((t) => (
-          <Tooltip key={t.transition_id} title={t.description || `Chuyển sang: ${t.to_state_name}`}>
+          <Tooltip
+            key={t.transition_id}
+            title={t.description || `Chuyển sang: ${t.to_state_name}`}
+            zIndex={99999}
+          >
             <Button
               {...getButtonVariant(t.to_state_code)}
               size={size}
