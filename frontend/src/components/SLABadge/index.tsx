@@ -17,7 +17,7 @@ export const SLABadge: React.FC<SLABadgeProps> = ({
   className = "",
 }) => {
   const [timeLeftStr, setTimeLeftStr] = useState<string>("");
-  const isPaused = stateCode === "ON_HOLD_PENDING_PARTS";
+  const isPaused = status === "PAUSED" || stateCode === "ON_HOLD_PENDING_PARTS";
 
   useEffect(() => {
     if (!deadlineAt || isPaused || status === "COMPLETED") {

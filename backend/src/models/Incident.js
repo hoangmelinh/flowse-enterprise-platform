@@ -237,12 +237,13 @@ class Incident {
       );
       const reqTaskId = taskRes.rows[0].task_id;
 
-      // 2. Tạo bản ghi approvals
+      // 2. Tạo bản ghi approvals gắn trực tiếp incident_id và request_note
+      const initialRequestNote = `Đề xuất linh kiện cho sự cố #${incident.incident_id} (Máy #${incident.asset_id}): ${partName} x ${quantity}. ${reason}`;
       const appRes = await client.query(
-        `INSERT INTO approvals (task_id, approver_id, status, decision_note)
-         VALUES ($1, NULL, 'PENDING', $2)
+        `INSERT INTO approvals (task_id, approver_id, status, request_note, decision_note, incident_id)
+         VALUES ($1, NULL, 'PENDING', $2, $2, $3)
          RETURNING approval_id`,
-        [reqTaskId, `Đề xuất linh kiện cho sự cố #${incident.incident_id} (Máy #${incident.asset_id}): ${partName} x ${quantity}. ${reason}`]
+        [reqTaskId, initialRequestNote, incident.incident_id]
       );
 
       // 3. Chuyển trạng thái sự cố sang ON_HOLD_PENDING_PARTS
@@ -256,6 +257,14 @@ class Incident {
           [holdStateRes.rows[0].state_id, incident.task_id]
         );
       }
+
+      // 3b. Đóng băng đồng hồ SLA của sự cố (Chuyển sang PAUSED và lưu thời điểm bắt đầu chờ)
+      await client.query(
+        `UPDATE sla_instances 
+         SET status = 'PAUSED', paused_at = CURRENT_TIMESTAMP
+         WHERE task_id = $1 AND status IN ('IN_SLA', 'AT_RISK')`,
+        [incident.task_id]
+      );
 
       // 4. Ghi Audit Log
       await client.query(

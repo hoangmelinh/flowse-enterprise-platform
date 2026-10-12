@@ -54,7 +54,7 @@ class SlaMonitorWorker {
         LEFT JOIN incidents inc ON t.task_id = inc.task_id
         LEFT JOIN assets a ON inc.asset_id = a.asset_id
         LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
-        WHERE si.status NOT IN ('COMPLETED') 
+        WHERE si.status NOT IN ('COMPLETED', 'PAUSED') 
           AND (ws.is_terminal IS NULL OR ws.is_terminal = FALSE)
           AND (ws.code IS NULL OR ws.code != 'ON_HOLD_PENDING_PARTS')
       `;
