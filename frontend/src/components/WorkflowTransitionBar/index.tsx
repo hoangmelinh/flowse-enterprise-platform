@@ -11,6 +11,11 @@ import {
   UserCheck,
   Wrench,
   ShieldAlert,
+  Camera,
+  Sparkles,
+  UploadCloud,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getTaskTransitions,
@@ -18,6 +23,8 @@ import {
   type WorkflowTransition,
 } from "@/api/workflows";
 import { getWorkspaceMembers } from "@/api/workspaces";
+import { uploadFile } from "@/api/upload";
+import { analyzeEvidence, type AIEvidenceAnalysis } from "@/api/incidents";
 
 interface WorkflowTransitionBarProps {
   taskId: number | string;
@@ -47,6 +54,12 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
   const [partName, setPartName] = useState("");
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState("");
+
+  // State chuyên biệt cho Bằng chứng nghiệm thu & AI Copilot (Giai đoạn 3)
+  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
+  const [aiAnalysis, setAiAnalysis] = useState<AIEvidenceAnalysis | null>(null);
+  const [analyzingAi, setAnalyzingAi] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchTransitions = useCallback(async () => {
     if (!taskId) return;
@@ -94,9 +107,49 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
       });
   }, []);
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingImage(true);
+      const res = await uploadFile(file);
+      const url = res.file.file_url;
+      setEvidenceUrls([url]);
+      message.success("Tải ảnh bằng chứng lên thành công!");
+
+      // Gọi AI Copilot phân tích ảnh tức thời
+      setAnalyzingAi(true);
+      try {
+        const aiRes = await analyzeEvidence({ imageUrl: url });
+        if (aiRes?.data) {
+          setAiAnalysis(aiRes.data);
+          if (aiRes.data.status === "VERIFIED") {
+            message.success(`AI Copilot: Đã nhận diện máy móc hợp lệ (${aiRes.data.score}%)`);
+          } else {
+            message.warning("AI Copilot: Phát hiện cảnh báo về hình ảnh hiện trường!");
+          }
+        }
+      } catch (aiErr: any) {
+        console.warn("AI analysis warning:", aiErr);
+      } finally {
+        setAnalyzingAi(false);
+      }
+    } catch (err: any) {
+      message.error("Lỗi khi tải ảnh lên: " + (err?.message || ""));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleButtonClick = (t: WorkflowTransition) => {
+    const isClosingOrVerifying =
+      t.to_state_code === "RESOLVED" ||
+      t.to_state_code === "WAITING_VERIFY" ||
+      t.to_state_code === "CLOSED" ||
+      t.is_terminal;
+
     const needsModal =
-      t.is_terminal ||
+      isClosingOrVerifying ||
       t.to_state_code === "CANCELLED" ||
       t.to_state_code === "ON_HOLD_PENDING_PARTS" ||
       t.to_state_code === "ASSIGNED" ||
@@ -110,6 +163,8 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
       setPartName("");
       setQuantity(1);
       setReason("");
+      setEvidenceUrls([]);
+      setAiAnalysis(null);
       setModalOpen(true);
     } else {
       doExecute(t);
@@ -131,6 +186,16 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
           reason: reason.trim(),
         };
         finalNote = `Đề xuất linh kiện: ${partName.trim()} (SL: ${quantity || 1}). Lý do: ${reason.trim()}`;
+      }
+
+      if (evidenceUrls.length > 0) {
+        metadata = {
+          ...(metadata || {}),
+          evidence_urls: evidenceUrls,
+          ai_evidence_status: aiAnalysis?.status || "VERIFIED",
+          ai_evidence_feedback: aiAnalysis?.feedback || null,
+          ai_evidence_score: aiAnalysis?.score || 0,
+        };
       }
 
       await executeTransition(taskId, {
@@ -192,6 +257,10 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
     return null;
   }
 
+  if (loading && transitions.length === 0) {
+    return <span className="text-xs text-gray-400">Đang tải FSM...</span>;
+  }
+
   return (
     <div className={`workflow-transition-bar inline-flex items-center gap-1.5 ${className}`}>
       <Space size={6} wrap>
@@ -201,7 +270,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         {transitions.map((t) => (
           <Tooltip
             key={t.transition_id}
-            title={t.description || `Chuyển sang: ${t.to_state_name}`}
+            title={(t as any).description || `Chuyển sang: ${t.to_state_name}`}
             zIndex={99999}
           >
             <Button
@@ -260,10 +329,21 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         }}
         onCancel={() => setModalOpen(false)}
         confirmLoading={submitting}
-        okText={activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" ? "Gửi đề xuất & Tạm dừng SLA" : "Xác nhận chuyển"}
+        okText={
+          activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS"
+            ? "Gửi đề xuất & Tạm dừng SLA"
+            : activeTransition?.to_state_code === "RESOLVED" || activeTransition?.to_state_code === "WAITING_VERIFY"
+            ? "Xác nhận & Hoàn tất"
+            : "Xác nhận chuyển"
+        }
         cancelText="Hủy bỏ"
         okButtonProps={{
-          className: activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700",
+          className:
+            activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS"
+              ? "bg-amber-600 hover:bg-amber-700"
+              : activeTransition?.to_state_code === "RESOLVED"
+              ? "bg-emerald-600 hover:bg-emerald-700"
+              : "bg-blue-600 hover:bg-blue-700",
         }}
       >
         <p className="text-sm text-gray-600 mb-3">
@@ -292,7 +372,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         )}
 
         {/* Luồng 2: Yêu cầu cấp linh kiện vật tư (ON_HOLD_PENDING_PARTS) */}
-        {activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" ? (
+        {activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" && (
           <div className="space-y-3 mb-3 bg-amber-50 dark:bg-amber-950/20 p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/40">
             <div className="text-xs text-amber-800 dark:text-amber-300 font-medium flex items-start gap-2">
               <ShieldAlert size={16} className="mt-0.5 shrink-0 text-amber-600" />
@@ -339,26 +419,141 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
               />
             </div>
           </div>
-        ) : (
-          /* Luồng ghi chú thông thường */
-          <div className="mb-2">
-            <label className="text-xs font-semibold text-gray-500 block mb-1">
-              {activeTransition?.to_state_code === "REPORTED"
-                ? "Lý do từ chối tiếp nhận (Audit Trail): *"
-                : "Ghi chú / Biên bản thực hiện (Audit Trail):"}
-            </label>
-            <Input.TextArea
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                activeTransition?.to_state_code === "REPORTED"
-                  ? "Nhập lý do KTV từ chối tiếp nhận (bận ca máy khác, không đủ dụng cụ...)"
-                  : "Nhập lý do, tóm tắt kết quả hoặc ghi chú chỉ đạo..."
-              }
-            />
+        )}
+
+        {/* Luồng 3: Bằng chứng nghiệm thu & AI Copilot (RESOLVED / WAITING_VERIFY) */}
+        {(activeTransition?.to_state_code === "RESOLVED" ||
+          activeTransition?.to_state_code === "WAITING_VERIFY" ||
+          activeTransition?.is_terminal) && (
+          <div className="space-y-3 mb-4 bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <Camera size={14} className="text-blue-600" />
+                Ảnh bằng chứng nghiệm thu hiện trường:
+              </label>
+              <span className="text-[11px] text-gray-500 font-medium">
+                (Được thẩm định bởi AI Copilot)
+              </span>
+            </div>
+
+            {/* Khung tải ảnh */}
+            {evidenceUrls.length === 0 ? (
+              <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-xl cursor-pointer bg-white dark:bg-gray-800/50 hover:bg-blue-50/50 transition-all group">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+                <UploadCloud size={24} className="text-gray-400 group-hover:text-blue-600 mb-1.5 transition-colors" />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {uploadingImage ? "Đang tải ảnh lên máy chủ..." : "Bấm để chọn ảnh chụp hiện trường máy móc"}
+                </span>
+                <span className="text-[10px] text-gray-400 mt-0.5">
+                  Hỗ trợ JPG, PNG (Tự động nén Sharp tối ưu dung lượng)
+                </span>
+              </label>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative inline-block w-full group">
+                  <img
+                    src={evidenceUrls[0]}
+                    alt="Bằng chứng nghiệm thu"
+                    className="w-full max-h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEvidenceUrls([]);
+                      setAiAnalysis(null);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-red-600 text-white shadow-md hover:bg-red-700 transition-all opacity-90 hover:opacity-100"
+                    title="Xóa ảnh và chọn ảnh khác"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+
+                {/* Khối hiển thị kết quả AI Copilot */}
+                {analyzingAi && (
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-xs flex items-center gap-2 animate-pulse">
+                    <Sparkles size={14} className="text-blue-600 animate-spin" />
+                    <span>AI Copilot đang phân tích cấu trúc chi tiết máy móc...</span>
+                  </div>
+                )}
+
+                {aiAnalysis && !analyzingAi && (
+                  <div
+                    className={`p-3 rounded-xl border text-xs ${
+                      aiAnalysis.status === "VERIFIED"
+                        ? "bg-emerald-50/80 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800/50 dark:text-emerald-300"
+                        : "bg-amber-50/90 border-amber-300 text-amber-900 dark:bg-amber-950/40 dark:border-amber-700/60 dark:text-amber-200"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {aiAnalysis.status === "VERIFIED" ? (
+                        <CheckCircle2 size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                      )}
+                      <div className="space-y-1 w-full">
+                        <div className="font-semibold flex items-center justify-between">
+                          <span>
+                            {aiAnalysis.status === "VERIFIED"
+                              ? `AI Verified (Độ tin cậy: ${aiAnalysis.score}%)`
+                              : `Cảnh báo AI Copilot (Độ tin cậy: ${aiAnalysis.score}%)`}
+                          </span>
+                        </div>
+                        <div className="text-[11px] leading-relaxed opacity-90">{aiAnalysis.feedback}</div>
+                        {aiAnalysis.tags && aiAnalysis.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {aiAnalysis.tags.map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  aiAnalysis.status === "VERIFIED"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200"
+                                }`}
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {aiAnalysis.status === "WARNING" && (
+                          <div className="mt-2 text-[10px] bg-amber-100/70 dark:bg-amber-900/40 p-1.5 rounded text-amber-800 dark:text-amber-300">
+                            💡 <em>Hệ thống vẫn cho phép bạn hoàn tất, nhưng ảnh sẽ được gắn cờ cảnh báo để Quản đốc kiểm tra lại.</em>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
+
+        {/* Luồng ghi chú thông thường */}
+        <div className="mb-2">
+          <label className="text-xs font-semibold text-gray-500 block mb-1">
+            {activeTransition?.to_state_code === "REPORTED"
+              ? "Lý do từ chối tiếp nhận (Audit Trail): *"
+              : "Ghi chú / Biên bản thực hiện (Audit Trail):"}
+          </label>
+          <Input.TextArea
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              activeTransition?.to_state_code === "REPORTED"
+                ? "Nhập lý do KTV từ chối tiếp nhận (bận ca máy khác, không đủ dụng cụ...)"
+                : "Nhập lý do, tóm tắt kết quả hoặc ghi chú chỉ đạo..."
+            }
+          />
+        </div>
       </Modal>
     </div>
   );

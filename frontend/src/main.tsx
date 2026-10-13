@@ -12,12 +12,12 @@ import './i18n'
 import './index.css'
 
 // Đảm bảo toàn bộ Toast Message và Notification luôn hiển thị ở tầng trên cùng (trên cả Modal)
-message.config({
+(message.config as any)({
     top: 24,
     zIndex: 99999,
 });
 
-notification.config({
+(notification.config as any)({
     top: 24,
     zIndex: 99999,
     placement: 'topRight',

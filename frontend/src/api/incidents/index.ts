@@ -23,6 +23,10 @@ export interface IncidentItem {
   sla_started_at?: string;
   resolved_at?: string;
   downtime_minutes?: number;
+  resolved_evidence_urls?: string[];
+  ai_evidence_status?: "VERIFIED" | "WARNING" | "NOT_EVALUATED";
+  ai_evidence_feedback?: string;
+  ai_evidence_score?: number;
 }
 
 export interface DowntimeStats {
@@ -74,3 +78,20 @@ export const deleteIncident = async (
 ): Promise<{ success: boolean; message: string }> => {
   return beApi.delete(`/incidents/${incidentId}`);
 };
+
+export interface AIEvidenceAnalysis {
+  isValid: boolean;
+  status: "VERIFIED" | "WARNING";
+  score: number;
+  tags: string[];
+  feedback: string;
+}
+
+export const analyzeEvidence = async (payload: {
+  imageUrl: string;
+  incidentTitle?: string;
+  assetName?: string;
+}): Promise<{ success: boolean; data: AIEvidenceAnalysis }> => {
+  return beApi.post("/incidents/analyze-evidence", payload);
+};
+

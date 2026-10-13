@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Form, Input, Select, message } from "antd";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, ShieldAlert } from "lucide-react";
+import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip } from "antd";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles } from "lucide-react";
 import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
@@ -156,6 +156,60 @@ const IncidentHubPage: React.FC = () => {
           <Tag color="processing" className="text-gray-500 inline-flex items-center gap-1">
             <Clock size={11} /> Đang tính giờ...
           </Tag>
+        );
+      },
+    },
+    {
+      title: "Bằng chứng & AI",
+      key: "evidence",
+      width: 170,
+      render: (_: any, record: IncidentItem) => {
+        const hasEvidence = record.resolved_evidence_urls && record.resolved_evidence_urls.length > 0;
+        if (!hasEvidence) {
+          return (
+            <span className="text-xs text-gray-400 italic">
+              {record.state_code === "RESOLVED" || record.state_code === "CLOSED" ? "Chưa có ảnh" : "-"}
+            </span>
+          );
+        }
+
+        const isVerified = record.ai_evidence_status === "VERIFIED";
+        const isWarning = record.ai_evidence_status === "WARNING";
+
+        return (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Image.PreviewGroup>
+                {record.resolved_evidence_urls!.map((url, idx) => (
+                  <Image
+                    key={idx}
+                    src={url}
+                    alt="Bằng chứng"
+                    width={44}
+                    height={44}
+                    className="rounded-lg object-cover border border-gray-200 dark:border-gray-700 shadow-xs hover:opacity-90"
+                  />
+                ))}
+              </Image.PreviewGroup>
+            </div>
+
+            {/* AI Status Badge */}
+            {isVerified && (
+              <Tooltip title={record.ai_evidence_feedback || "AI nhận diện chi tiết máy móc hợp lệ"}>
+                <Tag color="success" className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-help">
+                  <Sparkles size={10} className="text-emerald-500" /> AI Đạt ({record.ai_evidence_score || 90}%)
+                </Tag>
+              </Tooltip>
+            )}
+
+            {isWarning && (
+              <Tooltip title={record.ai_evidence_feedback || "AI phát hiện nghi vấn về ảnh hiện trường, cần Quản đốc thẩm định"}>
+                <Tag color="warning" className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-help font-medium">
+                  <AlertTriangle size={10} className="text-amber-600" /> AI Cảnh báo ({record.ai_evidence_score || 25}%)
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
         );
       },
     },

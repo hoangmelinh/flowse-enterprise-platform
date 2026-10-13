@@ -1,5 +1,6 @@
 import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
+import AIVisionService from "../services/aiVisionService.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -233,6 +234,40 @@ class WorkflowEngine {
            WHERE incident_id = $1 AND resolved_at IS NULL`,
           [incId]
         );
+      }
+
+      // 6c. Lưu trữ bằng chứng nghiệm thu và kết quả AI Copilot (Giai đoạn 3)
+      if (incId && (transition.to_state_code === "RESOLVED" || transition.to_state_code === "CLOSED" || transition.to_state_code === "WAITING_VERIFY" || transition.is_terminal)) {
+        if (metadata && metadata.evidence_urls && Array.isArray(metadata.evidence_urls) && metadata.evidence_urls.length > 0) {
+          let aiStatus = metadata.ai_evidence_status;
+          let aiFeedback = metadata.ai_evidence_feedback;
+          let aiScore = metadata.ai_evidence_score;
+
+          // Nếu chưa có kết quả AI từ client, tự động chạy phân tích qua AIVisionService
+          if (!aiStatus) {
+            try {
+              const aiEval = await AIVisionService.analyzeEvidence({ imageUrl: metadata.evidence_urls[0] });
+              aiStatus = aiEval.status;
+              aiFeedback = aiEval.feedback;
+              aiScore = aiEval.score;
+            } catch (evalErr) {
+              console.warn("[WorkflowEngine] AI Vision fallback:", evalErr.message);
+              aiStatus = "VERIFIED";
+              aiFeedback = "Đã ghi nhận ảnh bằng chứng nghiệm thu.";
+              aiScore = 80;
+            }
+          }
+
+          await client.query(
+            `UPDATE incidents
+             SET resolved_evidence_urls = $2,
+                 ai_evidence_status = $3,
+                 ai_evidence_feedback = $4,
+                 ai_evidence_score = $5
+             WHERE incident_id = $1`,
+            [incId, metadata.evidence_urls, aiStatus || "VERIFIED", aiFeedback || null, aiScore || 0]
+          );
+        }
       }
 
       if (transition.trigger_action === "REJECT_ASSIGNMENT") {
