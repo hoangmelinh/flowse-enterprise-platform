@@ -173,15 +173,22 @@ class WorkflowEngine {
 
       // Lấy thông tin incident nếu có
       let incId = null;
+      let incInfo = null;
       try {
         const incRes = await client.query(
-          `SELECT incident_id, asset_id FROM incidents WHERE task_id = $1`,
+          `SELECT i.incident_id, i.asset_id, i.symptom, a.name AS asset_name 
+           FROM incidents i 
+           LEFT JOIN assets a ON i.asset_id = a.asset_id 
+           WHERE i.task_id = $1`,
           [taskId]
         );
         if (incRes.rows.length > 0) {
           incId = incRes.rows[0].incident_id;
+          incInfo = incRes.rows[0];
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn("[WorkflowEngine] Incident lookup warning:", err.message);
+      }
 
       // 5. Nếu bước này yêu cầu Approval HOẶC chuyển sang ON_HOLD_PENDING_PARTS -> Tạo record approval
       if (transition.requires_approval || transition.to_state_code === "ON_HOLD_PENDING_PARTS") {
@@ -246,7 +253,12 @@ class WorkflowEngine {
           // Nếu chưa có kết quả AI từ client, tự động chạy phân tích qua AIVisionService
           if (!aiStatus) {
             try {
-              const aiEval = await AIVisionService.analyzeEvidence({ imageUrl: metadata.evidence_urls[0] });
+              const aiEval = await AIVisionService.analyzeEvidence({
+                imageUrl: metadata.evidence_urls[0],
+                incidentTitle: task.name || task.title || "",
+                assetName: incInfo ? incInfo.asset_name : "",
+                symptom: incInfo ? incInfo.symptom : "",
+              });
               aiStatus = aiEval.status;
               aiFeedback = aiEval.feedback;
               aiScore = aiEval.score;

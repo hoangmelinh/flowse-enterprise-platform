@@ -6,6 +6,7 @@ import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
 import { RequestPartsModal } from "./components/RequestPartsModal";
+import { getFileUrl } from "@/utils/imageUrl";
 
 const IncidentHubPage: React.FC = () => {
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
@@ -183,7 +184,7 @@ const IncidentHubPage: React.FC = () => {
                 {record.resolved_evidence_urls!.map((url, idx) => (
                   <Image
                     key={idx}
-                    src={url}
+                    src={getFileUrl(url)}
                     alt="Bằng chứng"
                     width={44}
                     height={44}
@@ -223,6 +224,9 @@ const IncidentHubPage: React.FC = () => {
           <div className="space-y-2">
             <WorkflowTransitionBar
               taskId={record.task_id}
+              taskName={record.task_name}
+              assetName={record.asset_name || record.asset_code}
+              symptom={record.symptom}
               currentStateCode={record.state_code}
               onTransitionSuccess={fetchData}
               size="small"

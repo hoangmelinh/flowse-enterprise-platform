@@ -138,6 +138,42 @@ async function runDualGateTest() {
     }
     console.log("✓ AI Copilot đã thẩm định thành công chi tiết máy móc hợp lệ (VERIFIED)!");
 
+    // 3b. Kiểm thử AI Contextual Semantic Cross-Matching:
+    // Case Mismatch: Sự cố Kẹt bàn trượt CNC nhưng nộp ảnh Bạc đạn SKF
+    console.log("\n3b. Kiểm thử AI Đối soát Ngữ cảnh (Mismatch: Bàn trượt vs Bạc đạn SKF):");
+    const skfImgPath = path.resolve(process.cwd(), "uploads", "test_skf_bearing.jpg");
+    await sharp(svgOverlay).jpeg().toFile(skfImgPath);
+
+    const aiMismatchResult = await AIVisionService.analyzeEvidence({
+      imageUrl: "/uploads/test_skf_bearing.jpg",
+      incidentTitle: "Kẹt bàn trượt CNC-024 cần đo Downtime",
+      assetName: "Máy Phay CNC 5 Trục Số 24",
+      symptom: "Bàn trượt trục X kẹt cứng, không di chuyển",
+    });
+    console.log(`   - Trạng thái AI: ${aiMismatchResult.status} (Điểm tin cậy: ${aiMismatchResult.score}%)`);
+    console.log(`   - Nhận xét AI: ${aiMismatchResult.feedback}`);
+    console.log(`   - Tags:`, aiMismatchResult.tags);
+    if (aiMismatchResult.status !== "WARNING" || aiMismatchResult.score !== 55) {
+      throw new Error("[FAIL] AI không phát hiện cảnh báo lệch linh kiện khi nộp ảnh SKF cho sự cố bàn trượt!");
+    }
+    console.log("✓ AI Copilot phát hiện chính xác ảnh nộp lệch hạng mục và phát cảnh báo mềm (55%)!");
+
+    // Case Match: Sự cố Yêu cầu thay bạc đạn SKF nộp ảnh Bạc đạn SKF
+    console.log("\n3c. Kiểm thử AI Đối soát Ngữ cảnh (Match: Yêu cầu thay bạc đạn SKF & Ảnh SKF):");
+    const aiMatchResult = await AIVisionService.analyzeEvidence({
+      imageUrl: "/uploads/test_skf_bearing.jpg",
+      incidentTitle: "KTV yêu cầu thay bạc đạn SKF",
+      assetName: "Máy Phay CNC 5 Trục Số 24",
+      symptom: "Ổ bi trục phát tiếng ồn lớn",
+    });
+    console.log(`   - Trạng thái AI: ${aiMatchResult.status} (Điểm tin cậy: ${aiMatchResult.score}%)`);
+    console.log(`   - Nhận xét AI: ${aiMatchResult.feedback}`);
+    console.log(`   - Tags:`, aiMatchResult.tags);
+    if (aiMatchResult.status !== "VERIFIED" || aiMatchResult.score !== 96) {
+      throw new Error("[FAIL] AI không xác nhận độ tin cậy 96% khi linh kiện khớp sự cố!");
+    }
+    console.log("✓ AI Copilot xác nhận 96% khi nội dung ảnh khớp chính xác với sự cố thay bạc!");
+
     // 4. Tạo sự cố thực tế và hoàn tất kèm bằng chứng ảnh
     console.log("\n4. Tạo sự cố máy CNC-024 và thực hiện đóng việc có đính kèm ảnh nghiệm thu:");
     const gateB = await Incident.reportIncident({

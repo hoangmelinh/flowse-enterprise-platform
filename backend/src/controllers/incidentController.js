@@ -102,11 +102,11 @@ export const getDowntimeStats = async (req, res, next) => {
 
 export const analyzeEvidence = async (req, res, next) => {
   try {
-    const { imageUrl, incidentTitle, assetName } = req.body;
+    const { imageUrl, incidentTitle, assetName, symptom } = req.body;
     if (!imageUrl) {
       return res.status(400).json({ success: false, message: "Đường dẫn hình ảnh (imageUrl) là bắt buộc." });
     }
-    const result = await AIVisionService.analyzeEvidence({ imageUrl, incidentTitle, assetName });
+    const result = await AIVisionService.analyzeEvidence({ imageUrl, incidentTitle, assetName, symptom });
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);

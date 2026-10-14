@@ -91,6 +91,7 @@ export const analyzeEvidence = async (payload: {
   imageUrl: string;
   incidentTitle?: string;
   assetName?: string;
+  symptom?: string;
 }): Promise<{ success: boolean; data: AIEvidenceAnalysis }> => {
   return beApi.post("/incidents/analyze-evidence", payload);
 };

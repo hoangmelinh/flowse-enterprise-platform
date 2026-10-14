@@ -25,9 +25,13 @@ import {
 import { getWorkspaceMembers } from "@/api/workspaces";
 import { uploadFile } from "@/api/upload";
 import { analyzeEvidence, type AIEvidenceAnalysis } from "@/api/incidents";
+import { getFileUrl } from "@/utils/imageUrl";
 
 interface WorkflowTransitionBarProps {
   taskId: number | string;
+  taskName?: string;
+  assetName?: string;
+  symptom?: string;
   currentStateCode?: string;
   onTransitionSuccess?: () => void;
   size?: "small" | "middle" | "large";
@@ -36,6 +40,9 @@ interface WorkflowTransitionBarProps {
 
 export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
   taskId,
+  taskName,
+  assetName,
+  symptom,
   currentStateCode,
   onTransitionSuccess,
   size = "middle",
@@ -117,16 +124,21 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
       setEvidenceUrls([url]);
       message.success("Tải ảnh bằng chứng lên thành công!");
 
-      // Gọi AI Copilot phân tích ảnh tức thời
+      // Gọi AI Copilot phân tích ảnh tức thời kết hợp đối soát ngữ cảnh sự cố
       setAnalyzingAi(true);
       try {
-        const aiRes = await analyzeEvidence({ imageUrl: url });
+        const aiRes = await analyzeEvidence({
+          imageUrl: url,
+          incidentTitle: taskName || "",
+          assetName: assetName || "",
+          symptom: symptom || "",
+        });
         if (aiRes?.data) {
           setAiAnalysis(aiRes.data);
           if (aiRes.data.status === "VERIFIED") {
             message.success(`AI Copilot: Đã nhận diện máy móc hợp lệ (${aiRes.data.score}%)`);
           } else {
-            message.warning("AI Copilot: Phát hiện cảnh báo về hình ảnh hiện trường!");
+            message.warning(`AI Copilot: ${aiRes.data.feedback || "Phát hiện cảnh báo về hình ảnh hiện trường!"}`);
           }
         }
       } catch (aiErr: any) {
@@ -458,7 +470,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
               <div className="space-y-2">
                 <div className="relative inline-block w-full group">
                   <img
-                    src={evidenceUrls[0]}
+                    src={getFileUrl(evidenceUrls[0])}
                     alt="Bằng chứng nghiệm thu"
                     className="w-full max-h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
                   />
