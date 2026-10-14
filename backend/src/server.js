@@ -85,8 +85,14 @@ app.use(generalLimiter);
 
 //public route
 import fs from 'fs';
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads', { recursive: true });
-app.use('/uploads', express.static('uploads'));
+import path from 'path';
+const localUploads = path.resolve(process.cwd(), 'uploads');
+const parentUploads = path.resolve(process.cwd(), '..', 'uploads');
+if (!fs.existsSync(localUploads)) fs.mkdirSync(localUploads, { recursive: true });
+app.use('/uploads', express.static(localUploads));
+if (fs.existsSync(parentUploads)) {
+  app.use('/uploads', express.static(parentUploads));
+}
 
 app.get("/db-health", async (req, res) => {
   try {

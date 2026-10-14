@@ -7,11 +7,13 @@ import {
   deleteIncident,
   getDowntimeStats,
   analyzeEvidence,
+  cleanTestData,
 } from "../controllers/incidentController.js";
 
 const router = Router();
 
 router.get("/stats/downtime-mttr", getDowntimeStats);
+router.post("/clean-test-data", cleanTestData);
 router.post("/analyze-evidence", analyzeEvidence);
 router.get("/", getIncidents);
 router.get("/:id", getIncidentById);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip } from "antd";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles } from "lucide-react";
-import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
+import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented } from "antd";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw } from "lucide-react";
+import { getIncidents, reportIncident, getDowntimeStats, cleanTestIncidents, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
@@ -17,15 +17,17 @@ const IncidentHubPage: React.FC = () => {
   const [partsModalOpen, setPartsModalOpen] = useState(false);
   const [selectedIncidentForParts, setSelectedIncidentForParts] = useState<IncidentItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [period, setPeriod] = useState<string>("month");
+  const [cleaningTest, setCleaningTest] = useState(false);
   const [form] = Form.useForm();
 
-  const fetchData = async () => {
+  const fetchData = async (targetPeriod: string = period) => {
     try {
       setLoading(true);
       const [incRes, assetRes, statsRes] = await Promise.all([
         getIncidents(),
         getAssets(),
-        getDowntimeStats().catch(() => null),
+        getDowntimeStats(targetPeriod).catch(() => null),
       ]);
       if (incRes?.data) setIncidents(incRes.data);
       if (assetRes?.data) setAssets(assetRes.data);
@@ -38,8 +40,31 @@ const IncidentHubPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(period);
+  }, [period]);
+
+  const handleCleanTestData = () => {
+    Modal.confirm({
+      title: "Dọn dẹp sự cố kiểm thử?",
+      content:
+        "Hệ thống sẽ xóa các sự cố mock kiểm thử (Test Gate...) để giải phóng các số liệu Downtime ảo và đưa bảng số liệu về 0 sạch sẽ. Bạn có chắc chắn muốn thực hiện?",
+      okText: "Xác nhận dọn dẹp",
+      okType: "danger",
+      cancelText: "Hủy",
+      onOk: async () => {
+        try {
+          setCleaningTest(true);
+          const res = await cleanTestIncidents();
+          message.success(res.message || "Đã dọn dẹp dữ liệu kiểm thử thành công!");
+          await fetchData(period);
+        } catch (err: any) {
+          message.error("Lỗi khi dọn dẹp: " + (err?.message || ""));
+        } finally {
+          setCleaningTest(false);
+        }
+      },
+    });
+  };
 
   const handleCreateIncident = async (values: any) => {
     try {
@@ -270,7 +295,7 @@ const IncidentHubPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={fetchData} loading={loading}>
+          <Button onClick={() => fetchData(period)} loading={loading}>
             Làm mới
           </Button>
           <Button
@@ -281,6 +306,38 @@ const IncidentHubPage: React.FC = () => {
           >
             Báo cáo sự cố mới
           </Button>
+        </div>
+      </div>
+
+      {/* Thanh Điều hướng Chu kỳ Thời gian & Thao tác Quản trị */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50 dark:bg-gray-900/60 p-3 rounded-2xl border border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Chu kỳ thống kê:
+          </span>
+          <Segmented
+            value={period}
+            onChange={(val) => setPeriod(val as string)}
+            options={[
+              { label: "Ca hôm nay", value: "today" },
+              { label: "Tuần này", value: "week" },
+              { label: "Tháng này (Chuẩn)", value: "month" },
+              { label: "Toàn thời gian", value: "all" },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Tooltip title="Dọn dẹp các sự cố mock kiểm thử (Test Gate) để giải phóng các giờ dừng máy ảo và đưa số liệu về 0 sạch sẽ">
+            <Button
+              size="small"
+              icon={<RotateCcw size={13} className="text-rose-500" />}
+              loading={cleaningTest}
+              onClick={handleCleanTestData}
+              className="text-xs text-gray-600 dark:text-gray-300 hover:text-rose-600"
+            >
+              Dọn ca test (Reset 0h)
+            </Button>
+          </Tooltip>
         </div>
       </div>
 

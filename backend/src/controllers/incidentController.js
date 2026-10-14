@@ -93,8 +93,18 @@ export const deleteIncident = async (req, res, next) => {
 
 export const getDowntimeStats = async (req, res, next) => {
   try {
-    const stats = await Incident.getDowntimeAndMTTRStats();
+    const { period = "month" } = req.query;
+    const stats = await Incident.getDowntimeAndMTTRStats(period);
     res.json({ success: true, data: stats });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cleanTestData = async (req, res, next) => {
+  try {
+    const result = await Incident.cleanTestData();
+    res.json({ success: true, message: `Đã dọn dẹp ${result.cleanedCount} sự cố kiểm thử thành công.`, data: result });
   } catch (error) {
     next(error);
   }

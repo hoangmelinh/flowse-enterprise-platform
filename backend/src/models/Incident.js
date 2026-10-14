@@ -361,9 +361,19 @@ class Incident {
   }
 
   /**
-   * Thống kê KPI Downtime và MTTR toàn phân xưởng (Giai đoạn 2)
+   * Thống kê KPI Downtime và MTTR toàn phân xưởng (Giai đoạn 2 & Mở rộng Chu kỳ)
+   * @param {string} [period='month'] - 'today' | 'week' | 'month' | 'all'
    */
-  static async getDowntimeAndMTTRStats() {
+  static async getDowntimeAndMTTRStats(period = "month") {
+    let timeCondition = "";
+    if (period === "today") {
+      timeCondition = "AND inc.created_at >= CURRENT_DATE";
+    } else if (period === "week") {
+      timeCondition = "AND inc.created_at >= DATE_TRUNC('week', CURRENT_DATE)";
+    } else if (period === "month") {
+      timeCondition = "AND inc.created_at >= DATE_TRUNC('month', CURRENT_DATE)";
+    }
+
     const statsQuery = `
       SELECT 
         COUNT(*)::int AS total_incidents,
@@ -376,6 +386,7 @@ class Incident {
       FROM incidents inc
       JOIN tasks t ON inc.task_id = t.task_id
       LEFT JOIN sla_instances si ON inc.task_id = si.task_id
+      WHERE 1=1 ${timeCondition}
     `;
 
     const topAssetsQuery = `
@@ -388,7 +399,7 @@ class Incident {
         COALESCE(SUM(inc.downtime_minutes), 0)::int AS total_downtime_minutes
       FROM assets a
       JOIN incidents inc ON a.asset_id = inc.asset_id
-      WHERE inc.resolved_at IS NOT NULL
+      WHERE inc.resolved_at IS NOT NULL ${timeCondition}
       GROUP BY a.asset_id, a.name, a.asset_code, a.location
       ORDER BY total_downtime_minutes DESC
       LIMIT 5
@@ -406,6 +417,7 @@ class Incident {
     const formattedTotalDowntime = hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`;
 
     return {
+      period,
       totalIncidents: stats.total_incidents,
       resolvedIncidents: stats.resolved_incidents,
       openIncidents: stats.open_incidents,
@@ -416,6 +428,57 @@ class Incident {
       slaBreachedCount: stats.sla_breached_count,
       topDowntimeAssets: topAssetsRes.rows,
     };
+  }
+
+  /**
+   * Dọn dẹp dữ liệu kiểm thử mock (Các sự cố có tiêu đề 'Test Gate%' hoặc 'Test %')
+   * Phục vụ Admin làm sạch giao diện và đưa Downtime về 0 trước khi chạy thật.
+   */
+  static async cleanTestData() {
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+
+      const testTasksRes = await client.query(`
+        SELECT t.task_id, inc.incident_id 
+        FROM tasks t
+        LEFT JOIN incidents inc ON t.task_id = inc.task_id
+        WHERE t.name ILIKE 'Test Gate%' OR t.name ILIKE 'Test %'
+      `);
+
+      if (testTasksRes.rows.length === 0) {
+        await client.query("COMMIT");
+        return { cleanedCount: 0 };
+      }
+
+      const taskIds = testTasksRes.rows.map(r => r.task_id).filter(Boolean);
+      const incIds = testTasksRes.rows.map(r => r.incident_id).filter(Boolean);
+
+      if (incIds.length > 0) {
+        await client.query(`DELETE FROM approvals WHERE incident_id = ANY($1::int[])`, [incIds]);
+        await client.query(`DELETE FROM incidents WHERE incident_id = ANY($1::int[])`, [incIds]);
+      }
+
+      if (taskIds.length > 0) {
+        await client.query(`DELETE FROM approvals WHERE task_id = ANY($1::int[])`, [taskIds]);
+        await client.query(`DELETE FROM sla_instances WHERE task_id = ANY($1::int[])`, [taskIds]);
+        await client.query(`DELETE FROM task_assigns WHERE task_id = ANY($1::int[])`, [taskIds]);
+        await client.query(`DELETE FROM time_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
+        await client.query(`DELETE FROM activity_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
+        await client.query(`DELETE FROM comments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
+        await client.query(`DELETE FROM attachments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
+        await client.query(`DELETE FROM incidents WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
+        await client.query(`DELETE FROM tasks WHERE task_id = ANY($1::int[])`, [taskIds]);
+      }
+
+      await client.query("COMMIT");
+      return { cleanedCount: testTasksRes.rows.length };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 }
 

@@ -48,8 +48,12 @@ export interface DowntimeStats {
   }>;
 }
 
-export const getDowntimeStats = async (): Promise<{ success: boolean; data: DowntimeStats }> => {
-  return beApi.get("/incidents/stats/downtime-mttr");
+export const getDowntimeStats = async (period: string = "month"): Promise<{ success: boolean; data: DowntimeStats }> => {
+  return beApi.get(`/incidents/stats/downtime-mttr?period=${period}`);
+};
+
+export const cleanTestIncidents = async (): Promise<{ success: boolean; message: string; data: { cleanedCount: number } }> => {
+  return beApi.post("/incidents/clean-test-data");
 };
 
 export const getIncidents = async (): Promise<{ success: boolean; data: IncidentItem[] }> => {
