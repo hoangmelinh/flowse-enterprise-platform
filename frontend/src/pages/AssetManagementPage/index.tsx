@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Input, Modal, message, Space } from "antd";
-import { Cpu, QrCode, Search, Wrench, MapPin, ClipboardCheck } from "lucide-react";
+import { Cpu, QrCode, Search, Wrench, MapPin, ClipboardCheck, HeartPulse } from "lucide-react";
 import { getAssets, resolveQrContext, type Asset } from "@/api/assets";
 import { InspectionRunnerModal } from "./components/InspectionRunnerModal";
+import AssetHealthRecordDrawer from "./components/AssetHealthRecordDrawer";
 
 const AssetManagementPage: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -14,6 +15,8 @@ const AssetManagementPage: React.FC = () => {
   const [manualToken, setManualToken] = useState("");
   const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
   const [selectedAssetForInspection, setSelectedAssetForInspection] = useState<Asset | null>(null);
+  const [healthDrawerOpen, setHealthDrawerOpen] = useState(false);
+  const [selectedAssetForHealth, setSelectedAssetForHealth] = useState<Asset | null>(null);
 
   const fetchAssets = async () => {
     try {
@@ -97,6 +100,33 @@ const AssetManagementPage: React.FC = () => {
       ),
     },
     {
+      title: "Hồ Sơ Sức Khỏe",
+      key: "health_score",
+      render: (_: any, record: Asset) => {
+        const score = record.health_score ?? 100;
+        const tagColor = score >= 80 ? "success" : score >= 50 ? "warning" : "error";
+        return (
+          <div
+            className="cursor-pointer group flex items-center gap-2"
+            onClick={() => {
+              setSelectedAssetForHealth(record);
+              setHealthDrawerOpen(true);
+            }}
+          >
+            <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+              <div
+                className={`h-full ${score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500'} transition-all`}
+                style={{ width: `${score}%` }}
+              />
+            </div>
+            <Tag color={tagColor} className="font-bold font-mono text-xs group-hover:scale-105 transition-transform">
+              {score}/100
+            </Tag>
+          </div>
+        );
+      },
+    },
+    {
       title: "Thao tác",
       key: "actions",
       render: (_: any, record: Asset) => (
@@ -119,6 +149,17 @@ const AssetManagementPage: React.FC = () => {
             }}
           >
             Kiểm tra định kỳ
+          </Button>
+          <Button
+            size="small"
+            className="border-emerald-500 text-emerald-600 hover:border-emerald-400 hover:text-emerald-500"
+            icon={<HeartPulse className="w-3.5 h-3.5 inline mr-1" />}
+            onClick={() => {
+              setSelectedAssetForHealth(record);
+              setHealthDrawerOpen(true);
+            }}
+          >
+            Hồ Sơ Sức Khoẻ
           </Button>
         </Space>
       ),
@@ -270,6 +311,13 @@ const AssetManagementPage: React.FC = () => {
         asset={selectedAssetForInspection}
         onClose={() => setInspectionModalOpen(false)}
         onSuccess={fetchAssets}
+      />
+
+      {/* Phase 4 – Asset Health Record Drawer */}
+      <AssetHealthRecordDrawer
+        open={healthDrawerOpen}
+        asset={selectedAssetForHealth}
+        onClose={() => setHealthDrawerOpen(false)}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
 import con from "./config/connect.js";
@@ -146,9 +147,13 @@ app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
 import SlaMonitorWorker from "./services/slaMonitorWorker.js";
+import socketService from "./services/socketService.js";
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server is running on ${HOST}:${PORT}`);
+const server = http.createServer(app);
+socketService.init(server, allowedOrigins);
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server is running on ${HOST}:${PORT} (HTTP + Socket.IO)`);
   // Khởi động bộ quét giám sát SLA định kỳ
   SlaMonitorWorker.start(60000);
 });

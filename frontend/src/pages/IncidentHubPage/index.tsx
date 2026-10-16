@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented } from "antd";
+import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented, Drawer } from "antd";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw } from "lucide-react";
 import { getIncidents, reportIncident, getDowntimeStats, cleanTestIncidents, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
@@ -7,8 +8,10 @@ import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
 import { RequestPartsModal } from "./components/RequestPartsModal";
 import { getFileUrl } from "@/utils/imageUrl";
+import { useRealtimeEvents } from "@/hooks/useRealtimeEvents";
 
 const IncidentHubPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [downtimeStats, setDowntimeStats] = useState<DowntimeStats | null>(null);
@@ -16,6 +19,7 @@ const IncidentHubPage: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [partsModalOpen, setPartsModalOpen] = useState(false);
   const [selectedIncidentForParts, setSelectedIncidentForParts] = useState<IncidentItem | null>(null);
+  const [focusedIncident, setFocusedIncident] = useState<IncidentItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [period, setPeriod] = useState<string>("month");
   const [cleaningTest, setCleaningTest] = useState(false);
@@ -42,6 +46,74 @@ const IncidentHubPage: React.FC = () => {
   useEffect(() => {
     fetchData(period);
   }, [period]);
+
+  // Tự động nhận diện query param incidentId hoặc taskId để mở pop-up chi tiết sự cố (Deeplink)
+  const targetIncidentId = searchParams.get("incidentId");
+  const targetTaskId = searchParams.get("taskId");
+
+  useEffect(() => {
+    if (incidents.length > 0) {
+      if (targetIncidentId) {
+        const found = incidents.find((i) => String(i.incident_id) === String(targetIncidentId));
+        if (found) setFocusedIncident(found);
+      } else if (targetTaskId) {
+        const found = incidents.find((i) => String(i.task_id) === String(targetTaskId));
+        if (found) setFocusedIncident(found);
+      }
+    }
+  }, [incidents, targetIncidentId, targetTaskId]);
+
+  // Lắng nghe sự kiện Realtime Socket.IO: Tự động cập nhật bảng không cần F5
+  useRealtimeEvents({
+    onIncidentCreated: (newInc: any) => {
+      // 1. Tự động chèn dòng sự cố mới lên đầu bảng
+      setIncidents((prev) => {
+        if (prev.some((item) => item.incident_id === newInc.incident_id)) return prev;
+        return [newInc, ...prev];
+      });
+
+      // 2. Phát thông báo Toast nổi bật
+      if (newInc.severity === "CRITICAL" || newInc.severity === "HIGH") {
+        message.error(`🚨 [${newInc.severity}] Sự cố mới: ${newInc.task_name} trên máy ${newInc.asset_name || "N/A"}`);
+      } else {
+        message.warning(`⚡ Sự cố mới phát sinh: ${newInc.task_name}`);
+      }
+
+      // Kéo lại số liệu downtime ngầm
+      fetchData(period);
+    },
+
+    onWorkflowTransitioned: (transition: any) => {
+      // Tự động đổi màu Tag trạng thái trên bảng
+      setIncidents((prev) =>
+        prev.map((item) =>
+          item.task_id === transition.task_id
+            ? {
+                ...item,
+                state_code: transition.current_state,
+                state_name: transition.current_state_name || transition.current_state,
+              }
+            : item
+        )
+      );
+
+      // Nếu đang mở Drawer xem chi tiết thì cập nhật luôn Drawer
+      setFocusedIncident((cur) => {
+        if (cur && cur.task_id === transition.task_id) {
+          return {
+            ...cur,
+            state_code: transition.current_state,
+            state_name: transition.current_state_name || transition.current_state,
+          };
+        }
+        return cur;
+      });
+
+      message.info(
+        `🔄 Sự cố #${transition.incident_id || transition.task_id} đã chuyển sang [${transition.current_state_name || transition.current_state}] bởi ${transition.actor_name || "Kỹ thuật viên"}`
+      );
+    },
+  });
 
   const handleCleanTestData = () => {
     Modal.confirm({
@@ -421,6 +493,13 @@ const IncidentHubPage: React.FC = () => {
           loading={loading}
           pagination={{ pageSize: 10 }}
           locale={{ emptyText: "Không có sự cố nào được ghi nhận." }}
+          onRow={(record) => ({
+            onClick: () => {
+              setFocusedIncident(record);
+              setSearchParams({ incidentId: String(record.incident_id) });
+            },
+            className: "cursor-pointer hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-colors",
+          })}
         />
       </div>
 
@@ -470,6 +549,156 @@ const IncidentHubPage: React.FC = () => {
         onClose={() => setPartsModalOpen(false)}
         onSuccess={fetchData}
       />
+
+      {/* Drawer Chi tiết Sự cố Đang chọn (Deeplink Focus Modal) */}
+      <Drawer
+        title={
+          focusedIncident ? (
+            <div className="flex items-center justify-between pr-4">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-base text-gray-900 dark:text-gray-100">
+                  Sự cố #{focusedIncident.incident_id}: {focusedIncident.task_name}
+                </span>
+                <Tag color={focusedIncident.severity === "CRITICAL" ? "red" : focusedIncident.severity === "HIGH" ? "orange" : "blue"}>
+                  {focusedIncident.severity}
+                </Tag>
+              </div>
+            </div>
+          ) : (
+            "Chi tiết sự cố"
+          )
+        }
+        placement="right"
+        width={580}
+        open={!!focusedIncident}
+        onClose={() => {
+          setFocusedIncident(null);
+          setSearchParams({});
+        }}
+      >
+        {focusedIncident && (
+          <div className="space-y-5">
+            {/* 1. Trạng thái & SLA Header */}
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-gray-400 font-medium">Trạng thái quy trình</div>
+                <div className="mt-1">
+                  <Tag color={focusedIncident.state_color || "blue"} className="font-semibold px-2.5 py-0.5 text-xs">
+                    {focusedIncident.state_name || focusedIncident.state_code}
+                  </Tag>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-gray-400 font-medium">Cam kết SLA</div>
+                <div className="mt-1">
+                  <SLABadge
+                    status={focusedIncident.sla_status || "IN_SLA"}
+                    stateCode={focusedIncident.state_code}
+                    deadlineAt={focusedIncident.sla_deadline_at}
+                    startedAt={focusedIncident.sla_started_at}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Thiết bị liên kết */}
+            <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-950/40 bg-indigo-50/30 dark:bg-indigo-950/20">
+              <div className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-1.5 flex items-center gap-1.5">
+                <Wrench size={14} /> Thiết bị liên quan
+              </div>
+              <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">
+                {focusedIncident.asset_name ? `${focusedIncident.asset_name} (${focusedIncident.asset_code})` : "Sự cố vận hành chung"}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                <span>Phòng ban: {(focusedIncident as any).department_name || "Phân xưởng sản xuất"}</span>
+              </div>
+            </div>
+
+            {/* 3. Triệu chứng & Người báo */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 space-y-2">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Mô tả hiện tượng / Triệu chứng
+              </div>
+              <p className="text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-lg border border-gray-100 dark:border-gray-700 whitespace-pre-wrap">
+                {focusedIncident.symptom || "Chưa có mô tả chi tiết."}
+              </p>
+              <div className="pt-2 flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 dark:border-gray-800">
+                <span>Người báo: <strong className="text-gray-700 dark:text-gray-300">{focusedIncident.reporter_name || "N/A"}</strong></span>
+                <span>Thời gian: {new Date(focusedIncident.reported_at).toLocaleString("vi-VN")}</span>
+              </div>
+            </div>
+
+            {/* 4. Thao tác Quy trình FSM */}
+            <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/20 dark:bg-purple-950/10 space-y-3">
+              <div className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+                Chuyển trạng thái xử lý sự cố (FSM)
+              </div>
+              <WorkflowTransitionBar
+                taskId={focusedIncident.task_id}
+                taskName={focusedIncident.task_name}
+                assetName={focusedIncident.asset_name || focusedIncident.asset_code}
+                symptom={focusedIncident.symptom}
+                currentStateCode={focusedIncident.state_code}
+                onTransitionSuccess={async () => {
+                  await fetchData();
+                  const res = await getIncidents();
+                  if (res?.data) {
+                    setIncidents(res.data);
+                    const updated = res.data.find((i) => i.incident_id === focusedIncident.incident_id);
+                    if (updated) setFocusedIncident(updated);
+                  }
+                }}
+              />
+              {focusedIncident.state_code === "IN_PROGRESS" && (
+                <div className="pt-2 border-t border-purple-100 dark:border-purple-900/30">
+                  <Button
+                    className="w-full text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-300 font-semibold"
+                    icon={<PackagePlus size={14} className="mr-1 text-amber-600" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedIncidentForParts(focusedIncident);
+                      setPartsModalOpen(true);
+                    }}
+                  >
+                    Xin cấp vật tư phụ tùng (Đóng băng SLA)
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* 5. Bằng chứng nghiệm thu & Đánh giá AI */}
+            {focusedIncident.resolved_evidence_urls && focusedIncident.resolved_evidence_urls.length > 0 && (
+              <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10 space-y-3">
+                <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>Ảnh bằng chứng sau khắc phục</span>
+                  {focusedIncident.ai_evidence_status === "VERIFIED" && (
+                    <Tag color="success" className="text-[10px]">AI Hợp lệ ({focusedIncident.ai_evidence_score || 90}%)</Tag>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Image.PreviewGroup>
+                    {focusedIncident.resolved_evidence_urls.map((url, idx) => (
+                      <Image
+                        key={idx}
+                        src={getFileUrl(url)}
+                        alt="Bằng chứng"
+                        width={80}
+                        height={80}
+                        className="rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs"
+                      />
+                    ))}
+                  </Image.PreviewGroup>
+                </div>
+                {focusedIncident.ai_evidence_feedback && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 italic bg-white/60 dark:bg-gray-800/60 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                    💡 Nhận xét AI: {focusedIncident.ai_evidence_feedback}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 };

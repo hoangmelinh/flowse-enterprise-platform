@@ -1,5 +1,7 @@
 import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
+import Asset from "./Asset.js";
+import socketService from "../services/socketService.js";
 
 class Incident {
   static async getAll() {
@@ -197,6 +199,16 @@ class Incident {
 
       await client.query("COMMIT");
 
+      // Tự động tính và lưu bền vững Health Score thiết bị (Giai đoạn 1 Enterprise)
+      if (asset_id) {
+        Asset.calculateAndPersistHealthScore(
+          asset_id,
+          `Phát sinh sự cố: ${task.name || title} [${severity}]`,
+          "INCIDENT_REPORTED",
+          { incident_id: incident.incident_id, severity }
+        ).catch((err) => console.error("[Incident.create] Lỗi cập nhật health score:", err.message));
+      }
+
       // Bắn thông báo theo RBAC (Manager/Admin + Brevo Email nếu High/Critical)
       NotificationService.dispatchIncidentAlert({
         incidentId: incident.incident_id,
@@ -207,6 +219,21 @@ class Incident {
         priority: severity === "CRITICAL" ? "URGENT" : severity === "HIGH" ? "HIGH" : "NORMAL",
         actorId: reported_by,
       }).catch((err) => console.error("[Incident.create] Lỗi phát thông báo:", err.message));
+
+      // Bắn sự kiện Realtime Socket.IO tới toàn bộ máy tính trong xưởng
+      socketService.emitIncidentCreated({
+        incident_id: incident.incident_id,
+        task_id: task.task_id,
+        task_name: task.name || title,
+        symptom,
+        severity,
+        asset_id,
+        state_code: "REPORTED",
+        state_name: "Mới báo cáo",
+        state_color: "volcano",
+        reported_at: new Date().toISOString(),
+        reporter_name: "Kỹ thuật viên hiện trường",
+      });
 
       return {
         ...incident,

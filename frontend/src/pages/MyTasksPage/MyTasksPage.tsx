@@ -7,6 +7,7 @@ import { Avatar, Popover } from 'antd';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import TaskDetailModal from '@/components/TaskDetailModal/TaskDetailModal';
 import CreateTaskModal from '@/components/Modal/CreateTaskModal';
@@ -42,6 +43,7 @@ export default function MyTasksPage() {
     const { t, i18n } = useTranslation('tasks');
     const { t: tc } = useTranslation('common');
     const dispatch = useDispatch<AppDispatch>();
+    const navigate = useNavigate();
     const { spaces: treeSpaces, spaceTree } = useSpaceTree();
 
     const listTasks = useSelector((state: RootState) => state.tasks.listTaskByUserId ?? EMPTY_ARRAY);
@@ -294,6 +296,29 @@ export default function MyTasksPage() {
                                 onClick={() => {
                                     if (!notif.is_read) {
                                         dispatch(fetchMarkNotificationAsRead(notif.notification_id));
+                                    }
+                                    // Điều hướng ngữ cảnh thông báo (Deeplink chuẩn Proposal)
+                                    if (notif.entity_type === 'INCIDENT' || notif.type.includes('SLA') || notif.type.includes('INCIDENT')) {
+                                        const incId = notif.metadata?.incidentId;
+                                        const taskId = notif.entity_id || notif.metadata?.taskId;
+                                        if (incId) {
+                                            navigate(`/incidents?incidentId=${incId}`);
+                                        } else if (taskId) {
+                                            navigate(`/incidents?taskId=${taskId}`);
+                                        } else {
+                                            navigate('/incidents');
+                                        }
+                                    } else if (notif.entity_type === 'REQUEST' || notif.type.includes('PARTS')) {
+                                        navigate('/approvals');
+                                    } else if (notif.entity_type === 'TASK' || notif.type.includes('task')) {
+                                        const taskId = notif.entity_id || notif.related_task_id;
+                                        if (taskId) {
+                                            const allTasks = Array.isArray(listTasks) ? listTasks.flatMap((g: any) => g.tasks || []) : [];
+                                            const found = allTasks.find((t: any) => t.task_id === taskId);
+                                            if (found) {
+                                                setSelectedTask(found);
+                                            }
+                                        }
                                     }
                                 }}
                             >

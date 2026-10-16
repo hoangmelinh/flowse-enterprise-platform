@@ -115,6 +115,16 @@ class Inspection {
           reported_by: inspectorId,
           severity: maxSeverity,
         });
+      } else if (assetId) {
+        // Nếu PASS toàn bộ, vẫn cập nhật lại Health Score để ghi nhận kiểm tra đạt
+        import("./Asset.js").then(({ default: Asset }) => {
+          Asset.calculateAndPersistHealthScore(
+            assetId,
+            `Hoàn thành kiểm tra định kỳ [${overallStatus}]`,
+            "INSPECTION_RUN",
+            { run_id: run.run_id, overall_status: overallStatus }
+          ).catch((err) => console.error("[Inspection] Lỗi cập nhật health score:", err.message));
+        });
       }
 
       return {

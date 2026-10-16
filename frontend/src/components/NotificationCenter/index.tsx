@@ -30,6 +30,7 @@ import {
   testBrevoEmailApi,
 } from "@/api/notifications";
 import type { NotificationData } from "@/store/modules/notifications";
+import { useRealtimeEvents } from "@/hooks/useRealtimeEvents";
 
 export const NotificationCenter: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -87,10 +88,25 @@ export const NotificationCenter: React.FC = () => {
                   {newAlerts.length > 1
                     ? `${latest.content} (và ${newAlerts.length - 1} thông báo khác)`
                     : latest.content}
+                  <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1.5 flex items-center gap-1">
+                    👉 Nhấp vào đây để xem chi tiết sự cố
+                  </div>
                 </div>
               ),
-              duration: 4,
+              duration: 6,
               placement: "topRight",
+              onClick: () => {
+                const incId = latest.metadata?.incidentId;
+                const taskId = latest.entity_id || latest.metadata?.taskId;
+                if (incId) {
+                  navigate(`/incidents?incidentId=${incId}`);
+                } else if (taskId) {
+                  navigate(`/incidents?taskId=${taskId}`);
+                } else {
+                  navigate("/incidents");
+                }
+              },
+              className: "cursor-pointer hover:shadow-lg transition-all",
             });
           }
         }
@@ -100,16 +116,54 @@ export const NotificationCenter: React.FC = () => {
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
-  // Polling chu kỳ 30 giây để cập nhật trạng thái thời gian thực
+  // Tải danh sách thông báo ban đầu
   useEffect(() => {
     fetchNotifs(false);
-    const interval = setInterval(() => {
-      fetchNotifs(true);
-    }, 30000);
-    return () => clearInterval(interval);
   }, [fetchNotifs]);
+
+  // Lắng nghe sự kiện Realtime Socket.IO đẩy xuống tức thì (0ms latency)
+  useRealtimeEvents({
+    onNotification: (notif) => {
+      if (!notif?.notification_id) return;
+      if (notifiedIdsRef.current.has(notif.notification_id)) return;
+      notifiedIdsRef.current.add(notif.notification_id);
+
+      setNotifications((prev) => [notif, ...prev]);
+      setUnreadCount((c) => c + 1);
+
+      antNotification.open({
+        message: (
+          <div className="font-bold text-sm flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
+            {notif.priority === "URGENT" ? "BÁO ĐỘNG ĐỎ VỠ SLA (REALTIME)" : "THÔNG BÁO MỚI (REALTIME)"}
+          </div>
+        ),
+        description: (
+          <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+            {notif.content}
+            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1.5 flex items-center gap-1">
+              👉 Nhấp vào đây để xem chi tiết
+            </div>
+          </div>
+        ),
+        duration: 6,
+        placement: "topRight",
+        onClick: () => {
+          if (notif.metadata?.actionUrl) {
+            navigate(notif.metadata.actionUrl);
+            return;
+          }
+          const incId = notif.metadata?.incidentId;
+          const taskId = notif.entity_id || notif.metadata?.taskId;
+          if (incId) navigate(`/incidents?incidentId=${incId}`);
+          else if (taskId) navigate(`/incidents?taskId=${taskId}`);
+          else navigate("/incidents");
+        },
+      });
+    },
+  });
 
   const handleMarkAsRead = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
@@ -147,9 +201,19 @@ export const NotificationCenter: React.FC = () => {
     }
     setOpen(false);
 
-    // Điều hướng theo ngữ cảnh thông báo
-    if (n.entity_type === "INCIDENT" || n.type.includes("SLA") || n.type.includes("INCIDENT")) {
-      navigate("/incidents");
+    // Điều hướng theo ngữ cảnh thông báo (Deeplink chuẩn Proposal)
+    if (n.metadata?.actionUrl) {
+      navigate(n.metadata.actionUrl);
+    } else if (n.entity_type === "INCIDENT" || n.type.includes("SLA") || n.type.includes("INCIDENT")) {
+      const incId = n.metadata?.incidentId;
+      const taskId = n.entity_id || n.metadata?.taskId;
+      if (incId) {
+        navigate(`/incidents?incidentId=${incId}`);
+      } else if (taskId) {
+        navigate(`/incidents?taskId=${taskId}`);
+      } else {
+        navigate("/incidents");
+      }
     } else if (n.entity_type === "REQUEST" || n.type.includes("PARTS")) {
       navigate("/approvals");
     } else {

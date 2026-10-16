@@ -1,5 +1,6 @@
 import con from "../config/connect.js";
 import EmailService from "./emailService.js";
+import socketService from "./socketService.js";
 
 /**
  * Enterprise Notification & Anti-Spam Throttling Service (Flowse 2.0)
@@ -85,7 +86,10 @@ class NotificationService {
         dedupKey,
         JSON.stringify(metadata),
       ]);
-      return res.rows[0];
+      const notif = res.rows[0];
+      // Bắn sự kiện thời gian thực (Realtime Push Notification)
+      socketService.emitNotificationPush(userId, notif);
+      return notif;
     } catch (err) {
       console.error("[NotificationService] Lỗi tạo in-app notification:", err.message);
       return null;

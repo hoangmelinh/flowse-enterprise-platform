@@ -1,6 +1,8 @@
 import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
 import AIVisionService from "../services/aiVisionService.js";
+import Asset from "../models/Asset.js";
+import socketService from "../services/socketService.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -324,6 +326,16 @@ class WorkflowEngine {
 
       await client.query("COMMIT");
 
+      // Tự động tính toán lại và lưu cố định Health Score thiết bị (Giai đoạn 1 Enterprise)
+      if (incInfo && incInfo.asset_id) {
+        Asset.calculateAndPersistHealthScore(
+          incInfo.asset_id,
+          `Chuyển trạng thái sự cố sang [${transition.to_state_code}]`,
+          "INCIDENT_TRANSITION",
+          { incident_id: incId, task_id: taskId, to_state: transition.to_state_code }
+        ).catch((err) => console.error("[WorkflowEngine] Lỗi cập nhật health score:", err.message));
+      }
+
       // Bắn thông báo ngoài transaction nếu xin vật tư
       if (transition.to_state_code === "ON_HOLD_PENDING_PARTS" && metadata && metadata.partName) {
         NotificationService.dispatchProcurementRequestAlert({
@@ -337,6 +349,18 @@ class WorkflowEngine {
           actorId: user.user_id,
         }).catch((err) => console.error("[WorkflowEngine] Lỗi thông báo vật tư:", err.message));
       }
+
+      // Bắn sự kiện Realtime Socket.IO tới toàn bộ máy tính trong hệ thống
+      socketService.emitWorkflowTransitioned({
+        task_id: taskId,
+        incident_id: incId,
+        previous_state: task.current_state_code,
+        current_state: transition.to_state_code,
+        current_state_name: transition.to_state_name,
+        actor_id: user.user_id,
+        actor_name: user.name || "Kỹ thuật viên",
+        version: updateTaskRes.rows[0].version,
+      });
 
       return {
         success: true,
