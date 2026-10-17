@@ -4,6 +4,7 @@ import { SpaceTreeProvider } from './SpaceTreeContext';
 import { useSpaceTreeState } from './useSpaceTreeState';
 import ModalsContainer from './ModalsContainer';
 import { useOnboardingTour } from '@/components/OnboardingTour';
+import OfflineSyncBanner from '@/components/OfflineSyncBanner';
 
 export default function AppLayoutMain() {
     const tree = useSpaceTreeState();
@@ -18,6 +19,7 @@ export default function AppLayoutMain() {
                     id="main-content"
                     className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-[var(--color-background)] transition-colors duration-250"
                 >
+                    <OfflineSyncBanner />
                     <Outlet />
                 </main>
 

@@ -141,6 +141,52 @@ const IncidentHubPage: React.FC = () => {
   const handleCreateIncident = async (values: any) => {
     try {
       setSubmitting(true);
+
+      // --- XỬ LÝ NGOẠI TUYẾN KHI MẤT MẠNG (OFFLINE INTERCEPT) ---
+      if (!navigator.onLine) {
+        const { enqueueAction } = await import("@/services/offlineQueue");
+        const tempId = `temp_${Date.now()}`;
+        const selectedAsset = assets.find((a) => a.asset_id === values.asset_id);
+
+        enqueueAction({
+          action_type: "REPORT_INCIDENT",
+          payload: {
+            title: values.title,
+            symptom: values.symptom,
+            asset_id: values.asset_id,
+            severity: values.severity,
+            temp_id: tempId,
+          },
+        });
+
+        // Cập nhật lạc quan (Optimistic UI) hiển thị ngay lập tức trên bảng
+        const optimisticIncident: IncidentItem = {
+          incident_id: tempId as any,
+          task_id: tempId as any,
+          task_name: values.title,
+          task_description: values.symptom || "",
+          symptom: values.symptom,
+          evidence_urls: [],
+          severity: values.severity,
+          asset_name: selectedAsset?.name || "Thiết bị ngoại tuyến",
+          asset_code: selectedAsset?.asset_code || "OFFLINE",
+          asset_location: selectedAsset?.location || "Chưa rõ",
+          state_name: "Chờ đồng bộ (Offline)",
+          state_code: "OFFLINE_PENDING",
+          state_color: "orange",
+          reported_at: new Date().toISOString(),
+          reporter_name: "Bạn (Offline)",
+          downtime_minutes: 0,
+          sla_status: "IN_SLA",
+        };
+
+        setIncidents((prev) => [optimisticIncident, ...prev]);
+        message.warning("⚡ Đang ngoại tuyến! Sự cố đã được lưu vào máy và sẽ tự động đồng bộ khi có mạng.");
+        setCreateModalOpen(false);
+        form.resetFields();
+        return;
+      }
+
       await reportIncident({
         title: values.title,
         symptom: values.symptom,
@@ -511,6 +557,8 @@ const IncidentHubPage: React.FC = () => {
         onOk={() => form.submit()}
         confirmLoading={submitting}
         okText="Gửi báo cáo"
+        zIndex={3000}
+        getContainer={() => document.body}
       >
         <Form form={form} layout="vertical" onFinish={handleCreateIncident} initialValues={{ severity: "MEDIUM" }}>
           <Form.Item name="title" label="Tiêu đề sự cố" rules={[{ required: true, message: "Vui lòng nhập tiêu đề" }]}>
@@ -570,6 +618,7 @@ const IncidentHubPage: React.FC = () => {
         }
         placement="right"
         width={580}
+        zIndex={1000}
         open={!!focusedIncident}
         onClose={() => {
           setFocusedIncident(null);

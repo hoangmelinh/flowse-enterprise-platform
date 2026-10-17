@@ -210,6 +210,26 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         };
       }
 
+      if (!navigator.onLine) {
+        const { enqueueAction } = await import("@/services/offlineQueue");
+        enqueueAction({
+          action_type: "WORKFLOW_TRANSITION",
+          payload: {
+            task_id: taskId,
+            to_state_id: t.to_state_id,
+            note: finalNote,
+            assignee_id: selectedAssigneeId,
+            evidence_urls: evidenceUrls,
+          },
+          base_version: 1,
+        });
+
+        message.warning(`⚡ Bạn đang ngoại tuyến! Thao tác chuyển sang "${t.to_state_name}" đã được lưu vào hàng đợi và sẽ tự đồng bộ khi có mạng.`);
+        setModalOpen(false);
+        onTransitionSuccess?.();
+        return;
+      }
+
       await executeTransition(taskId, {
         toStateId: t.to_state_id,
         note: finalNote,
@@ -298,9 +318,10 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         ))}
       </Space>
 
-      {/* Modal xác nhận chuyển trạng thái: zIndex 2500 để luôn hiển thị phía trước TaskDetailModal (z-[1200]) */}
+      {/* Modal xác nhận chuyển trạng thái: zIndex 3000 để luôn hiển thị phía trước Drawer (z-[1000]) và TaskDetailModal */}
       <Modal
-        zIndex={2500}
+        zIndex={3000}
+        getContainer={() => document.body}
         title={
           <div className="flex items-center gap-2">
             {activeTransition?.to_state_code === "ON_HOLD_PENDING_PARTS" ? (

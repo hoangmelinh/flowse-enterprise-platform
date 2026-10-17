@@ -63,14 +63,22 @@
     z-index: 99999 !important;
   }
 
+  .ant-drawer-root,
+  .ant-drawer,
+  .ant-drawer-mask,
+  .ant-drawer-content-wrapper {
+    z-index: 1000 !important;
+  }
+
   .ant-modal-root,
   .ant-modal-mask,
-  .ant-modal-wrap {
-    z-index: 2500 !important;
+  .ant-modal-wrap,
+  .ant-modal {
+    z-index: 3000 !important;
   }
 
   .ant-select-dropdown {
-    z-index: 2600 !important;
+    z-index: 3100 !important;
   }
 
   .ant-message .ant-message-notice-wrapper {
@@ -190,4 +198,23 @@
   .markdown-content tr:hover td {
     background: var(--color-surface-hover);
   }
+}
+
+/* ─── Global Overrides (Un-layered for highest specificity) ─── */
+.ant-drawer-root,
+.ant-drawer,
+.ant-drawer-mask,
+.ant-drawer-content-wrapper {
+  z-index: 1000 !important;
+}
+
+.ant-modal-root,
+.ant-modal-mask,
+.ant-modal-wrap,
+.ant-modal {
+  z-index: 3000 !important;
+}
+
+.ant-select-dropdown {
+  z-index: 3100 !important;
 }

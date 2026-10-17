@@ -17,6 +17,9 @@ import { fetchSpacesForWorkspace } from '@/store/modules/spaces';
 import { fetchWorkspaces } from '@/store/modules/workspaces';
 import { fetchWorkspaceMembers } from '@/store/modules/workspaces';
 
+import { Modal } from 'antd';
+import { getOfflineQueue } from '@/services/offlineQueue';
+
 export default function AppSidebar() {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -38,6 +41,28 @@ export default function AppSidebar() {
     };
 
     const handleLogout = () => {
+        const pendingActions = getOfflineQueue().filter(
+            (a) => a.status === 'PENDING' || a.status === 'FAILED'
+        );
+        if (pendingActions.length > 0) {
+            Modal.confirm({
+                title: 'Cảnh Báo Bàn Giao Ca (Shift Handover Guard)',
+                content: `Bạn đang có ${pendingActions.length} thao tác ngoại tuyến chưa đồng bộ lên máy chủ. Nếu đăng xuất bây giờ, các thao tác này chưa được ghi nhận vào hệ thống ca trực. Bạn có chắc chắn muốn đăng xuất không?`,
+                okText: 'Vẫn đăng xuất',
+                cancelText: 'Ở lại đồng bộ',
+                okButtonProps: { danger: true },
+                onOk: () => {
+                    try {
+                        dispatch(fetchSignOut());
+                        navigate('/login');
+                    } catch (error) {
+                        console.error('Logout failed:', error);
+                    }
+                },
+            });
+            return;
+        }
+
         try {
             dispatch(fetchSignOut());
             navigate('/login');

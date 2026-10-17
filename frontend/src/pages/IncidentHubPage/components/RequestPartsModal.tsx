@@ -43,7 +43,8 @@ export const RequestPartsModal: React.FC<RequestPartsModalProps> = ({
 
   return (
     <Modal
-      zIndex={2500}
+      zIndex={3000}
+      getContainer={() => document.body}
       title={
         <div className="flex items-center gap-2">
           <Wrench size={18} className="text-amber-600" />
