@@ -218,3 +218,83 @@
 .ant-select-dropdown {
   z-index: 3100 !important;
 }
+
+/* ═══════════════════════════════════════════════
+   Enterprise Print Engine Stylesheet (@media print)
+   ═══════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    text-shadow: none !important;
+  }
+
+  html, body, #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  /* Gỡ bỏ scroll trap của AppLayout */
+  .flex.h-screen,
+  #main-content,
+  main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Ẩn các thành phần giao diện web, modal, notification */
+  aside,
+  #app-sidebar,
+  #mobile-sidebar-toggle,
+  .no-print,
+  .print\:hidden,
+  .ant-message,
+  .ant-notification,
+  .ant-modal-root,
+  .ant-drawer-root,
+  .ant-tooltip,
+  .ant-popover {
+    display: none !important;
+  }
+
+  /* Tự động ngắt trang thông minh, chống cắt xẻ dòng/card */
+  .print\:break-inside-avoid,
+  .poster-card,
+  .ant-table-row,
+  .grid > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Bảng dữ liệu chuẩn in */
+  .ant-table {
+    background: transparent !important;
+    font-size: 11px !important;
+  }
+
+  .ant-table-thead > tr > th {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    font-weight: 700 !important;
+  }
+
+  .ant-table-tbody > tr > td {
+    border-bottom: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+  }
+}

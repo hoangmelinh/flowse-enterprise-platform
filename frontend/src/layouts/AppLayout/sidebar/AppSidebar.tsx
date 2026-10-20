@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Home, MessageSquare, Clock, Plus, Settings, Users, LogOut,
     Sparkles, Grid3X3, ChevronDown, ChevronRight, RefreshCcw,
-    PanelLeftOpen, X, ShieldCheck, AlertTriangle, Cpu
+    PanelLeftOpen, X, ShieldCheck, AlertTriangle, Cpu, Activity
 } from 'lucide-react';
 import WorkspaceSwitcher from '../workspace/WorkspaceSwitcher';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -111,7 +111,7 @@ export default function AppSidebar() {
     const sidebarContent = (
         <aside
             id="app-sidebar"
-            className={`flex w-65 shrink-0 flex-col overflow-y-auto border-r border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] px-2.5 py-3 transition-all duration-300
+            className={`flex w-65 shrink-0 flex-col overflow-y-auto border-r border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] px-2.5 py-3 transition-all duration-300 print:hidden
                 lg:relative lg:translate-x-0
                 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:shadow-2xl
                 max-lg:transition-transform max-lg:duration-300 max-lg:ease-in-out
@@ -154,6 +154,7 @@ export default function AppSidebar() {
                 {navItem('/approvals', <ShieldCheck size={18} strokeWidth={1.8} />, 'Phê duyệt')}
                 {navItem('/incidents', <AlertTriangle size={18} strokeWidth={1.8} />, 'Sự cố (Field)')}
                 {navItem('/assets', <Cpu size={18} strokeWidth={1.8} />, 'Thiết bị & QR')}
+                {navItem('/analytics', <Activity size={18} strokeWidth={1.8} />, 'Điều hành CMMS')}
                 {navItem('/time-tracking', <Clock size={18} strokeWidth={1.8} />, t('sidebar.timeTracking'))}
 
                 <div
@@ -236,7 +237,7 @@ export default function AppSidebar() {
             {/* Mobile backdrop overlay */}
             {isMobileOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] hidden max-lg:block"
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] hidden max-lg:block print:hidden"
                     onClick={() => setIsMobileOpen(false)}
                     aria-hidden="true"
                 />
@@ -248,7 +249,7 @@ export default function AppSidebar() {
                     type="button"
                     id="mobile-sidebar-toggle"
                     aria-label="Open sidebar"
-                    className="hidden max-lg:flex fixed bottom-5 left-4 z-50 items-center justify-center gap-2 rounded-full bg-[var(--color-primary-alt)] px-4 py-3 text-white shadow-lg shadow-[var(--color-primary-alt)]/40 transition-all hover:opacity-90 active:scale-95"
+                    className="hidden max-lg:flex fixed bottom-5 left-4 z-50 items-center justify-center gap-2 rounded-full bg-[var(--color-primary-alt)] px-4 py-3 text-white shadow-lg shadow-[var(--color-primary-alt)]/40 transition-all hover:opacity-90 active:scale-95 print:hidden"
                     onClick={() => setIsMobileOpen(true)}
                 >
                     <PanelLeftOpen size={18} />

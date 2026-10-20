@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented, Drawer } from "antd";
-import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw, Activity } from "lucide-react";
 import { getIncidents, reportIncident, getDowntimeStats, cleanTestIncidents, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
 import { RequestPartsModal } from "./components/RequestPartsModal";
+import { AIAnalyticsModal } from "./components/AIAnalyticsModal";
 import { getFileUrl } from "@/utils/imageUrl";
 import { useRealtimeEvents } from "@/hooks/useRealtimeEvents";
 
 const IncidentHubPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -18,6 +20,7 @@ const IncidentHubPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [partsModalOpen, setPartsModalOpen] = useState(false);
+  const [aiAnalyticsModalOpen, setAiAnalyticsModalOpen] = useState(false);
   const [selectedIncidentForParts, setSelectedIncidentForParts] = useState<IncidentItem | null>(null);
   const [focusedIncident, setFocusedIncident] = useState<IncidentItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -413,6 +416,14 @@ const IncidentHubPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            type="primary"
+            icon={<Activity className="w-4 h-4 inline mr-1 text-yellow-300" />}
+            onClick={() => navigate('/analytics')}
+            className="bg-linear-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-indigo-500 border-none shadow-sm font-semibold text-white"
+          >
+            Điều Hành CMMS & AI Hub
+          </Button>
           <Button onClick={() => fetchData(period)} loading={loading}>
             Làm mới
           </Button>
@@ -748,6 +759,14 @@ const IncidentHubPage: React.FC = () => {
           </div>
         )}
       </Drawer>
+
+      {/* Pop-up Điều hành AI Executive Analytics & Thẻ Hành Động Action Cards */}
+      <AIAnalyticsModal
+        open={aiAnalyticsModalOpen}
+        onClose={() => setAiAnalyticsModalOpen(false)}
+        currentPeriod={period}
+        onIncidentCreated={() => fetchData(period)}
+      />
     </div>
   );
 };
