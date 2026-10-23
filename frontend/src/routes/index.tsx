@@ -18,6 +18,7 @@ const SprintViewPage = lazy(() => import('../pages/SprintViewPage'));
 const ApprovalCenterPage = lazy(() => import('../pages/ApprovalCenterPage'));
 const IncidentHubPage = lazy(() => import('../pages/IncidentHubPage'));
 const AssetManagementPage = lazy(() => import('../pages/AssetManagementPage'));
+const CMMSAnalyticsPage = lazy(() => import('../pages/CMMSAnalyticsPage'));
 const AppLayout = lazy(() => import("../layouts/AppLayout"));
 const InvitationPage = lazy(() => import("../pages/InvitationPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
@@ -65,6 +66,10 @@ export const routes: RouteConfig[] = [
             {
                 path: '/assets',
                 element: <AssetManagementPage />
+            },
+            {
+                path: '/analytics',
+                element: <CMMSAnalyticsPage />
             },
             {
                 path: '/ai',

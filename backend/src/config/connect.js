@@ -28,4 +28,8 @@ con.connect((err, client, release) => {
     release();
 });
 
+con.on('error', (err) => {
+    console.error('Cảnh báo ngắt kết nối tạm thời từ PostgreSQL (idle client):', err.message);
+});
+
 export default con;

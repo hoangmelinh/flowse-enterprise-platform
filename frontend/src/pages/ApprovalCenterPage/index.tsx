@@ -65,6 +65,26 @@ const ApprovalCenterPage: React.FC = () => {
         <div>
           <div className="font-semibold text-gray-900 dark:text-gray-100">{record.task_name}</div>
           <div className="text-xs text-gray-500 line-clamp-1">{record.task_description || "Không có mô tả"}</div>
+          
+          {record.incident_id && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Tag color="volcano" className="font-medium">
+                🔗 Sự cố #{record.incident_id}
+              </Tag>
+              {(record.asset_name || record.asset_code) && (
+                <Tag color="cyan">
+                  Máy: {record.asset_name || record.asset_code}
+                </Tag>
+              )}
+            </div>
+          )}
+
+          {record.request_note && (
+            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded mt-1.5 border border-amber-200 dark:border-amber-900/30">
+              📝 {record.request_note}
+            </div>
+          )}
+
           <div className="mt-1 flex items-center gap-1.5">
             <Tag color={record.work_item_type === "INCIDENT" ? "red" : "blue"}>
               {record.work_item_type}
@@ -199,6 +219,17 @@ const ApprovalCenterPage: React.FC = () => {
               {selectedItem?.task_name}
             </span>
           </p>
+
+          {selectedItem?.incident_id && (
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
+              <span className="text-base leading-none">⚡</span>
+              <div>
+                <strong>Liên thông sự cố #{selectedItem.incident_id}:</strong> Khi bấm{" "}
+                <span className="underline font-semibold">{decisionType === "APPROVED" ? "Phê duyệt" : "Từ chối"}</span>, hệ thống sẽ{" "}
+                {decisionType === "APPROVED" ? "tự động chuyển Sự cố về trạng thái Đang khắc phục và dời hạn chót SLA tương ứng số phút đã chờ duyệt." : "kích hoạt lại tiến độ và ghi nhận từ chối linh kiện."}
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Ghi chú quyết định (tùy chọn)

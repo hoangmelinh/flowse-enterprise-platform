@@ -2,6 +2,7 @@ import { X, ChevronRight, Minimize2, Maximize2, MoreHorizontal } from 'lucide-re
 import { Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { StatusPicker } from '@/components/Pickers';
+import { WorkflowTransitionBar } from '@/components/WorkflowTransitionBar';
 import type { Task } from '@/types/tasks';
 
 interface TaskDetailHeaderProps {
@@ -43,15 +44,21 @@ export default function TaskDetailHeader({
                         options={statusOptions}
                         onChange={(newId) => updateTask(task.task_id, { status_id: newId })}
                     />
+
+                    <WorkflowTransitionBar
+                        taskId={task.task_id}
+                        size="small"
+                        onTransitionSuccess={() => updateTask(task.task_id, {})}
+                    />
                 </div>
 
                 <div className="flex items-center gap-0.5">
-                    <Tooltip title={isMaximized ? t('detail.minimize') : t('detail.maximize')}>
+                    <Tooltip title={isMaximized ? t('detail.minimize') : t('detail.maximize')} zIndex={99999}>
                         <button className={iconBtn} onClick={onToggleMaximize}>
                             {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                         </button>
                     </Tooltip>
-                    <Tooltip title={t('share.title')}>
+                    <Tooltip title={t('share.title')} zIndex={99999}>
                         <button className={iconBtn} onClick={onOpenShare}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
@@ -59,7 +66,7 @@ export default function TaskDetailHeader({
                             </svg>
                         </button>
                     </Tooltip>
-                    <Tooltip title="Options">
+                    <Tooltip title="Options" zIndex={99999}>
                         <button className={iconBtn}>
                             <MoreHorizontal size={16} />
                         </button>

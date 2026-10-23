@@ -9,7 +9,7 @@ import bcrypt from 'bcrypt';
 import { Resend } from 'resend';
 import crypto from 'crypto';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const otpStore = new Map();
 const OTP_TTL_MS = 10 * 60 * 1000;

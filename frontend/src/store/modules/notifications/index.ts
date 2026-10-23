@@ -15,6 +15,10 @@ export interface NotificationData {
     message?: string;
     content: string;
     is_read: boolean;
+    priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+    entity_id?: number | null;
+    entity_type?: string | null;
+    metadata?: any;
     related_task_id: number | null;
     related_space_id: number | null;
     created_at: string;

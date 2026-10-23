@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
 import con from "./config/connect.js";
@@ -27,6 +28,7 @@ import {
   assetRoutes,
   incidentRoutes,
   syncRoutes,
+  inspectionRoutes,
 } from "./routes/index.js";
 import { protectedRoute } from "./middlewares/authMiddlewares.js";
 import { globalErrorHandler, notFoundHandler } from "./middlewares/errorMiddleware.js";
@@ -45,7 +47,13 @@ const PORT = process.env.PORT || 5001;
 const HOST = process.env.HOST || "0.0.0.0";
 
 //middleware
-const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173'];
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+].filter(Boolean);
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -56,24 +64,36 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Blocked by CORS'));
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Blocked by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(generalLimiter);
 
 //public route
 import fs from 'fs';
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads', { recursive: true });
-app.use('/uploads', express.static('uploads'));
+import path from 'path';
+const localUploads = path.resolve(process.cwd(), 'uploads');
+const parentUploads = path.resolve(process.cwd(), '..', 'uploads');
+if (!fs.existsSync(localUploads)) fs.mkdirSync(localUploads, { recursive: true });
+app.use('/uploads', express.static(localUploads));
+if (fs.existsSync(parentUploads)) {
+  app.use('/uploads', express.static(parentUploads));
+}
 
 app.get("/db-health", async (req, res) => {
   try {
@@ -118,6 +138,7 @@ app.use('/api/v1/approvals', approvalRoutes);
 app.use('/api/v1/assets', assetRoutes);
 app.use('/api/v1/incidents', incidentRoutes);
 app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/inspections', inspectionRoutes);
 
 // ── 404 handler (đặt sau tất cả routes) ────────────────────────
 app.use(notFoundHandler);
@@ -125,6 +146,14 @@ app.use(notFoundHandler);
 // ── Global error handler (đặt cuối cùng) ────────────────────────
 app.use(globalErrorHandler);
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server is running on ${HOST}:${PORT}`);
+import SlaMonitorWorker from "./services/slaMonitorWorker.js";
+import socketService from "./services/socketService.js";
+
+const server = http.createServer(app);
+socketService.init(server, allowedOrigins);
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server is running on ${HOST}:${PORT} (HTTP + Socket.IO)`);
+  // Khởi động bộ quét giám sát SLA định kỳ
+  SlaMonitorWorker.start(60000);
 });

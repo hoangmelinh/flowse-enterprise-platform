@@ -18,13 +18,13 @@ import {
     Blocks,
     Edit,
     Search,
-    Sun,
-    Bell,
-    Lightbulb,
     PanelLeftClose,
     PanelLeftOpen,
-    Trash2
+    Trash2,
+    AlertTriangle,
+    Wrench
 } from 'lucide-react';
+import { ActionCard } from '@/components/ActionCard';
 
 export default function AIPage() {
     const dispatch = useDispatch<AppDispatch>();
@@ -166,7 +166,8 @@ export default function AIPage() {
                             ...m, 
                             content: fullResponse, 
                             isStreaming: false,
-                            followUps: response.suggestions || []
+                            followUps: response.suggestions || [],
+                            actionCard: response.actionCard
                         } : m) } 
                     : s
             ));
@@ -354,25 +355,25 @@ export default function AIPage() {
                             </div>
 
                             <div className="mt-6 flex w-full gap-3 justify-center text-left">
-                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-[var(--color-border)] hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Create Task")}>
-                                    <Sun size={14} className="mb-2 text-[var(--color-text-secondary)]" />
-                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Create Task</span>
-                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Add new action item</span>
+                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-purple-300 hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Tạo sự cố máy CNC-024 bị kẹt phoi trục chính")}>
+                                    <AlertTriangle size={14} className="mb-2 text-rose-500" />
+                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Báo sự cố CNC</span>
+                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Tạo Action Card sự cố</span>
                                 </button>
-                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-[var(--color-border)] hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Set Reminder")}>
-                                    <Bell size={14} className="mb-2 text-[var(--color-text-secondary)]" />
-                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Set Reminder</span>
-                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Remind about task</span>
+                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-purple-300 hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Phân tích Downtime và chỉ số MTTR phân xưởng tháng này")}>
+                                    <Sparkles size={14} className="mb-2 text-purple-500" />
+                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Downtime & MTTR</span>
+                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Tổng hợp hiệu suất vận hành</span>
                                 </button>
-                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-[var(--color-border)] hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Brainstorm Ideas")}>
-                                    <Lightbulb size={14} className="mb-2 text-[var(--color-text-secondary)]" />
-                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Brainstorm Ideas</span>
-                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Generate new concepts</span>
+                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-purple-300 hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Lập lịch bảo trì phòng ngừa định kỳ cho máy CNC-024")}>
+                                    <Wrench size={14} className="mb-2 text-indigo-500" />
+                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Bảo trì phòng ngừa</span>
+                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Đề xuất lịch bảo dưỡng PM</span>
                                 </button>
-                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-[var(--color-border)] hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Find Tasks")}>
-                                    <Search size={14} className="mb-2 text-[var(--color-text-secondary)]" />
-                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Find Tasks</span>
-                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Search for overdue tasks</span>
+                                <button className="flex flex-1 flex-col justify-start rounded-xl border border-[var(--color-border-light)] bg-[var(--color-surface-container-lowest)] p-3 shadow-sm hover:border-purple-300 hover:-translate-y-0.5 transition-all" onClick={() => handleSendMessage("Tìm các task quá hạn cần ưu tiên xử lý")}>
+                                    <Search size={14} className="mb-2 text-amber-500" />
+                                    <span className="text-[12px] font-extrabold text-[var(--color-on-surface)] mb-0.5">Task quá hạn</span>
+                                    <span className="text-[11px] font-medium text-[var(--color-text-tertiary)]">Rà soát việc trễ hạn</span>
                                 </button>
                             </div>
                         </div>
@@ -409,6 +410,29 @@ export default function AIPage() {
                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                             {message.content + (message.isStreaming ? ' █' : '')}
                                                         </ReactMarkdown>
+                                                    </div>
+                                                )}
+
+                                                {/* Render Action Card if attached */}
+                                                {!message.isSearching && message.actionCard && (
+                                                    <div className="mt-3 w-full max-w-xl">
+                                                        <ActionCard 
+                                                            card={message.actionCard}
+                                                            onExecuteSuccess={() => {
+                                                                setSessions(prev => prev.map(s => 
+                                                                    s.id === activeSessionId
+                                                                        ? {
+                                                                            ...s,
+                                                                            messages: s.messages.map(m => 
+                                                                                m.id === message.id && m.actionCard
+                                                                                    ? { ...m, actionCard: { ...m.actionCard, status: 'EXECUTED' } }
+                                                                                    : m
+                                                                            )
+                                                                        }
+                                                                        : s
+                                                                ));
+                                                            }}
+                                                        />
                                                     </div>
                                                 )}
                                                 

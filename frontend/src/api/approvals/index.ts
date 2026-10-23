@@ -14,6 +14,11 @@ export interface ApprovalItem {
   status: "PENDING" | "APPROVED" | "REJECTED";
   decision_note: string;
   created_at: string;
+  incident_id?: number;
+  asset_id?: number;
+  asset_name?: string;
+  asset_code?: string;
+  request_note?: string;
 }
 
 export const getPendingApprovals = async (): Promise<{ success: boolean; data: ApprovalItem[] }> => {

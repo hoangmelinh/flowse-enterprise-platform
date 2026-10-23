@@ -51,3 +51,20 @@ export const createAsset = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Phase 4 – Digital Health Record
+ * GET /assets/:id/health-record
+ */
+export const getAssetHealthRecord = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const record = await Asset.getHealthRecord(id);
+    if (!record) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+    res.json({ success: true, data: record });
+  } catch (error) {
+    next(error);
+  }
+};

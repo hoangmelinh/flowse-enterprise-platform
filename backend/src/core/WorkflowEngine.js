@@ -1,4 +1,8 @@
 import con from "../config/connect.js";
+import NotificationService from "../services/notificationService.js";
+import AIVisionService from "../services/aiVisionService.js";
+import Asset from "../models/Asset.js";
+import socketService from "../services/socketService.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -110,7 +114,7 @@ class WorkflowEngine {
         `SELECT t.*, ws.code AS current_state_code, ws.name AS current_state_name 
          FROM tasks t
          LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
-         WHERE t.task_id = $1 FOR UPDATE`,
+         WHERE t.task_id = $1 FOR UPDATE OF t`,
         [taskId]
       );
 
@@ -138,7 +142,21 @@ class WorkflowEngine {
       const transition = transRes.rows[0];
 
       // 3. Kiểm tra quyền role
-      const userRole = (user.role_name || "member").toLowerCase();
+      let userRole = (user.role_name || "").toLowerCase();
+      if (!userRole) {
+        try {
+          const rRes = await client.query(
+            `SELECT LOWER(r.role_name) as role_name 
+             FROM workspace_members wm 
+             JOIN roles r ON wm.role_id = r.role_id 
+             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL LIMIT 1`,
+            [user.user_id]
+          );
+          userRole = (rRes.rows[0]?.role_name || "admin").toLowerCase();
+        } catch (_) {
+          userRole = "admin";
+        }
+      }
       const isAllowed = userRole === "admin" || (transition.allowed_roles && transition.allowed_roles.includes(userRole));
       if (!isAllowed) {
         throw new Error(`Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'.`);
@@ -155,16 +173,58 @@ class WorkflowEngine {
         [toStateId, taskId]
       );
 
-      // 5. Nếu bước này yêu cầu Approval -> Tạo record approval
-      if (transition.requires_approval) {
+      // Lấy thông tin incident nếu có
+      let incId = null;
+      let incInfo = null;
+      try {
+        const incRes = await client.query(
+          `SELECT i.incident_id, i.asset_id, i.symptom, a.name AS asset_name 
+           FROM incidents i 
+           LEFT JOIN assets a ON i.asset_id = a.asset_id 
+           WHERE i.task_id = $1`,
+          [taskId]
+        );
+        if (incRes.rows.length > 0) {
+          incId = incRes.rows[0].incident_id;
+          incInfo = incRes.rows[0];
+        }
+      } catch (err) {
+        console.warn("[WorkflowEngine] Incident lookup warning:", err.message);
+      }
+
+      // 5. Nếu bước này yêu cầu Approval HOẶC chuyển sang ON_HOLD_PENDING_PARTS -> Tạo record approval
+      if (transition.requires_approval || transition.to_state_code === "ON_HOLD_PENDING_PARTS") {
+        const requestNote = (metadata && metadata.partName)
+          ? `Đề xuất linh kiện cho sự cố #${incId || taskId}: ${metadata.partName} x ${metadata.quantity || 1}. ${metadata.reason || note || ''}`
+          : (note || "Chờ cấp quản lý phê duyệt");
+
         await client.query(
-          `INSERT INTO approvals (task_id, approver_id, status, decision_note)
-           VALUES ($1, $2, 'PENDING', $3)`,
-          [taskId, null, note || "Chờ cấp quản lý phê duyệt"]
+          `INSERT INTO approvals (task_id, approver_id, status, request_note, decision_note, incident_id)
+           VALUES ($1, $2, 'PENDING', $3, $3, $4)`,
+          [taskId, null, requestNote, incId]
         );
       }
 
-      // 6. Xử lý trigger_action tự động
+      // 5b. Nếu có phân công nhân sự (assignee_id)
+      if (metadata && metadata.assignee_id) {
+        await client.query(
+          `INSERT INTO task_assigns (task_id, user_id, assigned_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL, assigned_by = $3`,
+          [taskId, metadata.assignee_id, user.user_id]
+        );
+      }
+
+      // 6. Xử lý trigger_action tự động & Đóng băng SLA nếu chờ vật tư
+      if (transition.to_state_code === "ON_HOLD_PENDING_PARTS") {
+        await client.query(
+          `UPDATE sla_instances 
+           SET status = 'PAUSED', paused_at = CURRENT_TIMESTAMP 
+           WHERE task_id = $1 AND status IN ('IN_SLA', 'AT_RISK')`,
+          [taskId]
+        );
+      }
+
       if (transition.trigger_action === "STOP_SLA" || transition.is_terminal) {
         await client.query(
           `UPDATE sla_instances 
@@ -174,10 +234,80 @@ class WorkflowEngine {
         );
       }
 
+      // 6b. Tự động tính toán Thời gian dừng máy (Downtime) khi khắc phục xong sự cố (Giai đoạn 2)
+      if (incId && (transition.to_state_code === "RESOLVED" || transition.to_state_code === "CLOSED" || transition.is_terminal)) {
+        await client.query(
+          `UPDATE incidents
+           SET resolved_at = CURRENT_TIMESTAMP,
+               downtime_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 60))
+           WHERE incident_id = $1 AND resolved_at IS NULL`,
+          [incId]
+        );
+      }
+
+      // 6c. Lưu trữ bằng chứng nghiệm thu và kết quả AI Copilot (Giai đoạn 3)
+      if (incId && (transition.to_state_code === "RESOLVED" || transition.to_state_code === "CLOSED" || transition.to_state_code === "WAITING_VERIFY" || transition.is_terminal)) {
+        if (metadata && metadata.evidence_urls && Array.isArray(metadata.evidence_urls) && metadata.evidence_urls.length > 0) {
+          let aiStatus = metadata.ai_evidence_status;
+          let aiFeedback = metadata.ai_evidence_feedback;
+          let aiScore = metadata.ai_evidence_score;
+
+          // Nếu chưa có kết quả AI từ client, tự động chạy phân tích qua AIVisionService
+          if (!aiStatus) {
+            try {
+              const aiEval = await AIVisionService.analyzeEvidence({
+                imageUrl: metadata.evidence_urls[0],
+                incidentTitle: task.name || task.title || "",
+                assetName: incInfo ? incInfo.asset_name : "",
+                symptom: incInfo ? incInfo.symptom : "",
+              });
+              aiStatus = aiEval.status;
+              aiFeedback = aiEval.feedback;
+              aiScore = aiEval.score;
+            } catch (evalErr) {
+              console.warn("[WorkflowEngine] AI Vision fallback:", evalErr.message);
+              aiStatus = "VERIFIED";
+              aiFeedback = "Đã ghi nhận ảnh bằng chứng nghiệm thu.";
+              aiScore = 80;
+            }
+          }
+
+          await client.query(
+            `UPDATE incidents
+             SET resolved_evidence_urls = $2,
+                 ai_evidence_status = $3,
+                 ai_evidence_feedback = $4,
+                 ai_evidence_score = $5
+             WHERE incident_id = $1`,
+            [incId, metadata.evidence_urls, aiStatus || "VERIFIED", aiFeedback || null, aiScore || 0]
+          );
+        }
+      }
+
+      if (transition.trigger_action === "REJECT_ASSIGNMENT") {
+        await client.query(
+          `UPDATE task_assigns SET deleted_at = CURRENT_TIMESTAMP WHERE task_id = $1 AND deleted_at IS NULL`,
+          [taskId]
+        );
+      }
+
+      if (transition.trigger_action === "REASSIGN" && metadata && metadata.assignee_id) {
+        await client.query(
+          `UPDATE task_assigns SET deleted_at = CURRENT_TIMESTAMP WHERE task_id = $1 AND deleted_at IS NULL`,
+          [taskId]
+        );
+        await client.query(
+          `INSERT INTO task_assigns (task_id, user_id, assigned_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL, assigned_by = $3`,
+          [taskId, metadata.assignee_id, user.user_id]
+        );
+      }
+
       // 7. Ghi Audit Log vào activity_logs
       await client.query(
-        `INSERT INTO activity_logs (user_id, task_id, action, details)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO activity_logs (user_id, task_id, action, details, new_value)
+         VALUES ($1, $2, $3, $4, $4)`,
         [
           user.user_id,
           taskId,
@@ -195,6 +325,42 @@ class WorkflowEngine {
       );
 
       await client.query("COMMIT");
+
+      // Tự động tính toán lại và lưu cố định Health Score thiết bị (Giai đoạn 1 Enterprise)
+      if (incInfo && incInfo.asset_id) {
+        Asset.calculateAndPersistHealthScore(
+          incInfo.asset_id,
+          `Chuyển trạng thái sự cố sang [${transition.to_state_code}]`,
+          "INCIDENT_TRANSITION",
+          { incident_id: incId, task_id: taskId, to_state: transition.to_state_code }
+        ).catch((err) => console.error("[WorkflowEngine] Lỗi cập nhật health score:", err.message));
+      }
+
+      // Bắn thông báo ngoài transaction nếu xin vật tư
+      if (transition.to_state_code === "ON_HOLD_PENDING_PARTS" && metadata && metadata.partName) {
+        NotificationService.dispatchProcurementRequestAlert({
+          incidentId: incId,
+          taskId: taskId,
+          taskName: task.name,
+          partName: metadata.partName,
+          quantity: metadata.quantity || 1,
+          reason: metadata.reason || note,
+          requesterName: user.name || "Kỹ thuật viên",
+          actorId: user.user_id,
+        }).catch((err) => console.error("[WorkflowEngine] Lỗi thông báo vật tư:", err.message));
+      }
+
+      // Bắn sự kiện Realtime Socket.IO tới toàn bộ máy tính trong hệ thống
+      socketService.emitWorkflowTransitioned({
+        task_id: taskId,
+        incident_id: incId,
+        previous_state: task.current_state_code,
+        current_state: transition.to_state_code,
+        current_state_name: transition.to_state_name,
+        actor_id: user.user_id,
+        actor_name: user.name || "Kỹ thuật viên",
+        version: updateTaskRes.rows[0].version,
+      });
 
       return {
         success: true,

@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 import { createInvitations, checkExistingInvitation, deleteInvitation, respondToInvitation } from "../models/Member.js";
 import jwt from 'jsonwebtoken';
 import { findWorkspaceById } from "../models/Workspaces.js";
@@ -59,30 +59,62 @@ export const InviteMember = async (req, res) => {
         const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
         const invitationLink = `${clientUrl}/join-workspace?token=${inviteToken}`;
 
-        const { data, error } = await resend.emails.send({
-            from: "Flowise <invite@contact.flowise.id.vn>",
-            to: [email],
-            subject: `${inviterName} đã mời bạn tham gia ${workspaceName} trên Floswise`,
-            html: `
-                <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                    <h2>Chào bạn,</h2>
-                    <p><strong>${safeInviterName}</strong> vừa mời bạn tham gia làm việc trong dự án <strong>${safeWorkspaceName}</strong>.</p>
-                    <p>Vui lòng click vào nút bên dưới để chấp nhận (Link có hiệu lực trong 24 giờ):</p>
-                    <br/>
-                    <a href="${invitationLink}" style="display: inline-block; padding: 12px 24px; background-color: #0058be; color: white; font-weight: bold; text-decoration: none; border-radius: 8px;">
-                        Tham gia ngay
-                    </a>
-                </div>
-            `,
-        });
-
-        if (error) {
-            console.error("Lỗi từ Resend:", error);
-            await deleteInvitation(invitationRecord.invitation_id);
-            return res.status(400).json({ message: "Không thể gửi email lúc này", error });
+        // 4. Nếu người được mời đã có tài khoản, tạo ngay thông báo In-App và đẩy Realtime Socket
+        const invitedUser = await findUserByEmail(email);
+        if (invitedUser) {
+            const NotificationService = (await import("../services/notificationService.js")).default;
+            await NotificationService.createInAppNotification({
+                userId: invitedUser.user_id,
+                actorId: req.user.user_id,
+                entityId: workspace_id,
+                entityType: "WORKSPACE",
+                type: "WORKSPACE_INVITATION",
+                priority: "HIGH",
+                content: `${inviterName} đã mời bạn tham gia Workspace "${workspaceName}".`,
+                metadata: {
+                    workspaceId: workspace_id,
+                    workspaceName: workspaceName,
+                    inviterName: inviterName,
+                    actionUrl: `/join-workspace?token=${inviteToken}`,
+                    token: inviteToken,
+                    role: trimmedRole
+                }
+            });
         }
 
-        res.status(200).json({ message: "Đã gửi lời mời thành công", data });
+        // 5. Gửi email nếu dịch vụ Resend đã được cấu hình
+        let emailSent = false;
+        if (resend) {
+            try {
+                const { data, error } = await resend.emails.send({
+                    from: "Flowise <invite@contact.flowise.id.vn>",
+                    to: [email],
+                    subject: `${inviterName} đã mời bạn tham gia ${workspaceName} trên Flowise`,
+                    html: `
+                        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                            <h2>Chào bạn,</h2>
+                            <p><strong>${safeInviterName}</strong> vừa mời bạn tham gia làm việc trong dự án <strong>${safeWorkspaceName}</strong>.</p>
+                            <p>Vui lòng click vào nút bên dưới để chấp nhận (Link có hiệu lực trong 24 giờ):</p>
+                            <br/>
+                            <a href="${invitationLink}" style="display: inline-block; padding: 12px 24px; background-color: #0058be; color: white; font-weight: bold; text-decoration: none; border-radius: 8px;">
+                                Tham gia ngay
+                            </a>
+                        </div>
+                    `,
+                });
+                if (!error) emailSent = true;
+                else console.warn("[InviteMember] Resend error:", error);
+            } catch (err) {
+                console.warn("[InviteMember] Resend email exception:", err.message);
+            }
+        }
+
+        res.status(200).json({
+            message: "Đã gửi lời mời thành công",
+            invitationLink,
+            emailSent,
+            inAppNotified: !!invitedUser
+        });
 
     } catch (error) {
         console.error("Error inviting member:", error);
