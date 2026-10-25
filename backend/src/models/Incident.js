@@ -3,8 +3,32 @@ import NotificationService from "../services/notificationService.js";
 import Asset from "./Asset.js";
 import socketService from "../services/socketService.js";
 
+import Department from "./Department.js";
+
 class Incident {
-  static async getAll() {
+  static async getAll(user = null) {
+    let whereClause = "";
+    const values = [];
+
+    if (user && user.user_id) {
+      // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
+      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
+
+      // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
+      if (accessibleDeptIds !== null) {
+        values.push(user.user_id);
+        values.push(accessibleDeptIds);
+        whereClause = `
+          WHERE (
+            inc.reported_by = $1 
+            OR tech.assignee_id = $1 
+            OR a.department_id = ANY($2::int[])
+            OR a.department_id IS NULL
+          )
+        `;
+      }
+    }
+
     const query = `
       SELECT 
         inc.*,
@@ -18,6 +42,7 @@ class Incident {
         a.asset_code,
         a.name AS asset_name,
         a.location AS asset_location,
+        a.department_id AS asset_department_id,
         u.name AS reporter_name,
         u.avatar_url AS reporter_avatar,
         tech.assignee_id,
@@ -38,9 +63,10 @@ class Incident {
         JOIN users u ON ta.user_id = u.user_id
         WHERE ta.deleted_at IS NULL
       ) tech ON t.task_id = tech.task_id
+      ${whereClause}
       ORDER BY inc.created_at DESC
     `;
-    const res = await con.query(query);
+    const res = await con.query(query, values);
     return res.rows;
   }
 
@@ -152,14 +178,21 @@ class Incident {
       );
       const defaultStatusId = statusRes.rows[0]?.status_id || null;
 
+      // Tìm department_id từ asset nếu có
+      let resolvedDeptId = null;
+      if (asset_id) {
+        const aRes = await client.query(`SELECT department_id FROM assets WHERE asset_id = $1`, [asset_id]);
+        resolvedDeptId = aRes.rows[0]?.department_id || null;
+      }
+
       // 1. Tạo Work Item trong bảng tasks
       const taskRes = await client.query(
         `INSERT INTO tasks (
           name, description, list_id, created_by, priority, 
-          work_item_type, workflow_id, current_state_id, status_id
-        ) VALUES ($1, $2, $3, $4, $5, 'INCIDENT', $6, $7, $8)
+          work_item_type, workflow_id, current_state_id, status_id, department_id
+        ) VALUES ($1, $2, $3, $4, $5, 'INCIDENT', $6, $7, $8, $9)
         RETURNING *`,
-        [title, symptom, targetListId, reported_by, severity === "CRITICAL" ? "Urgent" : "High", workflowId, initialStateId, defaultStatusId]
+        [title, symptom, targetListId, reported_by, severity === "CRITICAL" ? "Urgent" : "High", workflowId, initialStateId, defaultStatusId, resolvedDeptId]
       );
       const task = taskRes.rows[0];
 
@@ -183,11 +216,11 @@ class Incident {
 
       // 4. Ghi Audit Log
       await client.query(
-        `INSERT INTO activity_logs (user_id, task_id, action, new_value, details)
-         VALUES ($1, $2, 'REPORT_INCIDENT', $3, $3)`,
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, 'REPORT_INCIDENT', NULL, $3::jsonb)`,
         [
-          reported_by,
           task.task_id,
+          reported_by,
           JSON.stringify({
             incident_id: incident.incident_id,
             asset_id,
@@ -256,22 +289,24 @@ class Incident {
       await client.query("BEGIN");
 
       const incRes = await client.query(
-        `SELECT inc.*, t.name as task_name, t.workflow_id, t.current_state_id, t.list_id
+        `SELECT inc.*, t.name as task_name, t.workflow_id, t.current_state_id, t.list_id, t.department_id, ast.department_id AS asset_dept_id
          FROM incidents inc 
          JOIN tasks t ON inc.task_id = t.task_id 
+         LEFT JOIN assets ast ON inc.asset_id = ast.asset_id
          WHERE inc.incident_id = $1`,
         [incidentId]
       );
       if (incRes.rows.length === 0) throw new Error("Không tìm thấy sự cố");
       const incident = incRes.rows[0];
+      const deptId = incident.department_id || incident.asset_dept_id || null;
 
       // 1. Tạo Work Item dạng REQUEST
       const reqTitle = `Yêu cầu vật tư: ${partName} (${quantity}) cho sự cố #${incident.incident_id}`;
       const taskRes = await client.query(
-        `INSERT INTO tasks (name, description, list_id, created_by, priority, work_item_type)
-         VALUES ($1, $2, $3, $4, 'High', 'REQUEST')
+        `INSERT INTO tasks (name, description, list_id, created_by, priority, work_item_type, department_id)
+         VALUES ($1, $2, $3, $4, 'High', 'REQUEST', $5)
          RETURNING task_id`,
-        [reqTitle, `Số lượng: ${quantity}. Lý do: ${reason}`, incident.list_id, requestedBy]
+        [reqTitle, `Số lượng: ${quantity}. Lý do: ${reason}`, incident.list_id, requestedBy, deptId]
       );
       const reqTaskId = taskRes.rows[0].task_id;
 
@@ -306,11 +341,11 @@ class Incident {
 
       // 4. Ghi Audit Log
       await client.query(
-        `INSERT INTO activity_logs (user_id, task_id, action, new_value, details)
-         VALUES ($1, $2, 'REQUEST_SPARE_PARTS', $3, $3)`,
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, 'REQUEST_SPARE_PARTS', NULL, $3::jsonb)`,
         [
-          requestedBy,
           incident.task_id,
+          requestedBy,
           JSON.stringify({
             partName,
             quantity,
@@ -340,6 +375,278 @@ class Incident {
         request_task_id: reqTaskId,
         new_state: "ON_HOLD_PENDING_PARTS",
       };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Mở lại sự cố trong vòng 24 giờ (Reopen Protocol) per SRS & docs/01_business_domain/03_incident_management.md
+   */
+  static async reopenIncident({ incidentId, userId, reason = "Máy tái phát lỗi sau sửa chữa" }) {
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+
+      const incRes = await client.query(
+        `SELECT inc.*, t.name as task_name, t.current_state_id, ws.code as current_state_code
+         FROM incidents inc
+         JOIN tasks t ON inc.task_id = t.task_id
+         LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
+         WHERE inc.incident_id = $1
+         FOR UPDATE OF inc`,
+        [incidentId]
+      );
+      if (incRes.rows.length === 0) throw new Error("Không tìm thấy sự cố");
+      const incident = incRes.rows[0];
+
+      // 1. Kiểm tra điều kiện 24 giờ kể từ thời điểm giải quyết
+      if (!incident.resolved_at) {
+        throw new Error("Sự cố chưa được đánh dấu hoàn thành, không thể mở lại.");
+      }
+
+      const diffMs = Date.now() - new Date(incident.resolved_at).getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      if (diffHours > 24) {
+        throw new Error(
+          `Sự cố đã hoàn thành quá 24 giờ (${Math.round(diffHours)}h). Theo quy định, vui lòng báo cáo sự cố mới.`
+        );
+      }
+
+      // 2. Chuyển trạng thái task quay lại IN_PROGRESS
+      const inProgressStateRes = await client.query(
+        `SELECT state_id FROM workflow_states 
+         WHERE workflow_id = (SELECT workflow_id FROM workflow_definitions WHERE code = 'INCIDENT_FLOW')
+           AND code = 'IN_PROGRESS' LIMIT 1`
+      );
+      const inProgressStateId = inProgressStateRes.rows[0]?.state_id;
+
+      await client.query(
+        `UPDATE tasks 
+         SET current_state_id = $1, version = COALESCE(version, 1) + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE task_id = $2`,
+        [inProgressStateId, incident.task_id]
+      );
+
+      // 3. Reset resolved_at trên bảng incidents
+      await client.query(
+        `UPDATE incidents
+         SET resolved_at = NULL
+         WHERE incident_id = $1`,
+        [incidentId]
+      );
+
+      // 4. Kích hoạt lại đồng hồ SLA (cấp thêm 120 phút khắc phục sự cố tái phát)
+      await client.query(
+        `UPDATE sla_instances
+         SET status = 'IN_SLA',
+             deadline_at = CURRENT_TIMESTAMP + INTERVAL '120 minutes',
+             paused_at = NULL,
+             breached_at = NULL
+         WHERE task_id = $1`,
+        [incident.task_id]
+      );
+
+      // 5. Ghi Audit Log vào activity_logs
+      await client.query(
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, 'INCIDENT_REOPENED', to_jsonb($3::text), $4::jsonb)`,
+        [
+          incident.task_id,
+          userId,
+          incident.current_state_code,
+          JSON.stringify({
+            incident_id: incidentId,
+            reason,
+            reopened_at: new Date().toISOString(),
+          }),
+        ]
+      );
+
+      await client.query("COMMIT");
+
+      // Cập nhật lại Health Score cho thiết bị
+      if (incident.asset_id) {
+        Asset.calculateAndPersistHealthScore(
+          incident.asset_id,
+          `Mở lại sự cố #${incidentId}: ${reason}`,
+          "INCIDENT_REOPENED",
+          { incident_id: incidentId }
+        ).catch((err) => console.error("[Incident.reopen] Lỗi cập nhật health score:", err.message));
+      }
+
+      // Realtime notification
+      socketService.emitWorkflowTransitioned({
+        task_id: incident.task_id,
+        incident_id: incidentId,
+        previous_state: incident.current_state_code,
+        current_state: "IN_PROGRESS",
+        current_state_name: "Đang khắc phục (Mở lại)",
+        actor_id: userId,
+        reason,
+      });
+
+      return {
+        success: true,
+        incident_id: incidentId,
+        new_state: "IN_PROGRESS",
+        message: "Sự cố đã được mở lại thành công trong thời hạn 24h.",
+      };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Quản đốc phân công Kỹ thuật viên xử lý sự cố (Triage & Assignment)
+   */
+  static async assignTechnician({ incidentId, technicianId, assignedBy }) {
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+
+      const incRes = await client.query(
+        `SELECT inc.*, t.name as task_name, t.current_state_id, ws.code as current_state_code
+         FROM incidents inc
+         JOIN tasks t ON inc.task_id = t.task_id
+         LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
+         WHERE inc.incident_id = $1`,
+        [incidentId]
+      );
+      if (incRes.rows.length === 0) throw new Error("Không tìm thấy sự cố");
+      const incident = incRes.rows[0];
+
+      // 1. Gán kỹ thuật viên vào task_assigns
+      await client.query(
+        `INSERT INTO task_assigns (task_id, user_id, assigned_by)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL, assigned_by = $3`,
+        [incident.task_id, technicianId, assignedBy]
+      );
+
+      // 2. Nếu trạng thái đang là REPORTED -> Chuyển sang ASSIGNED
+      let newStateCode = incident.current_state_code;
+      if (incident.current_state_code === "REPORTED") {
+        const assignedStateRes = await client.query(
+          `SELECT state_id FROM workflow_states 
+           WHERE workflow_id = (SELECT workflow_id FROM workflow_definitions WHERE code = 'INCIDENT_FLOW')
+             AND code = 'ASSIGNED' LIMIT 1`
+        );
+        if (assignedStateRes.rows.length > 0) {
+          await client.query(
+            `UPDATE tasks 
+             SET current_state_id = $1, version = COALESCE(version, 1) + 1, updated_at = CURRENT_TIMESTAMP
+             WHERE task_id = $2`,
+            [assignedStateRes.rows[0].state_id, incident.task_id]
+          );
+          newStateCode = "ASSIGNED";
+        }
+      }
+
+      // 3. Ghi Audit Log vào activity_logs
+      await client.query(
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, 'TECHNICIAN_ASSIGNED', NULL, $3::jsonb)`,
+        [
+          incident.task_id,
+          assignedBy,
+          JSON.stringify({
+            incident_id: incidentId,
+            technician_id: technicianId,
+            state: newStateCode,
+          }),
+        ]
+      );
+
+      await client.query("COMMIT");
+
+      // Bắn thông báo cho Kỹ thuật viên được chỉ định
+      NotificationService.createAssignNotificationIfNotExists(
+        technicianId,
+        assignedBy,
+        incident.task_id,
+        `Bạn được phân công xử lý sự cố: "${incident.task_name}"`
+      ).catch(() => {});
+
+      return {
+        success: true,
+        incident_id: incidentId,
+        technician_id: technicianId,
+        current_state: newStateCode,
+      };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Bổ sung bằng chứng hình ảnh hiện trường hoặc sau sửa chữa (Evidence Lifecycle)
+   */
+  static async appendEvidence({ incidentId, evidenceUrls = [], uploadedBy, isResolvedEvidence = false }) {
+    if (!Array.isArray(evidenceUrls) || evidenceUrls.length === 0) {
+      throw new Error("Danh sách evidenceUrls không được để trống");
+    }
+
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+
+      const incRes = await client.query(
+        `SELECT task_id, evidence_urls, resolved_evidence_urls FROM incidents WHERE incident_id = $1`,
+        [incidentId]
+      );
+      if (incRes.rows.length === 0) throw new Error("Không tìm thấy sự cố");
+      const inc = incRes.rows[0];
+
+      if (isResolvedEvidence) {
+        const merged = Array.from(new Set([...(inc.resolved_evidence_urls || []), ...evidenceUrls]));
+        await client.query(
+          `UPDATE incidents SET resolved_evidence_urls = $1 WHERE incident_id = $2`,
+          [merged, incidentId]
+        );
+      } else {
+        const merged = Array.from(new Set([...(inc.evidence_urls || []), ...evidenceUrls]));
+        await client.query(
+          `UPDATE incidents SET evidence_urls = $1 WHERE incident_id = $2`,
+          [merged, incidentId]
+        );
+      }
+
+      // Tạo bản ghi attachments cho task
+      for (const url of evidenceUrls) {
+        await client.query(
+          `INSERT INTO attachments (task_id, file_name, file_url, uploaded_by)
+           VALUES ($1, 'Ảnh bằng chứng hiện trường', $2, $3)`,
+          [inc.task_id, url, uploadedBy]
+        );
+      }
+
+      // Ghi Audit Log
+      await client.query(
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, 'EVIDENCE_UPLOADED', NULL, $3::jsonb)`,
+        [
+          inc.task_id,
+          uploadedBy,
+          JSON.stringify({
+            incident_id: incidentId,
+            urls: evidenceUrls,
+            is_resolved: isResolvedEvidence,
+          }),
+        ]
+      );
+
+      await client.query("COMMIT");
+      return { success: true, incident_id: incidentId, added_count: evidenceUrls.length };
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

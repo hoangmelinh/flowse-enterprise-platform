@@ -7,6 +7,14 @@ const BASE_TASK_SELECT = `
     t.sprint_id,
     t.milestone_id,
     t.created_by,
+    t.work_item_type,
+    t.workflow_id,
+    t.current_state_id,
+    t.department_id,
+    t.version,
+    ws.name AS state_name,
+    ws.color AS state_color,
+    ws.code AS state_code,
     s.name AS space_name,
     s.color AS space_color,
     t.status_id,
@@ -51,6 +59,7 @@ const BASE_TASK_FROM_JOIN = `
   JOIN lists l ON t.list_id = l.list_id
   JOIN spaces s ON l.space_id = s.space_id
   LEFT JOIN task_status ts ON t.status_id = ts.status_id
+  LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
 `;
 
 const scopedError = (message, statusCode = 400) => {
@@ -203,8 +212,16 @@ export const findAllTasksBySprintId = async (sprint_id) => {
   }
 };
 
-export const findAllTasksByUserId = async (user_id) => {
+export const findAllTasksByUserId = async (user_id, filterType = null) => {
   try {
+    let typeClause = "";
+    const values = [user_id];
+
+    if (filterType) {
+      values.push(filterType);
+      typeClause = ` AND t.work_item_type = $2`;
+    }
+
     const query = `
       ${BASE_TASK_SELECT}
       ${BASE_TASK_FROM_JOIN}
@@ -219,9 +236,10 @@ export const findAllTasksByUserId = async (user_id) => {
                   AND ta.deleted_at IS NULL
             )
         )
+        ${typeClause}
       ORDER BY t.position ASC;
     `;
-    const result = await con.query(query, [user_id]);
+    const result = await con.query(query, values);
     return result.rows;
   } catch (error) {
     console.error("Error in findAllTasksByUserId:", error);
@@ -263,7 +281,11 @@ export const createTaskForList = async ({
   assignee_ids,
   due_date,
   status_id,
-  created_by
+  created_by,
+  work_item_type = 'TASK',
+  workflow_id = null,
+  current_state_id = null,
+  department_id = null,
 }) => {
   const client = await con.connect();
 
@@ -283,11 +305,34 @@ export const createTaskForList = async ({
     await ensureStatusInSpace(client, final_status_id, space_id);
     const validAssigneeIds = await ensureWorkspaceMembers(client, workspace_id, assignee_ids || []);
 
+    // Tự động phân giải workflow_id và initial state_id nếu chưa có
+    let finalWorkflowId = workflow_id;
+    let finalStateId = current_state_id;
+    if (!finalWorkflowId) {
+      const wfCode = work_item_type === 'INCIDENT' ? 'INCIDENT_FLOW'
+        : work_item_type === 'INSPECTION' ? 'INSPECTION_FLOW'
+        : work_item_type === 'REQUEST' ? 'REQUEST_FLOW'
+        : 'TASK_FLOW';
+      const wfRes = await client.query(
+        `SELECT w.workflow_id, s.state_id 
+         FROM workflow_definitions w
+         JOIN workflow_states s ON w.workflow_id = s.workflow_id
+         WHERE w.code = $1 AND s.is_initial = true
+         LIMIT 1`,
+        [wfCode]
+      );
+      if (wfRes.rows.length > 0) {
+        finalWorkflowId = wfRes.rows[0].workflow_id;
+        finalStateId = finalStateId || wfRes.rows[0].state_id;
+      }
+    }
+
     const taskQuery = `
                     INSERT INTO tasks (
                         name, description, list_id, 
-                        status_id, priority, due_date, start_date, created_by
-                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *`;
+                        status_id, priority, due_date, start_date, created_by,
+                        work_item_type, workflow_id, current_state_id, department_id, version
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 1) RETURNING *`;
 
     const taskValues = [
       name,
@@ -296,7 +341,11 @@ export const createTaskForList = async ({
       final_status_id,
       priority || 'Normal',
       due_date || null,
-      created_by || null
+      created_by || null,
+      work_item_type || 'TASK',
+      finalWorkflowId,
+      finalStateId,
+      department_id || null,
     ];
 
     const taskResult = await client.query(taskQuery, taskValues);
@@ -364,7 +413,12 @@ export const updateTask = async (task_id, updateData) => {
       'position',
       'list_id',
       'sprint_id',
-      'is_archived'
+      'is_archived',
+      'work_item_type',
+      'workflow_id',
+      'current_state_id',
+      'department_id',
+      'version'
     ];
 
     const fieldsToUpdate = [];

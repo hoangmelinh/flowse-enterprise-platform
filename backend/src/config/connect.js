@@ -8,15 +8,16 @@ const { Pool } = pkg;
 const useSsl = process.env.DB_SSL !== 'false';
 
 const con = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+    ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || '123456',
+        database: process.env.DB_NAME || 'flowse_enterprise',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+    }),
     max: 20, 
     idleTimeoutMillis: 30000, 
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
 });
 

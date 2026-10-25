@@ -262,6 +262,24 @@ class NotificationService {
       metadata: { incidentId, taskId, partName },
     });
   }
+
+  /**
+   * Tạo thông báo phân công công việc/sự cố cho Kỹ thuật viên
+   */
+  static async createAssignNotificationIfNotExists(technicianId, actorId, taskId, message) {
+    if (!technicianId) return;
+    return await this.createInAppNotification({
+      userId: technicianId,
+      actorId,
+      entityId: taskId,
+      entityType: "INCIDENT",
+      type: "ASSIGNMENT",
+      content: message || "Bạn được phân công xử lý công việc mới.",
+      priority: "HIGH",
+      dedupKey: `ASSIGN_TASK_${taskId}_USER_${technicianId}`,
+      metadata: { taskId, assignedBy: actorId },
+    });
+  }
 }
 
 export default NotificationService;

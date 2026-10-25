@@ -1,5 +1,27 @@
 import Inspection from "../models/Inspection.js";
 
+export const getInspectionTemplates = async (req, res, next) => {
+  try {
+    const templates = await Inspection.getAllTemplates();
+    res.json({ success: true, data: templates });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInspectionById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const item = await Inspection.getById(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy mẫu kiểm tra này" });
+    }
+    res.json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAssetChecklist = async (req, res, next) => {
   try {
     const { assetId } = req.params;

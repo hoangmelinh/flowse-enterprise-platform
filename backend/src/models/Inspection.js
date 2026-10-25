@@ -3,6 +3,51 @@ import Incident from "./Incident.js";
 
 class Inspection {
   /**
+   * Lấy danh mục toàn bộ mẫu checklist định kỳ (Inspection Templates per API Contract 2.5)
+   */
+  static async getAllTemplates() {
+    const query = `
+      SELECT c.*,
+        a.name AS asset_name,
+        a.asset_code,
+        (SELECT COUNT(*) FROM checklist_items ci WHERE ci.checklist_id = c.checklist_id) AS item_count
+      FROM checklists c
+      LEFT JOIN assets a ON c.asset_id = a.asset_id
+      WHERE c.is_active = true
+      ORDER BY c.checklist_id ASC
+    `;
+    const res = await con.query(query);
+    return res.rows;
+  }
+
+  /**
+   * Lấy chi tiết một checklist template kèm danh sách câu hỏi theo ID
+   */
+  static async getById(checklistId) {
+    const query = `
+      SELECT c.*, 
+        a.name AS asset_name,
+        a.asset_code,
+        json_agg(
+          json_build_object(
+            'item_id', ci.item_id,
+            'question', ci.question,
+            'require_evidence', ci.require_evidence,
+            'fail_severity', ci.fail_severity,
+            'position', ci.position
+          ) ORDER BY ci.position ASC
+        ) AS items
+      FROM checklists c
+      LEFT JOIN assets a ON c.asset_id = a.asset_id
+      LEFT JOIN checklist_items ci ON c.checklist_id = ci.checklist_id
+      WHERE c.checklist_id = $1
+      GROUP BY c.checklist_id, a.name, a.asset_code
+    `;
+    const res = await con.query(query, [checklistId]);
+    return res.rows[0] || null;
+  }
+
+  /**
    * Lấy checklist và danh sách các câu hỏi kiểm tra của một thiết bị
    */
   static async getChecklistByAsset(assetId) {

@@ -62,9 +62,92 @@ class WorkflowEngine {
   }
 
   /**
+   * Xác định toàn bộ vai trò hệ thống & vai trò ngữ cảnh (Contextual Roles) của User đối với một Task cụ thể
+   * Theo chuẩn SRS & docs/01_business_domain/09_rbac_and_resource_scope.md:
+   * - Base roles: admin, manager, member từ workspace_members
+   * - Contextual roles: 'technician' / 'assignee' nếu được giao việc; 'reporter' / 'creator' nếu là người tạo
+   * - Department roles: 'manager' nếu là quản đốc phân xưởng / phòng ban của task; 'qa' nếu thuộc bộ phận QA
+   */
+  static async getUserRolesForTask(userId, taskId) {
+    const roles = new Set();
+
+    // 1. Quyền theo Workspace
+    const wsRoleRes = await con.query(
+      `SELECT LOWER(r.role_name) as role_name 
+       FROM workspace_members wm 
+       JOIN roles r ON wm.role_id = r.role_id 
+       WHERE wm.user_id = $1 AND wm.deleted_at IS NULL`,
+      [userId]
+    );
+    wsRoleRes.rows.forEach((r) => roles.add(r.role_name));
+
+    // 2. Quyền ngữ cảnh được giao việc (Assignee / Technician)
+    const assignRes = await con.query(
+      `SELECT 1 FROM task_assigns WHERE task_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+      [taskId, userId]
+    );
+    if (assignRes.rows.length > 0) {
+      roles.add("assignee");
+      roles.add("technician");
+    }
+
+    // 3. Quyền người tạo (Creator / Reporter) và Quản lý phòng ban theo cây phân cấp doanh nghiệp
+    const taskRes = await con.query(
+      `SELECT t.created_by, t.department_id, ast.department_id AS asset_dept_id
+       FROM tasks t
+       LEFT JOIN incidents inc ON t.task_id = inc.task_id
+       LEFT JOIN assets ast ON inc.asset_id = ast.asset_id
+       WHERE t.task_id = $1`,
+      [taskId]
+    );
+    if (taskRes.rows.length > 0) {
+      if (taskRes.rows[0].created_by === userId) {
+        roles.add("reporter");
+        roles.add("creator");
+      }
+      const targetDeptId = taskRes.rows[0].department_id || taskRes.rows[0].asset_dept_id;
+      if (targetDeptId) {
+        // Kiểm tra phân cấp quản lý đa tầng: Nếu user là manager của targetDeptId HOẶC bất kỳ cấp cha nào
+        const isMgr = await con.query(
+          `WITH RECURSIVE mgr_tree AS (
+             SELECT department_id, parent_id, manager_id FROM departments WHERE manager_id = $1
+             UNION ALL
+             SELECT d.department_id, d.parent_id, d.manager_id
+             FROM departments d
+             JOIN mgr_tree mt ON d.parent_id = mt.department_id
+           )
+           SELECT 1 FROM mgr_tree WHERE department_id = $2 LIMIT 1`,
+          [userId, targetDeptId]
+        );
+        if (isMgr.rows.length > 0) {
+          roles.add("manager");
+        }
+      }
+    }
+
+    // 4. Phòng ban chức năng đặc thù (QA / QC)
+    const userDeptRes = await con.query(
+      `SELECT d.code FROM users u JOIN departments d ON u.department_id = d.department_id WHERE u.user_id = $1`,
+      [userId]
+    );
+    if (userDeptRes.rows.length > 0) {
+      const code = (userDeptRes.rows[0].code || "").toUpperCase();
+      if (code === "QA" || code === "QA_QC") {
+        roles.add("qa");
+      }
+    }
+
+    if (roles.size === 0) {
+      roles.add("member");
+    }
+
+    return Array.from(roles);
+  }
+
+  /**
    * Lấy các transition khả dụng cho một Work Item cụ thể dựa trên trạng thái hiện tại và role của User
    */
-  static async getAvailableTransitions(taskId, userRole = "member") {
+  static async getAvailableTransitions(taskId, userRoles = ["member"]) {
     const taskRes = await con.query(
       `SELECT task_id, workflow_id, current_state_id, status_id FROM tasks WHERE task_id = $1`,
       [taskId]
@@ -75,9 +158,11 @@ class WorkflowEngine {
 
     const task = taskRes.rows[0];
     if (!task.workflow_id || !task.current_state_id) {
-      // Nếu task chưa gắn workflow mới, trả về rỗng để fallback về kanban status cũ
       return [];
     }
+
+    const rolesArray = Array.isArray(userRoles) ? userRoles : [userRoles || "member"];
+    const isAdmin = rolesArray.includes("admin");
 
     const query = `
       SELECT 
@@ -94,10 +179,15 @@ class WorkflowEngine {
       JOIN workflow_states ts ON t.to_state_id = ts.state_id
       WHERE t.workflow_id = $1 
         AND t.from_state_id = $2
-        AND ($3 = ANY(t.allowed_roles) OR 'admin' = $3)
+        AND ($3 = true OR t.allowed_roles && $4::text[])
     `;
 
-    const res = await con.query(query, [task.workflow_id, task.current_state_id, userRole.toLowerCase()]);
+    const res = await con.query(query, [
+      task.workflow_id,
+      task.current_state_id,
+      isAdmin,
+      rolesArray.map((r) => r.toLowerCase()),
+    ]);
     return res.rows;
   }
 
@@ -141,25 +231,30 @@ class WorkflowEngine {
       }
       const transition = transRes.rows[0];
 
-      // 3. Kiểm tra quyền role
-      let userRole = (user.role_name || "").toLowerCase();
-      if (!userRole) {
-        try {
-          const rRes = await client.query(
-            `SELECT LOWER(r.role_name) as role_name 
-             FROM workspace_members wm 
-             JOIN roles r ON wm.role_id = r.role_id 
-             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL LIMIT 1`,
-            [user.user_id]
-          );
-          userRole = (rRes.rows[0]?.role_name || "admin").toLowerCase();
-        } catch (_) {
-          userRole = "admin";
-        }
-      }
-      const isAllowed = userRole === "admin" || (transition.allowed_roles && transition.allowed_roles.includes(userRole));
+      // 3. Kiểm tra quyền role động theo ngữ cảnh (Contextual RBAC)
+      const contextualRoles = await WorkflowEngine.getUserRolesForTask(user.user_id, taskId);
+      const userProvidedRoles = Array.isArray(user.roles) ? user.roles : (user.role ? [user.role] : []);
+      const rolesArray = Array.from(new Set([...userProvidedRoles, ...contextualRoles])).map((r) => r.toLowerCase());
+
+      const isAllowed =
+        rolesArray.includes("admin") ||
+        (transition.allowed_roles &&
+          transition.allowed_roles.some((r) => rolesArray.includes(r.toLowerCase())));
+
       if (!isAllowed) {
-        throw new Error(`Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'.`);
+        throw new Error(
+          `Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'. Vai trò yêu cầu: ${transition.allowed_roles.join(", ")}.`
+        );
+      }
+
+      // 3b. Kiểm tra required_fields (nếu có yêu cầu)
+      if (transition.required_fields && transition.required_fields.length > 0) {
+        for (const field of transition.required_fields) {
+          const val = metadata?.[field] || (field === "evidence_url" && metadata?.evidence_urls) || note;
+          if (!val || (Array.isArray(val) && val.length === 0)) {
+            throw new Error(`Bước chuyển này bắt buộc phải cung cấp thông tin [${field}].`);
+          }
+        }
       }
 
       // 4. Cập nhật trạng thái Task và tăng Version (hỗ trợ optimistic lock cho sync)
@@ -306,12 +401,13 @@ class WorkflowEngine {
 
       // 7. Ghi Audit Log vào activity_logs
       await client.query(
-        `INSERT INTO activity_logs (user_id, task_id, action, details, new_value)
-         VALUES ($1, $2, $3, $4, $4)`,
+        `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+         VALUES ($1, $2, $3, to_jsonb($4::text), $5::jsonb)`,
         [
-          user.user_id,
           taskId,
+          user.user_id,
           "WORKFLOW_TRANSITION",
+          task.current_state_code || "",
           JSON.stringify({
             transition_id: transition.transition_id,
             transition_name: transition.transition_name,
