@@ -168,24 +168,38 @@ graph TD
 ```text
 flowse-enterprise-platform/
 ├── backend/                             # Dịch vụ Backend (Node.js 20+ / Express 5)
+│   ├── scripts/                         # Bộ kịch bản kiểm thử tự động (verify_backend_flows.js)
 │   ├── src/
-│   │   ├── config/                      # Cấu hình Database Pool và migrations SQL
+│   │   ├── config/                      # Cấu hình Pool DB, migrations & seeds
 │   │   ├── core/                        # WorkflowEngine.js (State Machine điều phối)
 │   │   ├── controllers/                 # Bộ điều khiển xử lý logic nghiệp vụ
 │   │   │   ├── approvalController.js
 │   │   │   ├── assetController.js
 │   │   │   ├── departmentController.js
 │   │   │   ├── incidentController.js
+│   │   │   ├── inspectionController.js
 │   │   │   ├── syncController.js
 │   │   │   ├── taskController.js
+│   │   │   ├── workItemController.js
 │   │   │   ├── workflowController.js
 │   │   │   └── ...
-│   │   ├── middlewares/                 # Xác thực JWT, phân quyền RBAC, Rate Limiting
+│   │   ├── middlewares/                 # Xác thực JWT, phân quyền RBAC ngữ cảnh, Rate Limiting
 │   │   ├── models/                      # Tầng truy vấn cơ sở dữ liệu PostgreSQL
-│   │   ├── routes/                      # Khai báo các endpoint REST API
-│   │   └── server.js                    # File khởi chạy chính Express
+│   │   ├── routes/                      # Khai báo các endpoint REST API (/api/v1/...)
+│   │   ├── services/                    # SlaMonitorWorker, socketService, notificationService
+│   │   └── server.js                    # File khởi chạy chính Express + Socket.IO
 │   ├── package.json
 │   └── Dockerfile
+│
+├── mobile/                              # Ứng dụng Mobile (React Native / Expo / Clean Architecture)
+│   ├── src/
+│   │   ├── core/                        # Tokens theme, cấu hình, constants, errors
+│   │   ├── domain/                      # Entities nghiệp vụ & Repository Interfaces (Pure TS)
+│   │   ├── data/                        # Axios API Client, Secure Store, Repositories Impl
+│   │   └── presentation/                # UI Screens, Navigation, Zustand Store, Components
+│   ├── App.tsx                          # Điểm khởi chạy với Navigation & QueryClientProvider
+│   ├── app.json
+│   └── package.json
 │
 ├── frontend/                            # Ứng dụng Web (React 19 / TypeScript / Vite 7)
 │   ├── src/
@@ -217,7 +231,8 @@ flowse-enterprise-platform/
 │   └── 02_technical_contracts/          # Danh mục API contract và Database ERD mapping
 │
 ├── plan/                                # Tài liệu đề xuất gốc & SRS tham chiếu
-│   ├── dev/FLOWSE_2.0_SRS_v1.1.docx     # SRS v1.1 chuẩn ISO/IEC/IEEE 29148
+│   ├── dev/FLOWSE_SRS_Mobile_v1.docx    # SRS Mobile v1.1 chuẩn ISO/IEC/IEEE 29148
+│   ├── dev/MOBILE_IMPLEMENTATION_PLAN.md# Kế hoạch & tracking triển khai Mobile
 │   └── docs/FLOWSE_2.0_De_xuat_de_tai_hoan_chinh.docx # Thuyết minh đề án chi tiết
 │
 ├── docker-compose.yml                   # Khởi chạy toàn bộ hệ thống bằng 1 lệnh
@@ -261,21 +276,27 @@ Hệ thống đã được đóng gói sẵn sàng với Docker Compose (gồm P
 - **PostgreSQL** $\ge$ 16
 
 #### Bước 1: Khởi tạo Cơ sở dữ liệu
-Chạy lần lượt 2 file SQL trong thư mục `database/` vào cơ sở dữ liệu PostgreSQL của bạn:
-1. `database/flowise_1.0_baseline.sql`
-2. `database/005_flowse_2.0_enterprise_core.sql`
+Chạy các file SQL trong thư mục `database/` hoặc chạy script khởi tạo tự động:
+```bash
+cd backend
+node src/config/init_db.js
+```
 
-#### Bước 2: Cài đặt & Khởi chạy Backend
+#### Bước 2: Khởi chạy Backend
 ```bash
 cd backend
 cp .env.example .env
-# Điền thông tin kết nối DB vào file backend/.env
 npm install
 npm run dev
 ```
-> Backend chạy tại: `http://localhost:5001`
+> Backend chạy tại: `http://localhost:5001` (HTTP + Realtime Socket.IO + SlaMonitorWorker)
 
-#### Bước 3: Cài đặt & Khởi chạy Frontend
+#### Kiểm thử toàn diện Backend (28/28 Test Cases):
+```bash
+node scripts/verify_backend_flows.js
+```
+
+#### Bước 3: Khởi chạy Frontend Web
 ```bash
 cd frontend
 cp .env.example .env
@@ -284,61 +305,78 @@ npm run dev
 ```
 > Frontend chạy tại: `http://localhost:5173`
 
+#### Bước 4: Khởi chạy Mobile App
+```bash
+cd mobile
+npm install
+npm start
+```
+
 ---
 
-## 6. Danh mục API Endpoints
+## 6. Danh mục API Endpoints (Chuẩn hóa theo SRS mới & API Contract Matrix)
 
-### 🔐 Xác thực & Người dùng (IAM)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới |
-| `POST` | `/api/v1/auth/login` | Đăng nhập tài khoản & nhận JWT cookies |
-| `POST` | `/api/v1/auth/google-login` | Đăng nhập bằng Google OAuth 2.0 |
-| `POST` | `/api/v1/auth/refresh-token` | Làm mới Access Token bằng Refresh Token |
-| `POST` | `/api/v1/auth/logout` | Đăng xuất và xóa phiên làm việc |
-| `GET` | `/api/v1/users/profile` | Lấy thông tin cá nhân của người dùng hiện tại |
-| `GET` | `/api/v1/departments` | Lấy danh sách phòng ban trong doanh nghiệp |
+### 🔐 1. Xác thực & Quản lý Người dùng (IAM & Contextual RBAC)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | Đăng ký tài khoản người dùng mới | Public |
+| `POST` | `/api/v1/auth/login` | Đăng nhập tài khoản & nhận JWT token | Public |
+| `POST` | `/api/v1/auth/google-login` | Đăng nhập nhanh bằng Google OAuth 2.0 | Public |
+| `POST` | `/api/v1/auth/refresh-token` | Làm mới Access Token bằng Refresh Token | Public |
+| `POST` | `/api/v1/auth/logout` | Đăng xuất và xóa phiên làm việc | Authenticated |
+| `GET` | `/api/v1/users/profile` | Lấy thông tin cá nhân của người dùng hiện tại | `Member` |
+| `GET` | `/api/v1/users/contexts` | Lấy ngữ cảnh động, cây phòng ban & capabilities | `Member` |
+| `GET` | `/api/v1/departments/tree` | Lấy cây phân cấp doanh nghiệp (*Phân xưởng $\rightarrow$ Dây chuyền $\rightarrow$ Tổ/Ca*) | `Member` |
 
-### ⚙️ Quy trình nghiệp vụ (Workflow Engine)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/workflows` | Lấy danh sách các workflow đang kích hoạt |
-| `GET` | `/api/v1/workflows/:id` | Lấy chi tiết workflow, danh sách trạng thái và bước chuyển |
-| `GET` | `/api/v1/workflows/task/:taskId/transitions` | Lấy các bước chuyển trạng thái khả dụng cho một Work Item |
-| `POST` | `/api/v1/workflows/task/:taskId/transition` | Thực hiện bước chuyển trạng thái (State Transition) |
+### 📋 2. Đối tượng công việc & Máy trạng thái (Work Items & Workflow Engine)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/work-items/my-work` | Lấy danh sách việc của tôi (5 bucket: Today, Overdue, In Progress, Waiting, Completed) | `Member` |
+| `GET` | `/api/v1/work-items/:id` | Xem thông tin chi tiết Work Item kèm lịch sử và audit trail | `Member` |
+| `POST` | `/api/v1/work-items` | Tạo Work Item mới (Task, Incident, Request) | `Member` |
+| `GET` | `/api/v1/workflows` | Lấy danh sách các workflow đang kích hoạt | `Manager` |
+| `GET` | `/api/v1/workflows/:id/transitions` | Lấy các bước chuyển trạng thái khả dụng theo Contextual RBAC | `Member` |
+| `POST` | `/api/v1/workflows/:id/transition` | Thực thi bước chuyển trạng thái trong State Machine | Tùy `allowed_roles` |
 
-### 🛡️ Trung tâm phê duyệt (Approval Center)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/approvals/pending` | Danh sách các yêu cầu đang chờ phê duyệt |
-| `POST` | `/api/v1/approvals/:approvalId/decision` | Ra quyết định phê duyệt (`APPROVED`) hoặc từ chối (`REJECTED`) |
+### 🚨 3. Quản lý sự cố hiện trường (Incident Management)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/incidents` | Danh sách sự cố hiện trường kèm trạng thái và bộ lọc | `Member` |
+| `POST` | `/api/v1/incidents` | Báo sự cố máy móc mới (tự động khởi tạo Response SLA) | `Member` |
+| `POST` | `/api/v1/incidents/:id/assign` | Quản đốc chỉ định Kỹ thuật viên xử lý | `Manager` |
+| `POST` | `/api/v1/incidents/:id/evidence` | Tải ảnh hiện trường hoặc ảnh nghiệm thu | `Member` |
+| `POST` | `/api/v1/incidents/:id/request-parts` | Yêu cầu cấp vật tư (Cầu nối Hiện trường $\rightarrow$ Văn phòng, tạm dừng SLA) | `Member` |
+| `POST` | `/api/v1/incidents/:id/reopen` | **Mở lại sự cố trong vòng 24 giờ sau giải quyết** (Giao thức 24h Reopen) | `Manager` |
 
-### 🚨 Quản lý sự cố hiện trường (Incident Management)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/incidents` | Lấy danh sách các sự cố hiện trường kèm trạng thái và thiết bị |
-| `GET` | `/api/v1/incidents/:id` | Lấy chi tiết thông tin sự cố |
-| `POST` | `/api/v1/incidents` | Báo cáo sự cố máy móc mới (tự động gắn SLA và khởi tạo task) |
+### 🛡️ 4. Trung tâm phê duyệt (Approval Center)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/approvals/pending` | Danh sách các đề xuất đang chờ cấp quản lý xem xét | `Manager` |
+| `POST` | `/api/v1/approvals/:id/decision` | Ra quyết định phê duyệt (`APPROVED`) hoặc từ chối (`REJECTED`) | `Manager`, `Admin` |
 
-### 🏷️ Quản lý thiết bị & QR Context (Asset & QR Context)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/assets` | Lấy danh mục thiết bị và máy móc trong nhà xưởng |
-| `GET` | `/api/v1/assets/:id` | Chi tiết thiết bị |
-| `GET` | `/api/v1/assets/resolve?token=...` | Giải mã mã QR token, trả về ngữ cảnh số thiết bị |
-| `POST` | `/api/v1/assets` | Khai báo thiết bị mới vào hệ thống |
+### 🔍 5. Kiểm tra bảo dưỡng & Checklist (Inspection Engine)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/inspections/templates` | Lấy danh mục các mẫu checklist định kỳ | `Member` |
+| `GET` | `/api/v1/inspections/:id` | Lấy chi tiết phiếu kiểm tra kèm danh sách câu hỏi | `Member` |
+| `POST` | `/api/v1/inspections/:id/submit` | Nộp kết quả kiểm tra (tự kích hoạt sự cố nếu có lỗi) | `Member` |
 
-### 📲 Đồng bộ ngoại tuyến (Mobile Sync)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `POST` | `/api/v1/sync/batch` | Gửi gói đồng bộ ngoại tuyến theo lô kèm `idempotency_key` và `base_version` |
+### 🏷️ 6. Định danh thiết bị & Ngữ cảnh QR (Asset & QR Context)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/assets` | Danh mục máy móc thiết bị trong xưởng | `Member` |
+| `GET` | `/api/v1/assets/:id` | Xem chi tiết thông số kỹ thuật và hồ sơ bảo dưỡng | `Member` |
+| `GET` | `/api/v1/assets/resolve?token=...` | **Giải mã mã QR Opaque Token, trả về Digital Context & allowed_actions** | `Member` |
+| `POST` | `/api/v1/assets/:id/rotate-qr` | Cấp lại mã QR mới khi tem cũ bị lộ hoặc hỏng (Token Rotation) | `Admin` |
 
-### 📂 Quản lý công việc (Workspaces, Tasks & Projects)
-| Phương thức | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/workspaces` | Danh sách không gian làm việc của người dùng |
-| `GET` | `/api/v1/tasks/my-tasks` | Lấy toàn bộ đầu việc được phân công cho người dùng |
-| `POST` | `/api/v1/tasks/lists/:listId` | Tạo task mới trong danh sách |
-| `PUT` | `/api/v1/tasks/:taskId` | Cập nhật thông tin chi tiết task |
-| `POST` | `/api/v1/timelogs` | Ghi nhận thời gian làm việc trên task |
-| `POST` | `/api/v1/ai/chat` | Tương tác thông minh với trợ lý AI Copilot |
+### 📲 7. Tác nghiệp ngoại tuyến (Offline Batch Sync)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/sync/batch` | Đẩy gói đồng bộ ngoại tuyến theo lô với `idempotency_key` và kiểm tra Optimistic Locking `base_version` | `Member` |
+
+### 🤖 8. Trợ lý AI Copilot (Groq Llama 3.3 70B)
+| Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền tối thiểu |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/ai/query` | Truy vấn câu hỏi công việc bằng ngôn ngữ tự nhiên | `Member` |
+| `POST` | `/api/v1/ai/summarize-incident` | AI tóm tắt diễn biến sự cố từ các bình luận | `Member` |
+| `POST` | `/api/v1/ai/draft-action` | AI trích xuất thông tin để tạo thẻ Action Card xem trước (Human-in-the-loop) | `Member` |
