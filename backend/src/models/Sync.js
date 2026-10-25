@@ -98,13 +98,17 @@ class Sync {
             }
           }
 
-          // Thực hiện transition
+          // Thực hiện transition với quyền hạn ngữ cảnh động (Dynamic Contextual RBAC)
           actionResult = await WorkflowEngine.executeTransition({
             taskId: task_id,
             toStateId: to_state_id,
-            user: { user_id: userId, role_name: "member" },
+            user: { user_id: userId },
             note: note || (force_apply ? "[Ghi đè xung đột] Đồng bộ ngoại tuyến" : "Đồng bộ ngoại tuyến"),
-            evidenceUrls: evidence_urls,
+            metadata: {
+              evidence_urls: evidence_urls || payload.evidence_urls,
+              assignee_id: assignee_id || payload.assignee_id,
+              ...payload,
+            },
           });
 
           // Nếu có phân công KTV kèm theo

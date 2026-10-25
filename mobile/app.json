@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Flowse Enterprise",
+    "slug": "flowse-mobile",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.flowse.enterprise"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "package": "com.flowse.enterprise",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flowse cần quyền truy cập camera để quét mã QR máy móc và chụp ảnh bằng chứng hiện trường."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Flowse cần quyền truy cập ảnh để đính kèm bằng chứng báo sự cố hoặc nghiệm thu."
+        }
+      ]
+    ]
+  }
+}

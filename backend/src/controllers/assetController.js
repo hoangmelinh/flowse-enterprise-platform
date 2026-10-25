@@ -2,7 +2,7 @@ import Asset from "../models/Asset.js";
 
 export const getAssets = async (req, res, next) => {
   try {
-    const assets = await Asset.getAll();
+    const assets = await Asset.getAll(req.user);
     res.json({ success: true, data: assets });
   } catch (error) {
     next(error);
@@ -68,3 +68,18 @@ export const getAssetHealthRecord = async (req, res, next) => {
     next(error);
   }
 };
+
+export const rotateAssetQr = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await Asset.rotateQrToken(id, req.user?.user_id);
+    res.json({
+      success: true,
+      message: "Đã cấp lại mã QR an toàn mới thành công.",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

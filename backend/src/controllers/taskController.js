@@ -152,7 +152,8 @@ export const getTasksByUserId = async (req, res) => {
             return res.status(400).json({ error: "User ID is required" });
         }
 
-        const rawTasks = await findAllTasksByUserId(userId);
+        const filterType = req.query?.type || null;
+        const rawTasks = await findAllTasksByUserId(userId, filterType);
 
         const statusMap = new Map();
         const orphanedTasks = [];
@@ -228,7 +229,18 @@ export const createTasksForList = async (req, res) => {
     try {
         const { listId } = req.params;
 
-        const { name, description, priority, assignee_ids, due_date, status_id } = req.body;
+        const {
+            name,
+            description,
+            priority,
+            assignee_ids,
+            due_date,
+            status_id,
+            work_item_type,
+            workflow_id,
+            current_state_id,
+            department_id,
+        } = req.body;
 
         if (!listId) return res.status(400).json({ error: "List ID is required" });
         if (!name) return res.status(400).json({ error: "Name is required" });
@@ -236,7 +248,18 @@ export const createTasksForList = async (req, res) => {
         const created_by = req.user?.user_id || null;
 
         const newTask = await createTaskForList({
-            listId, name, description, priority, assignee_ids, due_date, status_id, created_by
+            listId,
+            name,
+            description,
+            priority,
+            assignee_ids,
+            due_date,
+            status_id,
+            created_by,
+            work_item_type,
+            workflow_id,
+            current_state_id,
+            department_id,
         });
 
         res.status(201).json({

@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getUserContexts,
   authMe,
   getProfiles,
   updateProfiles,
@@ -10,7 +11,9 @@ import { otpRequestLimiter, otpVerifyLimiter } from "../middlewares/rateLimitMid
 
 const router = express.Router();
 
+router.get("/contexts", getUserContexts);
 router.get("/me", authMe);
+router.get("/profile", authMe);
 router.get("/profiles", getProfiles);
 router.put("/profiles", updateProfiles);
 router.post("/request-password-otp", otpRequestLimiter, requestPasswordChangeOtp);

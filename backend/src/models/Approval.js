@@ -1,11 +1,44 @@
 import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
+import Department from "./Department.js";
 
 class Approval {
   /**
    * Lấy danh sách approval theo người duyệt hoặc pending approvals
+   * Tuân thủ quy tắc cách ly thẩm quyền phê duyệt theo Department Management Scope
    */
   static async getPendingApprovals(userId) {
+    // 1. Lấy danh sách phòng ban mà user có quyền quản lý (hoặc null nếu là Admin)
+    const managedDeptIds = await Department.getManagedDepartmentIds(userId);
+
+    let scopeClause = "";
+    const values = [];
+
+    if (managedDeptIds !== null) {
+      if (managedDeptIds.length > 0) {
+        // Cấp quản lý: Xem phiếu chỉ định đích danh HOẶC phiếu chờ duyệt trong phân xưởng quản lý
+        values.push(userId); // $1
+        values.push(managedDeptIds); // $2
+        scopeClause = `
+          AND (
+            a.approver_id = $1 
+            OR (
+              a.approver_id IS NULL 
+              AND (
+                t.department_id = ANY($2::int[]) 
+                OR ast.department_id = ANY($2::int[])
+                OR (t.department_id IS NULL AND ast.department_id IS NULL)
+              )
+            )
+          )
+        `;
+      } else {
+        // Thành viên thông thường (không quản lý phòng ban): Chỉ xem phiếu chỉ định đích danh
+        values.push(userId); // $1
+        scopeClause = `AND a.approver_id = $1`;
+      }
+    }
+
     const query = `
       SELECT 
         a.*,
@@ -13,27 +46,31 @@ class Approval {
         t.description AS task_description,
         t.priority,
         t.work_item_type,
+        t.department_id AS task_department_id,
         u.name AS requester_name,
         u.email AS requester_email,
         u.avatar_url AS requester_avatar,
         inc.asset_id,
         ast.name AS asset_name,
-        ast.asset_code
+        ast.asset_code,
+        ast.department_id AS asset_department_id
       FROM approvals a
       JOIN tasks t ON a.task_id = t.task_id
       JOIN users u ON t.created_by = u.user_id
       LEFT JOIN incidents inc ON a.incident_id = inc.incident_id
       LEFT JOIN assets ast ON inc.asset_id = ast.asset_id
       WHERE a.status = 'PENDING'
+      ${scopeClause}
       ORDER BY a.created_at DESC
     `;
-    const res = await con.query(query);
+    const res = await con.query(query, values);
     return res.rows;
   }
 
   /**
    * Ra quyết định: Approve hoặc Reject
    * Hỗ trợ tự động phục hồi sự cố và bù giờ SLA (Δt = NOW - paused_at)
+   * Kiểm tra phân quyền RBAC & Phân cấp doanh nghiệp (Chống tự duyệt)
    */
   static async makeDecision({ approvalId, approverId, status, decisionNote }) {
     if (!["APPROVED", "REJECTED"].includes(status)) {
@@ -44,7 +81,49 @@ class Approval {
     try {
       await client.query("BEGIN");
 
-      const query = `
+      // 1. Kiểm tra tồn tại và khóa dòng (Lock row)
+      const checkRes = await client.query(
+        `SELECT a.*, t.created_by, t.department_id AS task_department_id, ast.department_id AS asset_department_id
+         FROM approvals a
+         JOIN tasks t ON a.task_id = t.task_id
+         LEFT JOIN incidents inc ON a.incident_id = inc.incident_id
+         LEFT JOIN assets ast ON inc.asset_id = ast.asset_id
+         WHERE a.approval_id = $1 AND a.status = 'PENDING'
+         FOR UPDATE OF a`,
+        [approvalId]
+      );
+
+      if (checkRes.rows.length === 0) {
+        throw new Error("Approval record not found or already processed");
+      }
+      const existingApp = checkRes.rows[0];
+
+      // 2. Kiểm tra thẩm quyền phê duyệt của approverId
+      const wsRoleRes = await client.query(
+        `SELECT LOWER(r.role_name) as role_name 
+         FROM workspace_members wm 
+         JOIN roles r ON wm.role_id = r.role_id 
+         WHERE wm.user_id = $1 AND wm.deleted_at IS NULL`,
+        [approverId]
+      );
+      const isWsAdmin = wsRoleRes.rows.some((r) => r.role_name === 'admin');
+      const isWsManager = wsRoleRes.rows.some((r) => r.role_name === 'manager');
+
+      // Quy tắc phân định trách nhiệm (Separation of Duties): Người tạo không được tự phê duyệt
+      if (existingApp.created_by === approverId && !isWsAdmin) {
+        throw new Error("Quy tắc doanh nghiệp: Người yêu cầu không được tự phê duyệt đề xuất của chính mình.");
+      }
+
+      // Xác minh quyền duyệt theo cấp bậc doanh nghiệp & người được chỉ định
+      const isDesignatedApprover = existingApp.approver_id === approverId;
+      const targetDeptId = existingApp.task_department_id || existingApp.asset_department_id;
+      const isDeptManager = targetDeptId ? await Department.isManagerOfDepartment(approverId, targetDeptId) : false;
+
+      if (!isWsAdmin && !isWsManager && !isDesignatedApprover && !isDeptManager) {
+        throw new Error("Forbidden: Bạn không có thẩm quyền phê duyệt phiếu đề xuất này theo phân cấp phòng ban.");
+      }
+
+      const updateQuery = `
         UPDATE approvals
         SET status = $1,
             approver_id = $2,
@@ -54,11 +133,7 @@ class Approval {
         RETURNING *
       `;
 
-      const res = await client.query(query, [status, approverId, decisionNote || null, approvalId]);
-      if (res.rows.length === 0) {
-        throw new Error("Approval record not found or already processed");
-      }
-
+      const res = await client.query(updateQuery, [status, approverId, decisionNote || null, approvalId]);
       const appRecord = res.rows[0];
 
       // 1. Xác định incident_id (qua khóa ngoại trực tiếp hoặc fallback qua request_note)
@@ -110,11 +185,11 @@ class Approval {
 
             // C. Ghi Audit Log vào activity_logs
             await client.query(
-              `INSERT INTO activity_logs (user_id, task_id, action, new_value, details)
-               VALUES ($1, $2, 'PARTS_APPROVED_RESUME', to_jsonb('IN_PROGRESS'::text), $3::jsonb)`,
+              `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+               VALUES ($1, $2, 'PARTS_APPROVED_RESUME', to_jsonb('ON_HOLD_PENDING_PARTS'::text), $3::jsonb)`,
               [
-                approverId,
                 incidentData.task_id,
+                approverId,
                 JSON.stringify({
                   approval_id: approvalId,
                   decision_note: decisionNote,
@@ -134,11 +209,11 @@ class Approval {
             );
 
             await client.query(
-              `INSERT INTO activity_logs (user_id, task_id, action, new_value, details)
-               VALUES ($1, $2, 'PARTS_REJECTED', to_jsonb('REJECTED'::text), $3::jsonb)`,
+              `INSERT INTO activity_logs (task_id, user_id, action, old_value, new_value)
+               VALUES ($1, $2, 'PARTS_REJECTED', to_jsonb('ON_HOLD_PENDING_PARTS'::text), $3::jsonb)`,
               [
-                approverId,
                 incidentData.task_id,
+                approverId,
                 JSON.stringify({
                   approval_id: approvalId,
                   decision_note: decisionNote,

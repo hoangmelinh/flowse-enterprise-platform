@@ -3,7 +3,7 @@ import AIVisionService from "../services/aiVisionService.js";
 
 export const getIncidents = async (req, res, next) => {
   try {
-    const list = await Incident.getAll();
+    const list = await Incident.getAll(req.user);
     res.json({ success: true, data: list });
   } catch (error) {
     next(error);
@@ -122,5 +122,68 @@ export const analyzeEvidence = async (req, res, next) => {
     next(error);
   }
 };
+
+export const reopenIncident = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const result = await Incident.reopenIncident({
+      incidentId: id,
+      userId: req.user.user_id,
+      reason: reason || "Máy tái phát lỗi sau sửa chữa",
+    });
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignTechnician = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const technician_id = req.body.technician_id || req.body.technicianId;
+    if (!technician_id) {
+      return res.status(400).json({ success: false, message: "technician_id là bắt buộc." });
+    }
+    const result = await Incident.assignTechnician({
+      incidentId: id,
+      technicianId: technician_id,
+      assignedBy: req.user.user_id,
+    });
+    res.json({
+      success: true,
+      message: "Đã phân công Kỹ thuật viên thành công.",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const appendEvidence = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const evidence_urls = req.body.evidence_urls || req.body.evidenceUrls || [];
+    const is_resolved_evidence = req.body.is_resolved_evidence || req.body.isResolvedEvidence;
+    const result = await Incident.appendEvidence({
+      incidentId: id,
+      evidenceUrls: Array.isArray(evidence_urls) ? evidence_urls : [evidence_urls],
+      uploadedBy: req.user.user_id,
+      isResolvedEvidence: !!is_resolved_evidence,
+    });
+    res.json({
+      success: true,
+      message: "Đã tải lên bằng chứng thành công.",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 

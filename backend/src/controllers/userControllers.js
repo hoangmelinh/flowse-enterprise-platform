@@ -8,6 +8,8 @@ import {
 import bcrypt from 'bcrypt';
 import { Resend } from 'resend';
 import crypto from 'crypto';
+import con from '../config/connect.js';
+import Department from '../models/Department.js';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -25,16 +27,88 @@ setInterval(() => {
     }
 }, OTP_CLEANUP_INTERVAL_MS).unref?.();
 
+export const getUserContexts = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+
+        // 1. Lấy thông tin user kèm phòng ban hiện tại
+        const userRes = await con.query(
+            `SELECT u.user_id, u.username, u.name, u.email, u.avatar_url, u.sdt, u.phone_number, u.employee_code,
+                    u.department_id, d.name AS department_name, d.code AS department_code
+             FROM users u
+             LEFT JOIN departments d ON u.department_id = d.department_id
+             WHERE u.user_id = $1`,
+            [userId]
+        );
+        const user = userRes.rows[0];
+
+        // 2. Lấy danh sách workspace và vai trò của user trong từng workspace
+        const wsRes = await con.query(
+            `SELECT w.workspace_id, w.name, w.slug, w.description, LOWER(r.role_name) as role_name
+             FROM workspace_members wm
+             JOIN workspaces w ON wm.workspace_id = w.workspace_id
+             JOIN roles r ON wm.role_id = r.role_id
+             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL AND w.deleted_at IS NULL`,
+            [userId]
+        );
+
+        // 3. Lấy cây phân cấp phòng ban (Enterprise Department Hierarchy)
+        const departmentsTree = await Department.getHierarchyTree();
+
+        // 4. Lấy phạm vi phòng ban được phép truy cập (Accessible Department IDs)
+        const isWorkspaceAdmin = wsRes.rows.some((w) => w.role_name === 'admin');
+        const accessibleDeptIds = await Department.getAccessibleDepartmentIds(userId, isWorkspaceAdmin ? 'admin' : 'member');
+
+        // 5. Tính toán capabilities động dựa trên DB roles
+        const isManager =
+            isWorkspaceAdmin ||
+            wsRes.rows.some((w) => w.role_name === 'manager') ||
+            (await con.query(`SELECT 1 FROM departments WHERE manager_id = $1 LIMIT 1`, [userId])).rows.length > 0;
+        const isQA =
+            (user?.department_code || '').toUpperCase() === 'QA' ||
+            (user?.department_code || '').toUpperCase() === 'QA_QC' ||
+            isWorkspaceAdmin;
+
+        const capabilities = {
+            can_scan_qr: true,
+            can_report_incident: true,
+            can_triage_incident: isManager,
+            can_execute_repair: true,
+            can_verify_incident: isQA || isManager,
+            can_close_incident: isManager,
+            can_run_inspection: isQA || isManager,
+            can_approve: isManager,
+            can_create_task: true,
+            can_assign_work: isManager,
+        };
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                user,
+                workspaces: wsRes.rows,
+                departments: departmentsTree,
+                accessible_department_ids: accessibleDeptIds,
+                capabilities,
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: 'Lỗi server khi lấy ngữ cảnh người dùng', error: error.message });
+    }
+};
+
 export const authMe = async (req, res) => {
     try {
         const user_id = req.user.user_id;
         const user = await findUserById(user_id);
         return res.status(200).json({
-            message: 'Thong tin nguoi dung',
-            user
+            success: true,
+            message: 'Thông tin người dùng',
+            user,
+            data: user
         });
     } catch (error) {
-        return res.status(500).json({ message: 'Loi server', error: error.message });
+        return res.status(500).json({ success: false, message: 'Lỗi server', error: error.message });
     }
 };
 

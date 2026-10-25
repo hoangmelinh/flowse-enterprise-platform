@@ -22,6 +22,7 @@ import assetRoutes from './assetRoutes.js';
 import incidentRoutes from './incidentRoutes.js';
 import syncRoutes from './syncRoutes.js';
 import inspectionRoutes from './inspectionRoutes.js';
+import workItemRoutes from './workItemRoutes.js';
 
 export {
     authRoutes,
@@ -48,4 +49,5 @@ export {
     incidentRoutes,
     syncRoutes,
     inspectionRoutes,
+    workItemRoutes,
 };

@@ -12,6 +12,18 @@ export const getDepartments = async (req, res, next) => {
   }
 };
 
+export const getDepartmentTree = async (req, res, next) => {
+  try {
+    const tree = await Department.getHierarchyTree();
+    res.json({
+      success: true,
+      data: tree,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getDepartmentById = async (req, res, next) => {
   try {
     const department = await Department.getById(req.params.id);

@@ -10,8 +10,12 @@ class Workflow {
     return await WorkflowEngine.getWorkflowDetails(id);
   }
 
-  static async getTaskTransitions(taskId, userRole) {
-    return await WorkflowEngine.getAvailableTransitions(taskId, userRole);
+  static async getTaskTransitions(taskId, userRoles) {
+    return await WorkflowEngine.getAvailableTransitions(taskId, userRoles);
+  }
+
+  static async getUserRolesForTask(userId, taskId) {
+    return await WorkflowEngine.getUserRolesForTask(userId, taskId);
   }
 
   static async executeTransition(params) {

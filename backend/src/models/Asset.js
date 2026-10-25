@@ -1,7 +1,19 @@
 import con from "../config/connect.js";
+import Department from "./Department.js";
 
 class Asset {
-  static async getAll() {
+  static async getAll(user = null) {
+    let scopeClause = "";
+    const values = [];
+
+    if (user?.user_id) {
+      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id);
+      if (accessibleDeptIds !== null) {
+        values.push(accessibleDeptIds);
+        scopeClause = `WHERE (a.department_id = ANY($1::int[]) OR a.department_id IS NULL)`;
+      }
+    }
+
     const res = await con.query(`
       SELECT 
         a.*,
@@ -9,8 +21,9 @@ class Asset {
         (SELECT COUNT(*) FROM incidents inc WHERE inc.asset_id = a.asset_id) AS incident_count
       FROM assets a
       LEFT JOIN departments d ON a.department_id = d.department_id
+      ${scopeClause}
       ORDER BY a.asset_id ASC
-    `);
+    `, values);
     return res.rows;
   }
 
@@ -69,10 +82,49 @@ class Asset {
       [asset.asset_id]
     );
 
+    const allowed_actions = ["REPORT_INCIDENT", "VIEW_MANUAL"];
+    if (checklistsRes.rows.length > 0) {
+      allowed_actions.push("START_INSPECTION");
+    }
+
     return {
       asset,
       open_incidents: incidentsRes.rows,
+      active_incidents: incidentsRes.rows,
       available_checklists: checklistsRes.rows,
+      pending_inspections: checklistsRes.rows,
+      allowed_actions,
+    };
+  }
+
+  /**
+   * Cấp lại mã QR mới khi tem cũ bị lộ hoặc hỏng (Token Rotation per SRS 08 & API Contract 2.6)
+   */
+  static async rotateQrToken(assetId, rotatedBy) {
+    const asset = await this.getById(assetId);
+    if (!asset) throw new Error("Không tìm thấy thiết bị");
+
+    const crypto = await import("crypto");
+    const newToken = `flw_tok_${crypto.randomBytes(12).toString("hex")}`;
+
+    const res = await con.query(
+      `UPDATE assets 
+       SET qr_token = $1
+       WHERE asset_id = $2
+       RETURNING *`,
+      [newToken, assetId]
+    );
+
+    return {
+      success: true,
+      asset_id: assetId,
+      asset_code: asset.asset_code,
+      name: asset.name,
+      new_qr_token: newToken,
+      qr_uri: `flw://asset/resolve?token=${newToken}`,
+      rotated_by: rotatedBy,
+      rotated_at: new Date().toISOString(),
+      asset: res.rows[0],
     };
   }
 

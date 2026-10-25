@@ -1,0 +1,2439 @@
+FLOWSE 2.0
+TÀI LIỆU ĐẶC TẢ YÊU CẦU PHẦN MỀM
+SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+Nền tảng quản lý công việc và số hóa quy trình doanh nghiệpĐịnh hướng doanh nghiệp sản xuất · Mobile-first · Web hỗ trợ quản trị
+Thông tin
+Giá trị
+Mã tài liệu
+FLOWSE-SRS-001
+Phiên bản
+1.0 – Draft for Review
+Ngày
+25/10/2026
+Phạm vi
+Mobile MVP + Web management tối thiểu
+Trạng thái
+Dự thảo đặc tả; cần xác nhận với nhóm/giảng viên và khảo sát nghiệp vụ
+Căn cứ
+Proposal FLOWSE 2.0 v1.0; Mobile Matrix v1.2; các quyết định phạm vi đã thống nhất
+MỤC ĐÍCH SỬ DỤNG
+Nguồn yêu cầu thống nhất cho phân tích nghiệp vụ, thiết kế Figma, lập trình Mobile/Web, kiểm thử và bảo vệ đồ án.
+KIỂM SOÁT TÀI LIỆU VÀ QUY ƯỚC
+Mục
+Nội dung
+Đối tượng đọc
+Product Owner, BA, UI/UX Designer, Mobile Developer, Backend Developer, QA, giảng viên.
+Thứ tự ưu tiên nguồn
+(1) Proposal gốc; (2) quyết định phạm vi trong hội thoại; (3) Ma trận Mobile v1.2 – chỉ dùng nội dung không mâu thuẫn; (4) đề xuất SRS được đánh dấu chờ duyệt.
+Nguyên tắc xung đột
+Không coi các persona/phân hệ phát sinh trong ma trận hoặc ảnh UI là scope chính thức nếu proposal không hỗ trợ.
+Trạng thái hiệu lực
+DRAFT – SRS chi tiết hóa và đề xuất, chưa được doanh nghiệp sản xuất xác nhận thực địa.
+Quản lý phiên bản
+Mọi thay đổi scope/role/business rule sau v1.0 phải được cập nhật vào change log và ma trận truy vết.
+Lịch sử thay đổi
+Phiên bản
+Ngày
+Nội dung
+Trạng thái
+1.0
+25/10/2026
+Tái xây dựng SRS Mobile-first; chuẩn hóa scope, role, workflow, màn hình và NFR.
+Dự thảo
+Ký hiệu và mức ưu tiên
+Ký hiệu
+Ý nghĩa
+P0 / MUST
+Yêu cầu bắt buộc trong Mobile MVP hoặc Web tối thiểu hỗ trợ MVP.
+P1 / SHOULD
+Mở rộng gần; không là điều kiện nghiệm thu MVP trừ khi nhóm chủ động nâng scope.
+P2 / COULD
+Nâng cao; ngoài phạm vi triển khai chính.
+[P]
+Dựa trên proposal gốc.
+[C]
+Chi tiết đã chốt trong trao đổi (Mobile giao task đầy đủ, dashboard theo phạm vi nhà máy).
+[D]
+Đề xuất BA/SRS, cần xác nhận trước khi đóng baseline.
+ĐK
+Được thao tác nếu đồng thời thỏa role, resource scope, assignment, state và chính sách tương ứng.
+FR / BR / NFR / UI / UC / WF / AT
+Functional Requirement / Business Rule / Non-functional / Screen / Use Case / Workflow / Acceptance Test.
+Mục lục nội dung
+Phần I
+Phần II
+1. Giới thiệu
+9. Mô hình dữ liệu logic
+2. Tổng quan hệ thống
+10. Giao tiếp hệ thống, API và event
+3. Phạm vi và phân kỳ
+11. Yêu cầu phi chức năng
+4. Người dùng, tổ chức và phân quyền
+12. Kiểm thử và nghiệm thu
+5. Yêu cầu chức năng
+13. Ma trận truy vết yêu cầu
+6. Use case chi tiết
+14. Rủi ro, vấn đề mở và khảo sát
+7. Workflow, trạng thái và business rule
+Phụ lục A. Thuật ngữ; B. Permission key
+8. UI/UX Mobile-first
+Phụ lục C. Bàn giao Design Mobile
+1. GIỚI THIỆU
+1.1. Mục đích
+Đặc tả yêu cầu chức năng, dữ liệu, quyền truy cập, hành vi giao diện Mobile và điều kiện nghiệm thu cho FLOWSE 2.0; đưa hệ thống từ quản lý Project/Task thành nền tảng Enterprise Work Management với Work Item và Workflow dùng chung. [P]
+1.2. Vấn đề cần giải quyết
+Công việc phát sinh qua chat, email, Excel, giấy tờ và cuộc gọi dẫn đến thiếu owner, deadline, tiến độ và lịch sử.
+Yêu cầu liên phòng ban khó truy vết trạng thái; hành động phê duyệt chưa nhất quán.
+Tác nghiệp hiện trường cần Mobile đơn giản, chụp ảnh, quét QR và cập nhật công việc nhanh.
+Trưởng bộ phận, trưởng dây chuyền, quản đốc phải xem và điều phối được công việc thuộc cấp dưới đúng scope, không chỉ My Work. [C]
+1.3. Mục tiêu sản phẩm
+1.  Một Work Item và workflow chuẩn hóa vòng đời TASK, REQUEST, INCIDENT, INSPECTION và công việc sửa chữa liên quan.
+2.  Mobile là kênh thực thi chính cho nhân viên, người xử lý, người phê duyệt và quản lý cấp cơ sở.
+3.  Web dùng để cấu hình vai trò, tổ chức, workflow, mẫu biểu, QR và quản trị phức tạp.
+4.  Mọi hành động quan trọng có kiểm soát quyền và audit; thông báo cập nhật gần realtime.
+5.  Có ít nhất một workflow Office ↔ Field hoàn thành end-to-end phục vụ demo.
+1.4. Tài liệu tham chiếu
+Mã
+Nguồn
+Phạm vi sử dụng
+SRC-01
+FLOWSE_2.0_De_xuat_de_tai_hoan_chinh.docx (Proposal v1.0)
+Định vị sản phẩm, 3 lớp chức năng, 4 case study, kiến trúc, MVP, ngoại phạm vi.
+SRC-02
+FLOWSE_2.0_Mobile_Matrix_v1_2_Office_Factory_Managers.xlsx
+Role/permission chi tiết, danh sách màn, màn task và dashboard quản lý; chỉ dùng nếu phù hợp SRC-01.
+SRC-03
+Thống nhất phạm vi trong cuộc trao đổi 25/10/2026
+Mobile giao việc/subtask đầy đủ; quản lý dây chuyền/phân xưởng xem theo cấp; kế toán/HRM/mua hàng độc lập ngoài scope.
+1.5. Định nghĩa ranh giới triển khai
+Quy tắc cốt lõi  FLOWSE số hóa việc, yêu cầu, kiểm tra, xử lý sự cố và sự phối hợp; không triển khai kế toán, tài chính, HRM, ERP/MES, WMS, QMS hoặc CMMS toàn diện.
+2. TỔNG QUAN HỆ THỐNG
+2.1. Bối cảnh sử dụng và kiến trúc chức năng
+Ba lớp kiến trúc chức năng kế thừa proposal: Office & Collaboration → Enterprise Workflow Core → Field Operations. Web và Mobile cùng sử dụng backend, dữ liệu, phân quyền và nhật ký hoạt động. [P]
+Lớp
+Phạm vi chức năng
+Kênh ưu tiên
+Office & Collaboration
+Project, Task, My Work, comment, file, request, approval, notification.
+Mobile thực thi; Web điều phối nâng cao.
+Workflow Core
+Work Item, state-transition, validation, role/scope, approval, SLA, audit, automation giới hạn.
+Server điều khiển; Web cấu hình.
+Field Operations
+Incident, inspection, checklist, asset QR, evidence, repair work, material request giới hạn.
+Mobile hiện trường.
+2.2. Giả định vận hành
+Một tenant (doanh nghiệp) có thể có nhiều site/nhà máy; site có các đơn vị phân xưởng, dây chuyền, tổ/ca theo cấu hình. [C/D]
+Cùng một tài khoản có thể kiêm nhiều role và được cấp phạm vi độc lập; đổi role/site không tự mở rộng quyền. [C]
+Đối với MVP, bộ biểu mẫu và workflow được cấu hình trước; chưa yêu cầu kéo-thả workflow nâng cao. [P]
+Chỉ số dashboard MVP lấy từ Work Item, Incident, Inspection, Approval, SLA; không tự sinh OEE/sản lượng nếu không có nguồn dữ liệu. [C]
+Kho/mua hàng chỉ là actor xử lý bước trong yêu cầu vật tư; không có phân hệ tồn kho, mua sắm chuyên biệt. [C]
+2.3. Các bên liên quan
+Stakeholder
+Mục tiêu
+Người dùng Mobile
+Nhận việc, tạo việc/yêu cầu theo quyền, xử lý và xác nhận với ít thao tác.
+Trưởng bộ phận
+Giao task, điều phối workload, review và theo dõi việc quá hạn.
+Quản lý sản xuất
+Theo dõi công việc, sự cố, inspection và yêu cầu đang chờ trong phạm vi cấp quản lý.
+Kỹ thuật / QA
+Nhận phiếu sửa chữa, ghi bằng chứng, hoàn tất kiểm tra.
+Quản trị
+Cấu hình tổ chức, phân quyền, mẫu workflow, QR/asset và audit.
+Đội Design/Dev/QA
+Nguồn yêu cầu thống nhất, mã ID traceable và điều kiện nghiệm thu rõ.
+3. PHẠM VI VÀ PHÂN KỲ
+3.1. Phạm vi P0 – MVP
+Nhóm
+Chức năng P0
+Ghi chú
+Nền tảng
+Login, chọn ngữ cảnh, My Work, Work Item, comment/file, notification, audit, permission.
+Mobile + Backend + Web quản trị tối thiểu.
+Văn phòng
+Project/Task, subtask, checklist, phân công, review; Internal Request/Approval.
+Có dashboard task theo nhóm cho trưởng bộ phận. [C]
+Sản xuất
+Incident, QR/asset context, Inspection, xử lý sửa chữa theo incident, evidence.
+Quản lý xem theo cấp tổ/line/xưởng/site. [C]
+Vật tư hỗ trợ
+Yêu cầu vật tư phát sinh từ sửa chữa; phê duyệt, xác nhận cấp phát/đã nhận, chuyển cần mua.
+Không làm PO, tồn kho kế toán, nhà cung cấp.
+Kiểm chứng
+4 workflow demo end-to-end; phân quyền, cảnh báo SLA và audit.
+Chạy trên thiết bị Mobile và Web demo.
+3.2. Phạm vi P1 / P2
+Mức
+Ứng viên mở rộng
+Điều kiện
+P1
+Selected offline draft/sync + conflict; giao ca; bảo trì định kỳ; SOP/tài liệu; QC NCR đơn giản; ủy quyền phê duyệt.
+Chỉ thực hiện sau P0 ổn định.
+P2
+AI Copilot, workflow builder nâng cao, ERP/MES integration, phân tích nâng cao, OEE/traceability/CAPA.
+Có dữ liệu thực và thời gian phát triển.
+3.3. Ngoài phạm vi triển khai
+Hệ thống kế toán/tài chính, đề nghị thanh toán như phân hệ độc lập, payroll, HRM đầy đủ.
+Quản trị mua hàng chuyên sâu (nhà cung cấp, RFQ, PO, giá vốn, công nợ), quản lý tồn kho WMS và ERP.
+Điều độ và thực thi sản xuất MES, BOM/MRP, lệnh sản xuất đầy đủ, OEE chưa có dữ liệu nguồn.
+Chat thay thế Slack, họp video và bộ soạn thảo văn phòng toàn diện.
+Điều khiển máy PLC/OT trực tiếp từ Mobile, các hành động tự động gây thay đổi trạng thái máy.
+3.4. 4 workflow chuẩn của MVP
+Mã
+Tên
+Chuỗi nghiệp vụ
+WF-01
+Incident / Repair / Verify
+Worker → Report → Triage → Assign → Repair → Verify → Resolve; nhánh thiếu vật tư.
+WF-02
+Inspection / Fail → Related Work
+Inspector → Checklist → Pass/Fail → nếu Fail tạo Incident/WorkItem liên quan.
+WF-03
+Internal Request / Approval
+Employee → Manager Approval → Bộ phận xử lý → Delivery → Confirm.
+WF-04
+Project / Task Collaboration
+Project → Task → Assignee → In Progress → Review → Done.
+4. MÔ HÌNH NGƯỜI DÙNG, TỔ CHỨC VÀ PHÂN QUYỀN
+4.1. Cấu trúc đơn vị nghiệp vụ
+Cấu trúc tham chiếu: Tenant → Site/Nhà máy → Phân xưởng → Dây chuyền → Tổ/ca; đồng thời có Department văn phòng, nhóm chức năng và membership theo thời gian. Không hardcode rằng trưởng ca luôn là cấp dưới trực tiếp của trưởng dây chuyền. [C/D]
+Đối tượng
+Định nghĩa
+Quy tắc
+Tenant
+Doanh nghiệp sở hữu không gian dữ liệu.
+Dữ liệu tenant khác phải cách ly.
+Site
+Nhà máy / địa điểm quản lý.
+Một người có thể được cấp nhiều site.
+Org Unit
+Phòng ban, phân xưởng, dây chuyền, tổ.
+Quan hệ cây và loại đơn vị cấu hình.
+Shift
+Ca làm việc/phiên trực.
+Gắn công việc hoặc lịch trực khi có dữ liệu.
+Membership
+Một user gắn role trong scope cụ thể.
+Có trạng thái, hiệu lực và phạm vi.
+4.2. Vai trò nghiệp vụ và trang chủ Mobile
+Role
+Persona
+Home / Navigation gợi ý
+Phạm vi nghiệp vụ
+VP
+Nhân viên văn phòng
+My Work / Công việc / Yêu cầu
+Việc cá nhân, dự án tham gia; giao người khác nếu grant.
+TP
+Trưởng bộ phận
+Tổng quan nhóm / Công việc / Phê duyệt
+Phòng ban, dự án do quản lý; duyệt nếu là approver.
+CN
+Công nhân sản xuất
+Hôm nay / Quét QR / Báo sự cố
+Task/ca/asset có liên quan; không xem dashboard toàn xưởng.
+TC
+Tổ trưởng / Trưởng ca
+Hôm nay / Đội-ca / Sự cố
+Tổ/ca phụ trách; phân công và triage được cấp.
+QLDC
+Trưởng dây chuyền
+Tổng quan / Dây chuyền / Công việc
+Dây chuyền được cấp; không thấy line khác.
+QLPX
+Quản đốc phân xưởng
+Tổng quan / Phân xưởng / Công việc
+Các dây chuyền trong phân xưởng được cấp.
+QLN
+Quản lý nhà máy
+Tổng quan / Đơn vị / Phê duyệt
+Một/nhiều site được phân quyền.
+KT
+Kỹ thuật / Bảo trì
+Công việc / Quét QR / Sự cố
+Phiếu sửa chữa và asset được giao.
+QC
+Nhân viên QA/QC
+Kiểm tra / Công việc / Quét QR
+Phiếu inspection và đơn vị được giao.
+KHO
+Nhân viên kho (hỗ trợ)
+Vật tư / Công việc
+Yêu cầu cấp vật tư được giao; không quản lý WMS.
+MH
+Người theo dõi mua (hỗ trợ)
+Yêu cầu / Công việc
+Chỉ yêu cầu chuyển mua được giao; không có module Procurement.
+QT
+Quản trị hệ thống
+Thông báo / Cá nhân
+Web cấu hình; không mặc định có quyền phê duyệt.
+Phân loại nguồn  VP/CN/KT-QC/Manager/QT là persona gốc trong proposal. TP, TC, QLDC, QLPX, QLN là phân rã theo quyết định Mobile; KHO và MH là actor hỗ trợ có điều kiện trong workflow vật tư, không phải phân hệ kinh doanh độc lập.
+4.3. Mô hình kiểm tra quyền (server-side)
+Quyền thực hiện một hành động = Permission theo Membership × Resource Scope × Workflow Guard × Object Relation (creator/assignee/approver/verifier) × trạng thái tài khoản. Quyền xem và quyền thao tác là hai quyền khác nhau.
+1.  Mobile chỉ hiển thị CTA khi backend trả capabilities hợp lệ, nhưng mọi API vẫn kiểm tra lại quyền tại server.
+2.  Một quản lý có quyền phân công không mặc nhiên được duyệt mọi yêu cầu.
+3.  Một người được phép xem task của đội không mặc nhiên được sửa hoặc xem dữ liệu nhạy cảm đính kèm.
+4.  Admin hệ thống không mặc định là approver nghiệp vụ.
+5.  Phản hồi 403 khi không đủ quyền; 404 có thể dùng để tránh lộ tài nguyên ngoài tenant/scope theo chính sách bảo mật.
+4.4. Ma trận quyền ở cấp khả năng
+Hành động
+VP
+TP
+CN
+TC
+QLDC
+QLPX
+Xem My Work
+✓
+✓
+✓
+✓
+✓
+✓
+Tạo task
+✓
+✓
+ĐK
+✓
+✓
+✓
+Giao/reassign task
+ĐK
+✓
+—
+✓
+✓
+✓
+Xem dashboard bộ phận
+—
+✓
+—
+ĐK
+✓
+✓
+Tạo request nội bộ
+✓
+✓
+✓
+✓
+✓
+✓
+Approve / Reject
+—
+ĐK
+—
+ĐK
+ĐK
+ĐK
+Báo sự cố
+ĐK
+ĐK
+✓
+✓
+✓
+✓
+Triage / assign incident
+—
+ĐK
+—
+✓
+✓
+✓
+Thực hiện sửa chữa
+—
+—
+—
+—
+—
+—
+Xác minh / đóng sự cố
+—
+ĐK
+—
+ĐK
+ĐK
+ĐK
+Thực hiện QC checklist
+—
+—
+ĐK
+ĐK
+—
+—
+Tạo yêu cầu vật tư
+ĐK
+ĐK
+ĐK
+ĐK
+ĐK
+ĐK
+Xác nhận cấp phát
+—
+—
+—
+—
+—
+—
+Cập nhật theo dõi mua
+—
+—
+—
+—
+—
+—
+Cấu hình role/workflow
+—
+—
+—
+—
+—
+—
+Hành động
+QLN
+KT
+QC
+KHO
+MH
+QT
+Xem My Work
+✓
+✓
+✓
+✓
+✓
+✓
+Tạo task
+✓
+ĐK
+ĐK
+ĐK
+ĐK
+—
+Giao/reassign task
+✓
+ĐK
+—
+—
+—
+—
+Xem dashboard bộ phận
+✓
+—
+—
+—
+—
+—
+Tạo request nội bộ
+✓
+✓
+✓
+✓
+✓
+—
+Approve / Reject
+ĐK
+—
+ĐK
+—
+—
+—
+Báo sự cố
+✓
+✓
+ĐK
+—
+—
+—
+Triage / assign incident
+✓
+ĐK
+—
+—
+—
+—
+Thực hiện sửa chữa
+—
+✓
+—
+—
+—
+—
+Xác minh / đóng sự cố
+ĐK
+—
+ĐK
+—
+—
+—
+Thực hiện QC checklist
+—
+ĐK
+✓
+—
+—
+—
+Tạo yêu cầu vật tư
+ĐK
+✓
+ĐK
+—
+—
+—
+Xác nhận cấp phát
+—
+—
+—
+✓
+—
+—
+Cập nhật theo dõi mua
+—
+—
+—
+—
+ĐK
+—
+Cấu hình role/workflow
+—
+—
+—
+—
+—
+✓
+Chú thích: ✓ = được xét khi có đúng resource scope; ĐK = cần quan hệ/assignment/transition/approver cụ thể; — = không mặc định. Đây là ma trận P0 có kiểm soát, QLDC/QLPX được suy ra từ role scope v1.2 nên cần PO duyệt trước baseline. Chi tiết permission key nằm tại mục 5 và phụ lục B.
+5. YÊU CẦU CHỨC NĂNG (FUNCTIONAL REQUIREMENTS)
+Mỗi yêu cầu FR có mã ổn định, mức P0/P1, nội dung kiểm tra được và ghi chú nguồn. Các điều kiện chức năng được mô tả độc lập giao diện; điều kiện hiển thị CTA tại mục 8.
+5.1. Authentication / Context / Organization
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-AUTH-01
+P0
+Mobile đăng nhập, duy trì và kết thúc phiên; phiên hết hạn phải yêu cầu xác thực lại.
+[P]
+FR-AUTH-02
+P0
+Đổi context site/role chỉ trong membership hợp lệ; làm mới danh sách, dashboard và capabilities theo scope.
+[C]
+FR-AUTH-03
+P0
+Server kiểm tra role + scope cho mọi thao tác đọc/ghi và từ chối truy cập chéo tenant/site.
+[P]
+FR-AUTH-04
+P0
+Người dùng bị vô hiệu hóa hoặc thu hồi role phải mất quyền ở lần gọi API tiếp theo.
+[D]
+FR-ORG-01
+P0
+Hệ thống lưu org unit (department/site/workshop/line/team) dưới cấu hình phân cấp linh hoạt.
+[C]
+FR-ORG-02
+P0
+Manager xem danh sách đơn vị và nhân viên thuộc phạm vi; có thể lọc công việc theo đơn vị/nhân viên.
+[C]
+5.2. My Work / Task / Project
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-WRK-01
+P0
+Mobile hiển thị My Work theo được giao/đã tạo/đang theo dõi; lọc theo trạng thái, ưu tiên, hạn và từ khóa.
+[P/C]
+FR-WRK-02
+P0
+User có quyền tạo task với tiêu đề, mô tả, assignee, project tùy chọn, priority và deadline.
+[P/C]
+FR-WRK-03
+P0
+Creator/manager theo quyền được sửa task chưa khóa; server kiểm tra field-level và state guard.
+[C]
+FR-WRK-04
+P0
+Người có quyền điều phối được assign/reassign task trong scope; lưu actor, người cũ, người mới, lý do.
+[C]
+FR-WRK-05
+P0
+Task hỗ trợ subtask (có assignee/status riêng theo cấu hình) và checklist đơn giản.
+[C]
+FR-WRK-06
+P0
+Assignee nhận việc, cập nhật tiến độ, gửi review hoặc hoàn thành theo state được phép.
+[P/C]
+FR-WRK-07
+P0
+Work Item có comment, mention, file/ảnh, activity timeline và audit đọc theo quyền.
+[P]
+FR-WRK-08
+P0
+Reviewer được chỉ định chấp nhận hoàn thành hoặc trả về cần sửa; lưu phản hồi.
+[C/D]
+FR-WRK-09
+P0
+Mobile xem project tham gia, task trong project, mốc chính và tạo task khi được quyền.
+[P/C]
+FR-WRK-10
+P0
+Trưởng bộ phận/line/xưởng xem dashboard task theo phạm vi, quá hạn và workload từ Work Item.
+[C]
+FR-WRK-11
+P1
+Cho phép tác nghiệp task offline ở một số trạng thái an toàn, đồng bộ theo version.
+[P]
+5.3. Workflow / Approval / SLA / Automation
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-FLW-01
+P0
+Workflow định nghĩa state, transition, role guard, required fields và action hooks; mọi chuyển trạng thái do server kiểm soát.
+[P]
+FR-FLW-02
+P0
+Work Item ghi workflow definition version cố định khi khởi tạo instance.
+[D]
+FR-FLW-03
+P0
+Khi transition thất bại, server trả mã lỗi, trường thiếu và trạng thái mới nhất cho Mobile.
+[D]
+FR-APR-01
+P0
+Approver xem danh sách bước đang chờ duyệt của chính mình, xem chi tiết và timeline.
+[P]
+FR-APR-02
+P0
+Approve/Reject chỉ được thực hiện bởi approver hiện hành và phải online; reject bắt buộc lý do.
+[P/C]
+FR-APR-03
+P0
+Quy trình có thể có nhiều cấp duyệt theo mẫu, chỉ mở bước tiếp theo sau khi bước trước hợp lệ.
+[P]
+FR-SLA-01
+P0
+Hiển thị deadline/SLA theo policy với trạng thái còn hạn/gần hạn/quá hạn.
+[P]
+FR-SLA-02
+P0
+Cảnh báo tới người thực hiện/người quản lý theo rule đã thiết lập; audit lưu event cảnh báo.
+[P]
+FR-AUTO-01
+P0
+Kết quả Inspection Fail có thể sinh Work Item liên quan đúng workflow và không tạo trùng khi retry.
+[P]
+FR-FLW-04
+P2
+Workflow builder kéo-thả và condition phức tạp.
+[P]
+5.4. Internal Request
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-REQ-01
+P0
+Người có quyền chọn loại Request được bật, điền form, đính file và gửi yêu cầu.
+[P]
+FR-REQ-02
+P0
+Người tạo được sửa/bổ sung Request tại Draft/Returned; hủy khi state/policy cho phép.
+[D]
+FR-REQ-03
+P0
+Request chạy luồng tạo → duyệt → xử lý → bàn giao → người yêu cầu xác nhận.
+[P]
+FR-REQ-04
+P0
+Người xử lý được giao cập nhật kết quả/bằng chứng; người yêu cầu xác nhận hoàn thành.
+[P]
+FR-REQ-05
+P0
+Một loại Request có field bắt buộc, role xử lý và SLA khác theo cấu hình mẫu.
+[P/D]
+5.5. Incident / QR / Asset
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-INC-01
+P0
+Mobile quét QR chứa identifier/token không nhạy cảm và truy xuất asset/location hợp lệ trong scope.
+[P]
+FR-INC-02
+P0
+Người dùng báo sự cố với title, mô tả, mức độ, asset/location, ảnh/bằng chứng và thời điểm.
+[P]
+FR-INC-03
+P0
+Trưởng ca/manager có quyền triage sự cố, đánh giá ưu tiên và assign technician.
+[P/C]
+FR-INC-04
+P0
+Sự cố hiển thị timeline và trạng thái REPORTED/TRIAGED/ASSIGNED/IN_PROGRESS/WAITING_VERIFY/RESOLVED.
+[P]
+FR-INC-05
+P0
+Asset Profile hiển thị mã, tên, vị trí, trạng thái tham chiếu và các sự cố đã liên kết trong scope.
+[P/D]
+FR-INC-06
+P0
+Verifier được chỉ định xác nhận sửa chữa đạt/không đạt; không đạt trả về xử lý.
+[P]
+FR-INC-07
+P0
+Chỉ authorized closer được đóng sự cố sau khi hoàn tất điều kiện verify.
+[P/C]
+FR-INC-08
+P1
+Cảnh báo báo trùng incident mở cùng asset, xử lý reopen theo policy.
+[D]
+5.6. Maintenance / Material subflow
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-MNT-01
+P0
+Kỹ thuật nhận phiếu sửa chữa liên kết Incident và cập nhật chẩn đoán, kết quả, ảnh, thời gian xử lý.
+[P/D]
+FR-MNT-02
+P0
+Kỹ thuật được gửi yêu cầu vật tư có mã thiết bị/phiếu sửa chữa, tên vật tư, số lượng, lý do.
+[P/C]
+FR-MAT-01
+P0
+Yêu cầu vật tư được chuyển qua bước duyệt nếu policy yêu cầu và gán đúng người xử lý.
+[C]
+FR-MAT-02
+P0
+Kho xác nhận có thể cấp/không đáp ứng; khi cấp phát lưu số lượng, người nhận và xác nhận bàn giao.
+[C/D]
+FR-MAT-03
+P0
+Nếu không đáp ứng, xử lý chuyển người theo dõi mua; cập nhật trạng thái, ghi chú và tham chiếu ngoài hệ thống.
+[C]
+FR-MAT-04
+P0
+Người yêu cầu/người nhận xác nhận đã nhận vật tư; yêu cầu liên kết incident/work order.
+[C]
+FR-MAT-05
+P0
+FLOWSE không tự động trừ kho thực, tạo PO hoặc tính giá trị tồn kho.
+[C]
+FR-MNT-03
+P1
+Quản lý bảo trì định kỳ theo lịch, checklist và trạng thái kiểm tra.
+[D]
+5.7. Inspection / Quality
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-QC-01
+P0
+Inspector nhận danh sách Inspection theo scope/phân công; mở phiếu và checklist phiên bản đã chốt.
+[P]
+FR-QC-02
+P0
+Checklist hỗ trợ kết quả Pass/Fail/NA (nếu được phép), ghi chú, ảnh và validation.
+[P/D]
+FR-QC-03
+P0
+Gửi kết quả Inspection online; nếu Fail thì tạo hoặc liên kết Work Item xử lý lỗi.
+[P]
+FR-QC-04
+P0
+Quản lý/QA có quyền xem lịch sử Inspection và bằng chứng theo asset/khu vực trong scope.
+[P/C]
+FR-QC-05
+P1
+NCR và quy trình xử lý sai lệch chất lượng riêng.
+[D]
+5.8. Dashboard / Notification / Audit
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-DASH-01
+P0
+Quản lý xem tổng task, đang làm, quá hạn, incidents đang mở, inspections cần xử lý thuộc đúng scope.
+[C]
+FR-DASH-02
+P0
+Drill-down KPI mở danh sách đã lọc theo site/xưởng/line/tổ/cá nhân; không lộ dữ liệu ngoài quyền.
+[C]
+FR-DASH-03
+P0
+Dashboard ghi rõ khoảng thời gian và thời điểm cập nhật; không hiển thị OEE/sản lượng thiếu nguồn.
+[C]
+FR-NOT-01
+P0
+Thông báo task assign, approval, incident, SLA và kết quả transition; push mở đúng item khi có quyền.
+[P]
+FR-NOT-02
+P0
+Thông báo đã đọc/chưa đọc và trạng thái lỗi push không làm mất dữ liệu công việc.
+[D]
+FR-AUD-01
+P0
+Audit ghi actor, action, entity, timestamp, state before/after cho các transition/approve/assign.
+[P/C]
+FR-AUD-02
+P0
+Audit không cho sửa/xóa từ giao diện nghiệp vụ; chỉ role phù hợp được tra cứu.
+[D]
+5.9. Web Admin & Integration
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-ADM-01
+P0
+Web quản lý tenant/site/org unit/user/membership/role và phạm vi.
+[P/C]
+FR-ADM-02
+P0
+Web cấu hình workflow state, transition, approver và required fields bằng mẫu form/config.
+[P]
+FR-ADM-03
+P0
+Web cấu hình form/checklist, định nghĩa Asset/QR và danh sách danh mục tối thiểu.
+[P/D]
+FR-ADM-04
+P0
+Web xem dashboard/audit cơ bản theo scope; không đòi Web đầy đủ như Mobile.
+[P/D]
+FR-INT-01
+P2
+API/webhook đồng bộ tham chiếu ERP/MES/CMMS và theo dõi job.
+[D]
+5.10. Offline & AI (ngoài acceptance P0)
+Mã FR
+ƯT
+Đặc tả có thể kiểm thử
+Nguồn
+FR-SYN-01
+P1
+Cache My Work đã xem, draft incident/checklist/ảnh; gắn base_version và idempotency_key.
+[P]
+FR-SYN-02
+P1
+Khi kết nối lại, sync queue, retry/backoff và trả 409 nếu version thay đổi; không ghi đè âm thầm.
+[P]
+FR-SYN-03
+P1
+Approve/Reject, thay quyền, assign nhạy cảm và đóng phiếu buộc online.
+[P]
+FR-AI-01
+P2
+AI tạo/tóm tắt/gợi ý work; người dùng xác nhận trước action nhạy cảm.
+[P]
+6. USE CASE ĐẶC TẢ CHI TIẾT
+UC-01. Đăng nhập và chọn ngữ cảnh
+Thuộc tính
+Đặc tả
+Actor
+VP/CN/TC/KT/QC/TP/QLDC/QLPX/QLN/KHO/MH/QT
+Tiền điều kiện
+Tài khoản hoạt động và có ít nhất một membership
+Luồng chính
+1. User đăng nhập; 2. Server xác thực; 3. Nếu nhiều role/site, hiển thị lựa chọn; 4. Tải Home/capabilities đúng context.
+Luồng thay thế / lỗi
+Sai mật khẩu → cảnh báo; tài khoản khóa → từ chối; context hết hiệu lực → quay lại chọn.
+Hậu điều kiện
+Session và scope hợp lệ.
+Screen mapping
+AUTH-01, CTX-01
+FR liên quan
+FR-AUTH-01..04
+UC-02. Tạo task và giao việc trên Mobile
+Thuộc tính
+Đặc tả
+Actor
+VP/TP và người được grant; TC/QLDC/QLPX/QLN
+Tiền điều kiện
+Có quyền task.create; assignee thuộc scope được phép
+Luồng chính
+1. Từ My Work/nhóm chọn Tạo task; 2. Nhập trường bắt buộc; 3. Chọn người thực hiện, deadline, priority; 4. Thêm subtask/checklist; 5. Lưu; 6. Assignee nhận thông báo.
+Luồng thay thế / lỗi
+Assignee ngoài scope → báo quyền; deadline sai → validation; mạng lỗi → không tạo trùng khi retry.
+Hậu điều kiện
+Task tồn tại, assignee đúng, timeline ghi nhận.
+Screen mapping
+WORK-03, WORK-04
+FR liên quan
+FR-WRK-02..05; FR-NOT-01
+UC-03. Theo dõi đội nhóm và chuyển người xử lý
+Thuộc tính
+Đặc tả
+Actor
+TP/TC/QLDC/QLPX/QLN
+Tiền điều kiện
+Role điều phối trong Org Unit; task thuộc scope
+Luồng chính
+1. Mở Dashboard; 2. Chạm KPI quá hạn; 3. Lọc nhân viên/line; 4. Xem task; 5. Nếu đủ quyền reassign; 6. Lưu lý do và thông báo.
+Luồng thay thế / lỗi
+Không đủ quyền → không có CTA hoặc 403; bị người khác đổi state → 409 + refresh.
+Hậu điều kiện
+Danh sách đúng scope, assignee mới và lịch sử đầy đủ.
+Screen mapping
+TEAM-01..03, DASH-01
+FR liên quan
+FR-WRK-04; FR-WRK-10; FR-DASH-01..02
+UC-04. Tạo và xử lý yêu cầu nội bộ
+Thuộc tính
+Đặc tả
+Actor
+VP/CN hoặc người dùng được cấp; approver; assignee
+Tiền điều kiện
+Request type đang bật, mẫu biểu hợp lệ
+Luồng chính
+1. Tạo yêu cầu; 2. Điền form; 3. Submit; 4. Approver duyệt/từ chối; 5. Assignee thực hiện; 6. Bàn giao; 7. Người tạo xác nhận.
+Luồng thay thế / lỗi
+Bị trả về → bổ sung; từ chối → kết thúc/khởi tạo lại theo policy; step approver hết hạn → báo lỗi.
+Hậu điều kiện
+Request COMPLETE; audit các bước và approval quyết định.
+Screen mapping
+REQ-01..03, APR-01..02
+FR liên quan
+FR-REQ-01..05; FR-APR-01..03
+UC-05. Quét QR và báo sự cố thiết bị
+Thuộc tính
+Đặc tả
+Actor
+CN/TC/KT/QC được cấp
+Tiền điều kiện
+Có quyền incident.report; asset hợp lệ/site phù hợp
+Luồng chính
+1. Quét QR; 2. Xem mã/vị trí asset; 3. Chọn Báo sự cố; 4. Nhập mô tả, ưu tiên, ảnh; 5. Submit; 6. Hệ thống tạo incident và thông báo người tiếp nhận.
+Luồng thay thế / lỗi
+QR không hợp lệ/asset ngoài site → không cho báo theo asset; thiếu ảnh nếu policy yêu cầu → chặn; mạng lỗi → trạng thái rõ ràng.
+Hậu điều kiện
+Incident ở REPORTED, có evidence và liên kết asset.
+Screen mapping
+QR-01, AST-01, INC-02
+FR liên quan
+FR-INC-01..02; FR-NOT-01
+UC-06. Tiếp nhận và phân công sự cố
+Thuộc tính
+Đặc tả
+Actor
+TC/QLDC/QLPX/QLN được cấp
+Tiền điều kiện
+Incident REPORTED/TRIAGED và nằm trong scope
+Luồng chính
+1. Mở inbox sự cố; 2. Đánh giá ảnh hưởng/mức độ; 3. Chọn người kỹ thuật; 4. Gán SLA/priority theo rule; 5. Confirm; 6. Gửi push.
+Luồng thay thế / lỗi
+Không có technician khả dụng → giữ TRIAGED, nâng cấp/escalate; assignment bị xung đột → refresh.
+Hậu điều kiện
+Incident ASSIGNED và lịch sử assign.
+Screen mapping
+INC-01, INC-03, INC-04
+FR liên quan
+FR-INC-03..04; FR-SLA-01
+UC-07. Kỹ thuật sửa chữa và yêu cầu vật tư
+Thuộc tính
+Đặc tả
+Actor
+KT, approver, KHO, MH có điều kiện
+Tiền điều kiện
+Work Order được giao, incident đang xử lý
+Luồng chính
+1. KT Accept; 2. Chẩn đoán; 3. Nếu cần tạo Material Request; 4. Duyệt nếu cần; 5. Kho cấp / đánh dấu chờ mua; 6. Người nhận xác nhận; 7. KT sửa và gửi hoàn tất.
+Luồng thay thế / lỗi
+Kho không cấp đủ → trạng thái chờ; yêu cầu bị từ chối → quay lại KT; vật tư đã nhận nhưng verify fail → mở lại sửa.
+Hậu điều kiện
+Work Order WAITING_VERIFY; request liên kết; không ghi tồn kho ERP.
+Screen mapping
+MNT-01..03, MAT-01..03
+FR liên quan
+FR-MNT-01..02; FR-MAT-01..05
+UC-08. Xác minh và đóng sự cố
+Thuộc tính
+Đặc tả
+Actor
+TC/QLDC/QLPX/QLN/QC được chỉ định
+Tiền điều kiện
+Incident WAITING_VERIFY; evidence bắt buộc đầy đủ
+Luồng chính
+1. Verifier mở phiếu; 2. Xem kết quả và bằng chứng; 3. Pass hoặc Fail; 4. Fail trả kỹ thuật, Pass chuyển RESOLVED bởi closer theo policy.
+Luồng thay thế / lỗi
+Verifier không phải actor hợp lệ → 403; thiết bị chưa an toàn → không chấp nhận; trạng thái đổi đồng thời → 409.
+Hậu điều kiện
+Incident RESOLVED nếu pass; audit không bị xóa.
+Screen mapping
+INC-03, MNT-02
+FR liên quan
+FR-INC-06..07; FR-AUD-01
+UC-09. Thực hiện Inspection và xử lý Fail
+Thuộc tính
+Đặc tả
+Actor
+QC/CN được phân công, TC/manager
+Tiền điều kiện
+Inspection ASSIGNED với checklist hợp lệ
+Luồng chính
+1. Mở danh sách; 2. Chọn phiếu; 3. Trả lời checkpoint; 4. Gắn ảnh; 5. Submit Pass/Fail; 6. Nếu Fail tạo related Work Item.
+Luồng thay thế / lỗi
+Thiếu field/ảnh bắt buộc → ngăn Submit; retry gửi lại → idempotent; inspection không còn giao → 403/409.
+Hậu điều kiện
+Inspection đã submit; Fail có task/sự cố liên kết.
+Screen mapping
+QC-01, QC-02
+FR liên quan
+FR-QC-01..04; FR-AUTO-01
+UC-10. Duyệt kết quả task
+Thuộc tính
+Đặc tả
+Actor
+Assignee, reviewer được chỉ định
+Tiền điều kiện
+Task ở IN_PROGRESS hoặc REVIEW theo workflow
+Luồng chính
+1. Assignee gửi review; 2. Reviewer mở inbox; 3. Kiểm tra kết quả; 4. Chọn Accept hoặc Return; 5. Audit và notify.
+Luồng thay thế / lỗi
+Reviewer không được chỉ định → không có quyền; trả về bắt buộc nhập lý do.
+Hậu điều kiện
+Task DONE hoặc quay IN_PROGRESS; lịch sử rõ.
+Screen mapping
+WORK-02, APR-01
+FR liên quan
+FR-WRK-06..08
+7. WORKFLOW, TRẠNG THÁI VÀ BUSINESS RULE
+7.1. WF-01 – Incident / Repair / Verify
+Được lấy từ proposal làm luồng demo xuyên suốt Worker Mobile → Manager Web/Mobile → Technician Mobile → Verify. Nhánh vật tư bổ sung để minh họa phối hợp; không biến thành nghiệp vụ mua hàng độc lập.
+Từ trạng thái
+Hành động
+Sang trạng thái
+Actor và guard
+—
+Report
+REPORTED
+Reporter hợp lệ; title/location và evidence theo policy.
+REPORTED
+Triage
+TRIAGED
+Điều phối được phân quyền trong scope.
+TRIAGED
+Assign
+ASSIGNED
+Assignee hợp lệ; role kỹ thuật, policy deadline.
+ASSIGNED
+Accept / Start
+IN_PROGRESS
+Technician đúng phiếu được giao.
+IN_PROGRESS
+Request material
+WAITING_MATERIAL
+Có linked MaterialRequest; pause SLA nếu policy quy định.
+WAITING_MATERIAL
+Material confirmed
+IN_PROGRESS
+Material Request đã được xác nhận nhận.
+IN_PROGRESS
+Complete repair
+WAITING_VERIFY
+Đủ kết quả sửa và bằng chứng.
+WAITING_VERIFY
+Verify fail
+IN_PROGRESS
+Được chỉ định verifier; có lý do trả lại.
+WAITING_VERIFY
+Verify pass + Resolve
+RESOLVED
+Pass và closer hợp lệ; audit đóng phiếu.
+Business rule bắt buộc
+BR-INC-01: Không có transition trực tiếp REPORTED → RESOLVED trong mặc định.
+BR-INC-02: Technician không tự đóng Incident nếu không đồng thời có quyền closer được cấu hình.
+BR-INC-03: Khi chờ vật tư, quyền cấp phát/chuyển mua không tự động được trao cho kỹ thuật.
+BR-INC-04: Verify fail phải có lý do và giữ lịch sử vòng sửa trước.
+BR-INC-05: Hành động đóng phiếu/duyệt bắt buộc online; không được commit từ offline queue.
+7.2. WF-02 – Inspection / Fail
+Từ
+Action
+Sang
+Ràng buộc
+ASSIGNED
+Start
+IN_PROGRESS
+Đúng assignee/inspection template version.
+IN_PROGRESS
+Submit all Pass
+PASSED
+Đủ checkpoint bắt buộc và evidence.
+IN_PROGRESS
+Submit any Fail
+FAILED
+Lưu failing checkpoints; tạo related incident/task bằng automation idempotent.
+IN_PROGRESS
+Save draft
+IN_PROGRESS
+Lưu online P0; cache offline chỉ P1.
+7.3. WF-03 – Internal Request / Approval
+Từ
+Action
+Sang
+Ràng buộc
+DRAFT
+Submit
+PENDING_APPROVAL
+Mẫu hợp lệ; xác định approver.
+PENDING_APPROVAL
+Approve
+PROCESSING
+Chỉ approver bước hiện hành.
+PENDING_APPROVAL
+Return
+RETURNED
+Có lý do, creator được bổ sung.
+PENDING_APPROVAL
+Reject
+REJECTED
+Có lý do; kết thúc.
+RETURNED
+Resubmit
+PENDING_APPROVAL
+Validate lại tất cả required fields.
+PROCESSING
+Mark delivered
+DELIVERED
+Đủ kết quả/bằng chứng bàn giao.
+DELIVERED
+Confirm
+COMPLETED
+Requester/receiver hợp lệ.
+7.4. WF-04 – Project / Task
+Từ
+Action
+Sang
+Ràng buộc
+TODO
+Start
+IN_PROGRESS
+Đúng assignee.
+IN_PROGRESS
+Submit review
+REVIEW
+Đủ checklist/subtask theo policy.
+REVIEW
+Accept
+DONE
+Reviewer hợp lệ.
+REVIEW
+Return
+IN_PROGRESS
+Reviewer cung cấp lý do.
+TODO / IN_PROGRESS
+Cancel
+CANCELLED
+Owner/manager được phép; có ghi lý do.
+7.5. Luồng phụ – Yêu cầu vật tư
+Material Request là Request Type liên kết với Incident/Maintenance. Dòng trạng thái tham chiếu: CREATED → PENDING_APPROVAL (nếu cần) → ASSIGNED_TO_WAREHOUSE → ISSUED hoặc PROCUREMENT_NEEDED → IN_FOLLOWUP → ISSUED → RECEIVED → COMPLETED. [C/D]
+Hệ thống chỉ xác nhận nghiệp vụ yêu cầu/cấp phát trên FLOWSE, không khẳng định thay thế tồn kho thực.
+Khi kho xác nhận “không đáp ứng”, tạo bước theo dõi của MH nếu có actor đó; nếu doanh nghiệp không dùng role MH, quản lý xử lý bước này.
+Số lượng yêu cầu, số lượng thực cấp, thời điểm, người giao/nhận phải được lưu rõ.
+Cần policy cho cấp phát một phần và trường hợp vật tư trả lại; mặc định MVP chỉ minh họa cấp đủ/không đáp ứng, cấp một phần đánh dấu [D] chờ duyệt.
+7.6. Quy tắc SLA / Escalation
+SLA được gắn theo loại Work Item/bước; ví dụ “10 phút phản hồi, 2 giờ xử lý” trong proposal chỉ là minh họa, không đóng cứng cho mọi nhà máy. SLA bắt đầu/tạm dừng/tiếp tục/kết thúc theo rule cụ thể từng workflow. [P/D]
+BR
+Quy tắc
+BR-SLA-01
+Nếu quá hạn response/resolution, hệ thống ghi event và gửi cảnh báo cho owner/supervisor trong scope.
+BR-SLA-02
+SLA pause khi WAITING_MATERIAL chỉ nếu policy xác định; nếu chưa cấu hình, không tự pause.
+BR-SLA-03
+Dashboard quá hạn phải dùng cùng logic SLA/backend với list task; không tính độc lập trên client.
+BR-WF-01
+Mọi transition lưu timestamp, actor, previous state, next state, workflow version.
+BR-WF-02
+Retry cùng idempotency key không được tạo thêm Work Item / Approval / Inspection issue.
+8. ĐẶC TẢ UI/UX MOBILE-FIRST
+8.1. Nguyên tắc thiết kế
+Một ứng dụng Mobile dùng chung design system; Home và navigation thay đổi theo context và capabilities, không tạo app riêng cho từng role.
+Mỗi màn ưu tiên một Primary CTA. Các action ít dùng nằm trong menu phụ; tuyệt đối không hiển thị hành động không được phép như một CTA khả dụng.
+Màn công nhân/kỹ thuật ưu tiên thao tác một tay, vùng chạm đủ lớn, quét QR/chụp ảnh thuận tiện; màn quản lý ưu tiên dashboard + drill-down.
+Hiển thị rõ trạng thái workflow, ai đang giữ phiếu, deadline, người phụ trách, bước tiếp theo và timeline.
+Không dùng màu đơn độc để truyền trạng thái; badge phải có nhãn chữ và icon/biểu tượng phù hợp.
+Bộ UI cho thiết bị Mobile được thiết kế ít nhất trạng thái loading/empty/error/permission/validation/offline/retry.
+8.2. Navigation theo role
+Persona
+Tab chính trên Mobile
+Quick Action quan trọng
+VP
+Hôm nay | Công việc | Yêu cầu | Thông báo | Cá nhân
+Tạo task / Tạo yêu cầu
+TP
+Tổng quan | Nhóm | Công việc | Phê duyệt | Cá nhân
+Giao việc / Phê duyệt
+CN
+Hôm nay | Quét QR | Báo sự cố | Thông báo | Cá nhân
+Quét QR / Báo sự cố
+TC
+Hôm nay | Đội-ca | Công việc | Sự cố | Cá nhân
+Phân công / Triage
+QLDC
+Tổng quan | Dây chuyền | Công việc | Sự cố | Cá nhân
+Xem line / Phân công
+QLPX
+Tổng quan | Phân xưởng | Công việc | Phê duyệt | Cá nhân
+Drilldown line / Escalate
+QLN
+Tổng quan | Đơn vị | Công việc | Phê duyệt | Cá nhân
+Chọn site / Xem tồn đọng
+KT
+Công việc | Quét QR | Sự cố | Thông báo | Cá nhân
+Nhận việc / Cập nhật sửa
+QC
+Kiểm tra | Quét QR | Công việc | Thông báo | Cá nhân
+Mở checklist
+KHO
+Vật tư | Công việc | Thông báo | Cá nhân
+Xác nhận cấp phát
+MH
+Yêu cầu | Công việc | Thông báo | Cá nhân
+Cập nhật trạng thái theo dõi mua
+QT
+Thông báo | Cá nhân (Web là kênh quản trị chính)
+Chuyển Web quản trị nếu cần
+8.3. Danh mục màn hình và ID chuẩn SRS
+Screen ID
+Tên màn hình
+Vai trò / scope
+ƯT
+FR liên quan
+AUTH-01
+Đăng nhập
+Tất cả
+P0
+FR-AUTH-01
+CTX-01
+Chọn role / site
+Nhiều membership
+P0
+FR-AUTH-02
+HOME-01
+Home theo persona
+Tất cả
+P0
+FR-WRK-01; FR-DASH-01
+WORK-01
+Danh sách My Work / Task
+Tất cả
+P0
+FR-WRK-01
+WORK-02
+Task Detail / Timeline
+Người có quyền item
+P0
+FR-WRK-06..08
+WORK-03
+Tạo / sửa task
+Người có task.create
+P0
+FR-WRK-02..05
+WORK-04
+Giao / chuyển người
+Manager / assignee grant
+P0
+FR-WRK-04
+WORK-05
+Subtask & Checklist
+Creator/assignee
+P0
+FR-WRK-05
+PROJ-01
+Dự án tham gia / Task theo dự án
+VP/TP/member
+P0
+FR-WRK-09
+TEAM-01
+Danh sách nhân viên đội/bộ phận
+TP/TC/QLDC/QLPX/QLN
+P0
+FR-ORG-02
+TEAM-02
+Danh sách Task của đội
+Manager
+P0
+FR-WRK-10
+TEAM-03
+Dashboard nhóm văn phòng
+TP
+P0
+FR-WRK-10
+DASH-01
+Dashboard sản xuất theo cấp
+TC/QLDC/QLPX/QLN
+P0
+FR-DASH-01..03
+ORG-01
+Cây phân xưởng/dây chuyền/tổ
+Quản lý
+P0
+FR-ORG-01..02
+ORG-02
+Chi tiết đơn vị sản xuất
+QLDC/QLPX/QLN
+P0
+FR-DASH-02
+REQ-01
+Danh sách yêu cầu
+User/assignee
+P0
+FR-REQ-01..05
+REQ-02
+Tạo / sửa yêu cầu
+Người có request.create
+P0
+FR-REQ-01..02
+REQ-03
+Chi tiết / bàn giao / xác nhận
+Creator/assignee
+P0
+FR-REQ-03..04
+APR-01
+Inbox phê duyệt
+Approver
+P0
+FR-APR-01
+APR-02
+Chi tiết quyết định duyệt
+Approver
+P0
+FR-APR-02..03
+QR-01
+Quét QR
+CN/KT/QC/được cấp
+P0
+FR-INC-01
+AST-01
+Hồ sơ thiết bị
+Người có asset.read
+P0
+FR-INC-05
+INC-01
+Danh sách sự cố
+CN/TC/KT/Manager
+P0
+FR-INC-03..04
+INC-02
+Báo sự cố mới
+Reporter
+P0
+FR-INC-02
+INC-03
+Chi tiết sự cố / Timeline
+Người có incident.read
+P0
+FR-INC-04..07
+INC-04
+Triage / Phân công kỹ thuật
+Điều phối
+P0
+FR-INC-03
+MNT-01
+Công việc sửa chữa
+KT
+P0
+FR-MNT-01
+MNT-02
+Cập nhật và gửi kết quả sửa chữa
+KT
+P0
+FR-MNT-01
+MAT-01
+Danh sách yêu cầu vật tư
+KT/KHO/MH/Manager
+P0
+FR-MAT-01..05
+MAT-02
+Tạo / xem chi tiết yêu cầu vật tư
+KT/KHO/approver
+P0
+FR-MNT-02; FR-MAT-01
+MAT-03
+Kho cấp phát / chuyển cần mua
+KHO/MH có điều kiện
+P0
+FR-MAT-02..04
+QC-01
+Danh sách kiểm tra
+QC/assigned
+P0
+FR-QC-01
+QC-02
+Checklist kiểm tra / Submit
+QC/assigned
+P0
+FR-QC-02..03
+NOT-01
+Thông báo
+Tất cả
+P0
+FR-NOT-01..02
+PROFILE-01
+Hồ sơ và cài đặt cá nhân
+Tất cả
+P0
+FR-AUTH-01
+SYNC-01
+Queue / Conflict (mở rộng)
+Role có offline
+P1
+FR-SYN-01..03
+ID trong SRS là danh định chuẩn cho bàn giao từ tài liệu này; nếu ma trận v1.2 sử dụng MOB-W01 / MOB-O01 thì cần tạo mapping khi đồng bộ backlog. Không dùng ảnh mockup cũ làm nguồn nghiệp vụ.
+8.4. Đặc tả chi tiết màn hình trọng tâm
+AUTH-01 — Login
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Email/tên đăng nhập, mật khẩu; trạng thái session; lỗi kết nối.
+CTA và tác vụ
+Đăng nhập; quên mật khẩu chỉ khi backend hỗ trợ.
+Hiển thị theo quyền / điều kiện
+Chỉ tài khoản hoạt động; giới hạn retry và không hiển thị mật khẩu.
+Empty / error / exception
+Sai thông tin, khóa tài khoản, timeout, chưa có membership.
+CTX-01 — Chọn role/site
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Danh sách site/role hợp lệ, nhãn vai trò hiện tại, đơn vị quản lý.
+CTA và tác vụ
+Áp dụng ngữ cảnh.
+Hiển thị theo quyền / điều kiện
+Danh sách do server cấp; chọn xong tải lại permissions/counters.
+Empty / error / exception
+Không có membership; scope bị thu hồi; lỗi tải.
+HOME-01 — Home theo role
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Greeting, context, KPI thuộc role, My Work, quick actions, cảnh báo.
+CTA và tác vụ
+Mở công việc, tạo task/yêu cầu, quét QR, xử lý phiếu theo role.
+Hiển thị theo quyền / điều kiện
+Nút dựa capabilities; card dashboard không vượt phạm vi.
+Empty / error / exception
+Empty Today, loading, no permission, stale summary.
+WORK-01 — My Work / Task list
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Các tab của tôi/đã giao/đang theo dõi; title, deadline, priority, assignee, state.
+CTA và tác vụ
+Tìm/lọc/sắp xếp, tạo task nếu có quyền.
+Hiển thị theo quyền / điều kiện
+Không xem task của người khác nếu không là member/manager.
+Empty / error / exception
+Không có task, lọc trống, mất mạng, thiếu quyền.
+WORK-02 — Task Detail
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Mã, title, status, owner, assignee, project, deadline, description, subtask, checklist, attachments, activity.
+CTA và tác vụ
+Update, comment, add file, submit review/complete, assign nếu có quyền.
+Hiển thị theo quyền / điều kiện
+CTA thay đổi theo state + capabilities, reviewer và lock status.
+Empty / error / exception
+Task đã reassigned, state conflict 409, deleted/inaccessible.
+WORK-03 — Create/Edit Task
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Title*, mô tả, assignee*, project tùy chọn, priority, deadline, subtask/checklist.
+CTA và tác vụ
+Lưu task, thêm checklist, chọn người thực hiện.
+Hiển thị theo quyền / điều kiện
+Chỉ người có task.create và assignee trong scope; deadline theo policy.
+Empty / error / exception
+Thiếu bắt buộc, invalid date, assignee ngoài scope, submit trùng.
+WORK-04 — Assign/Reassign Sheet
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Assignee hiện tại, danh sách người cùng scope, deadline, ghi chú/lý do.
+CTA và tác vụ
+Xác nhận phân công.
+Hiển thị theo quyền / điều kiện
+work.assign và target user hợp lệ; ghi audit before/after.
+Empty / error / exception
+Không tìm thấy người phù hợp, 403, concurrent update.
+WORK-05 — Subtask/Checklist
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Danh sách subtask với title/state/assignee; checklist tick state; tiến độ tổng.
+CTA và tác vụ
+Thêm/sửa subtask, tick checklist.
+Hiển thị theo quyền / điều kiện
+Task không bị khóa, quyền theo item; check required trước Done.
+Empty / error / exception
+Parent DONE/LOCKED, item xung đột, sai quyền.
+TEAM-03 — Team Dashboard
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Tổng task, đang làm, quá hạn, chờ review; danh sách workload theo nhân viên.
+CTA và tác vụ
+Mở KPI / lọc team task, chọn nhân viên.
+Hiển thị theo quyền / điều kiện
+Chỉ TP/phạm vi quản lý được xem.
+Empty / error / exception
+No team, no data, KPI unavailable.
+DASH-01 — Operational Dashboard
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Chọn site/org, task open/overdue, incident open, inspection pending, material pending.
+CTA và tác vụ
+Drilldown KPI, chọn line/xưởng/ca, mở incident.
+Hiển thị theo quyền / điều kiện
+No OEE/sản lượng khi chưa có source; hierarchical scope.
+Empty / error / exception
+Site không có quyền, mạng lỗi, thiếu data source.
+ORG-02 — Unit Detail
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Tên/vị trí unit; nhân viên liên quan, task, incidents, inspection, asset.
+CTA và tác vụ
+Xem danh sách đã lọc; assign từ task/incident.
+Hiển thị theo quyền / điều kiện
+QLDC chỉ line được cấp, QLPX nhiều line thuộc xưởng, QLN site.
+Empty / error / exception
+Unit không tồn tại/ngoài quyền, no incidents.
+REQ-02 — Create Internal Request
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Request type, form động, field required, file và người yêu cầu.
+CTA và tác vụ
+Lưu nháp/gửi.
+Hiển thị theo quyền / điều kiện
+Form type phải enabled, validate server side.
+Empty / error / exception
+Form version changed, thiếu field, 403.
+REQ-03 — Request Detail
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Mã phiếu, form value, approver step, processor, delivery, history.
+CTA và tác vụ
+Bổ sung, hủy, xác nhận nhận, xem lịch sử (theo quyền).
+Hiển thị theo quyền / điều kiện
+Mỗi CTA tương ứng workflow guard.
+Empty / error / exception
+Rejected, returned, waiting another approver.
+APR-02 — Approval Detail
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Tóm tắt request, tài liệu, approval step, người yêu cầu, lịch sử.
+CTA và tác vụ
+Duyệt / Từ chối kèm lý do.
+Hiển thị theo quyền / điều kiện
+Chỉ current approver, bắt buộc online, không tự duyệt trái policy.
+Empty / error / exception
+Step đã xử lý, 403, 409, yêu cầu xác nhận lần hai.
+QR-01 — QR Scanner
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Camera scanner, vùng quét, hướng dẫn, mã dự phòng.
+CTA và tác vụ
+Quét / nhập mã nếu policy cho phép.
+Hiển thị theo quyền / điều kiện
+Opaque asset ID, server resolve và check scope.
+Empty / error / exception
+Camera permission denied, unreadable QR, invalid/out-of-scope asset.
+AST-01 — Asset Context
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Mã/tên/vị trí, tình trạng tham chiếu, incident gần đây, history.
+CTA và tác vụ
+Báo sự cố / xem công việc liên quan.
+Hiển thị theo quyền / điều kiện
+asset.read trên site; no control PLC/OT.
+Empty / error / exception
+Thiết bị không tồn tại/không thuộc site.
+INC-02 — Report Incident
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Asset/location*, title*, mô tả, mức độ*, ảnh/evidence, reporter/time.
+CTA và tác vụ
+Gửi báo sự cố.
+Hiển thị theo quyền / điều kiện
+Theo incident.report; required fields rule; chống submit trùng.
+Empty / error / exception
+Mất mạng, thiếu bằng chứng, QR sai.
+INC-03 — Incident Detail
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Code, asset, trạng thái, SLA, reporter, assignee, evidence, timeline, related MR.
+CTA và tác vụ
+Triage, assign, update, verify, resolve theo role/state.
+Hiển thị theo quyền / điều kiện
+Capabilities trả từ API; close chỉ sau verify.
+Empty / error / exception
+Phiếu đã đóng, changed assignee, 409/403.
+MNT-02 — Maintenance Update
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Phiếu sửa, chẩn đoán, ảnh, kết quả, thời gian xử lý, vật tư liên kết.
+CTA và tác vụ
+Lưu xử lý / tạo MR / gửi hoàn thành.
+Hiển thị theo quyền / điều kiện
+Chỉ KT được giao; complete cần evidence.
+Empty / error / exception
+Thiếu linh kiện, returned verification, upload error.
+MAT-03 — Material Fulfillment
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Mã MR, vật tư/số lượng, site, người yêu cầu, trạng thái, lịch sử.
+CTA và tác vụ
+Xác nhận cấp / đánh dấu cần mua / bàn giao (theo quyền).
+Hiển thị theo quyền / điều kiện
+Không hiển thị tồn kho tự động nếu không có hệ thống nguồn.
+Empty / error / exception
+Không đáp ứng, cấp một phần ngoài MVP, người nhận không xác nhận.
+QC-02 — Inspection Checklist
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Inspection code, asset/line, checkpoint, pass/fail/NA, ghi chú, ảnh.
+CTA và tác vụ
+Lưu, gửi kết quả, tạo related task khi Fail.
+Hiển thị theo quyền / điều kiện
+Checkpoint bắt buộc; submit online; chống sinh issue trùng.
+Empty / error / exception
+Thiếu ảnh, mất mạng, phiếu không còn giao.
+NOT-01 — Notification Inbox
+Đặc tính
+Đặc tả
+Dữ liệu hiển thị / trường
+Actor/action/work ID, thời gian, unread, filter.
+CTA và tác vụ
+Mở item gốc; đánh dấu đọc.
+Hiển thị theo quyền / điều kiện
+Deep link phải kiểm tra lại quyền.
+Empty / error / exception
+Item đã bị xóa/thu hồi quyền, push trễ.
+8.5. Các trạng thái UI dùng chung
+Trạng thái
+Yêu cầu UI
+Hành vi
+Loading
+Skeleton/placeholder cùng bố cục.
+Không nhân đôi thao tác.
+Empty
+Nêu lý do không có dữ liệu, tùy màn gợi ý CTA.
+Không đánh đồng “không có dữ liệu” với “không có quyền”.
+Validation error
+Lỗi ngay cạnh field và tóm tắt ở đầu form.
+Giữ dữ liệu user đã nhập.
+Forbidden 403
+Thông báo không đủ quyền và điều hướng an toàn.
+Không hiển thị dữ liệu đã cache ngoài scope mới.
+Not found 404
+Màn item không tồn tại/không thể truy cập.
+Có nút quay lại danh sách.
+Conflict 409
+So sánh thay đổi mới nhất và cho tải lại.
+Không overwrite im lặng.
+Network error
+Thử lại, bảo toàn form draft hợp lệ.
+Hiện thông tin offline nếu hỗ trợ P1.
+Upload failure
+Cho retry ảnh/file, trạng thái từng file.
+Không đánh dấu hoàn thành khi evidence bắt buộc chưa tải.
+Success
+Toast/inline status + điều hướng tới item.
+Phản hồi chỉ sau khi server xác nhận thành công.
+9. MÔ HÌNH DỮ LIỆU LOGIC
+9.1. Nguyên tắc dữ liệu
+Data model được thiết kế trước tiên quanh WorkItem và WorkflowInstance, không gom toàn bộ nghiệp vụ vào một bảng task.
+Domain entity có thể gắn WorkItem và bổ sung thuộc tính riêng; WorkItemRelation liên kết Incident → Material Request → Maintenance.
+Mọi entity nghiệp vụ có tenant_id và có scope site/unit khi phù hợp; thời gian sử dụng UTC tại server, hiển thị theo local timezone trên Mobile.
+Form template/checklist/workflow có version; bản đã thực thi phải tham chiếu được version cũ.
+Hành động quan trọng có actor_id, created_at, updated_at, version, audit reference; xóa mềm nếu cần đảm bảo truy vết.
+9.2. Danh mục entity chính
+Entity
+Trường logic tiêu biểu
+Mục đích
+Organization
+id, name, status
+Tenant / phạm vi dữ liệu
+Site
+id, organization_id, name, status
+Nhà máy / địa điểm
+OrgUnit
+id, site_id, parent_id, type, name
+Department / workshop / line / team
+User
+id, name, login, status
+Tài khoản dùng chung
+Membership
+id, user_id, role_id, scope_type, scope_id, effective_range
+Gán vai trò theo phạm vi
+WorkItem
+id, type, title, description, status, priority, owner_id, assignee_id, due_at, version
+Đơn vị công việc chung
+WorkItemRelation
+id, source_work_item_id, target_work_item_id, relation_type
+Liên kết phiếu
+Project
+id, site_id?, name, owner_id, status
+Nhóm task dự án
+WorkflowDefinition
+id, code, version, status
+Mẫu workflow versioned
+WorkflowInstance
+id, work_item_id, definition_id, current_state, version
+Bản chạy và trạng thái
+TransitionEvent
+id, instance_id, from_state, to_state, actor_id, timestamp
+Lịch sử chuyển trạng thái
+ApprovalStep
+id, instance_id, approver_id, level, status, decided_at, reason
+Bước duyệt
+SlaInstance
+id, work_item_id, policy_id, deadline_at, paused_at, status
+Theo dõi SLA
+Comment
+id, work_item_id, author_id, body, created_at
+Thảo luận theo phiếu
+Attachment
+id, work_item_id, uri, mime, size, uploader_id
+File/ảnh bằng chứng
+Asset
+id, site_id, unit_id, code, name, location, qr_token
+Thiết bị/ngữ cảnh QR
+Incident
+id, work_item_id, asset_id, reported_at, severity, symptom, verifier_id
+Thông tin đặc thù sự cố
+MaintenanceWorkOrder
+id, work_item_id, incident_id, technician_id, diagnosis, result
+Nghiệp vụ sửa chữa
+InspectionResult
+id, work_item_id, template_version, object_ref, result, submitted_at
+Kết quả kiểm tra
+ChecklistResponse
+id, inspection_id, checkpoint_id, answer, note, evidence_id
+Câu trả lời checkpoint
+MaterialRequest
+id, work_item_id, maintenance_id, requester_id, warehouse_ref, status
+Yêu cầu vật tư giới hạn
+MaterialRequestLine
+id, request_id, item_ref, requested_qty, issued_qty, unit
+Chi tiết số lượng vật tư
+Notification
+id, user_id, event_type, entity_ref, read_at, created_at
+Thông báo in-app
+AuditEvent
+id, actor_id, entity_type, entity_id, action, before_after, timestamp
+Bằng chứng thao tác
+IdempotencyRecord
+id, request_key, operation, result_ref, created_at
+Chống tạo trùng request; tối thiểu server P0
+9.3. Ràng buộc quan hệ
+1.  Organization 1–n Site; Site 1–n OrgUnit; OrgUnit có quan hệ parent-child cấu hình.
+2.  User n–n Role thông qua Membership có scope và hiệu lực; không lưu duy nhất một role trong User.
+3.  Project 1–n WorkItem; WorkItem 1–1 hoặc 1–n WorkflowInstance theo chính sách, bản P0 khuyến nghị một active instance mỗi item.
+4.  WorkItem 1–n Comment, Attachment, AuditEvent; WorkItem n–n WorkItem qua WorkItemRelation.
+5.  Incident liên kết Asset; có thể phát sinh MaintenanceWorkOrder và MaterialRequest; không nhét object vật tư vào Incident dạng chuỗi.
+6.  InspectionResult liên kết checklist template version và Work Item lỗi nếu Fail.
+7.  Mã hiển thị (INC-001, MR-002...) không dùng làm khóa chính hệ thống.
+9.4. Từ điển trạng thái và điều kiện thống nhất
+Đối tượng
+Trạng thái tham chiếu
+Lưu ý
+Task
+TODO, IN_PROGRESS, REVIEW, DONE, CANCELLED
+Không thay đổi state tùy tiện từ client.
+Request
+DRAFT, PENDING_APPROVAL, RETURNED, REJECTED, PROCESSING, DELIVERED, COMPLETED
+Reason bắt buộc Reject/Return.
+Incident
+REPORTED, TRIAGED, ASSIGNED, IN_PROGRESS, WAITING_MATERIAL, WAITING_VERIFY, RESOLVED
+WAITING_MATERIAL là nhánh mở rộng đề xuất; cần rule pause SLA.
+Inspection
+ASSIGNED, IN_PROGRESS, PASSED, FAILED
+FAIL tạo item liên quan khi cấu hình.
+MaterialRequest
+CREATED, PENDING_APPROVAL, ASSIGNED_TO_WAREHOUSE, PROCUREMENT_NEEDED, ISSUED, RECEIVED, COMPLETED
+Không suy diễn biến động tồn kho thực.
+10. GIAO TIẾP HỆ THỐNG, API VÀ EVENT
+10.1. Kiến trúc triển khai tham chiếu
+Mobile React Native + TypeScript; Web Next.js + TypeScript; PostgreSQL; push notification; WebSocket/realtime và Object Storage theo proposal. Backend có điểm chưa thống nhất trong proposal: hình kiến trúc dùng Spring Boot, bảng công nghệ ghi Next.js. SRS KHÔNG tự chốt công nghệ backend; cần nhóm xác nhận tại Open Issue OI-01. [P]
+10.2. API resource contract mức khái niệm
+API resource (tham khảo)
+Use case
+Yêu cầu contract
+POST /auth/login; GET /me/contexts
+UC-01
+Trả session và membership hợp lệ.
+GET /work-items; POST /work-items
+UC-02 / UC-03
+Filter cursor/page, scope server-side, stable sort.
+GET /work-items/{id}; POST /{id}/transitions
+UC-02 / UC-10
+Capabilities; workflow guard; version optimistic lock.
+POST /work-items/{id}/assignment
+UC-03
+Assignee, reason, expectedVersion; audit.
+GET /projects; GET /projects/{id}/tasks
+UC-02
+Chỉ project membership/được chia sẻ.
+GET/POST /requests; POST /requests/{id}/actions
+UC-04
+Form validation và request lifecycle.
+GET /approvals/inbox; POST /approvals/{id}/decision
+UC-04 / UC-10
+Current approver, online-only, reason.
+GET /assets/resolve?code=...
+UC-05
+Resolve token, không lộ dữ liệu ngoài site.
+GET/POST /incidents; POST /incidents/{id}/actions
+UC-05..08
+Triage/assign/verify/resolve guard.
+GET/POST /inspections; POST /inspections/{id}/submit
+UC-09
+Checklist answer, evidence, auto Work Item.
+GET/POST /material-requests; POST /{id}/actions
+UC-07
+Warehouse fulfill / mark purchase / confirm received.
+GET /dashboards/{scope}; GET /org-units/{id}/work
+UC-03
+Scope+filters, click-through to list.
+GET /notifications; PATCH /notifications/{id}/read
+Notification
+Permission checked again on deep link.
+GET /files/upload-policy; POST /files/confirm
+Các UC cần ảnh/file
+MIME/size validation; stored outside DB.
+Đường dẫn trên là đề xuất contract theo resource (không phải OpenAPI đã chốt). Về triển khai, có thể thêm prefix /api/v1 và thay đổi endpoint theo kiến trúc được thống nhất.
+10.3. Quy ước phản hồi / lỗi
+Mã
+Ý nghĩa
+Mobile phải làm
+200/201
+Thành công
+Cập nhật view bằng dữ liệu server trả.
+400/422
+Sai payload/validation
+Giữ form; highlight field và giải thích rõ.
+401
+Phiên không hợp lệ
+Yêu cầu đăng nhập lại an toàn.
+403
+Không đủ quyền
+Ẩn action, hiện thông báo không có quyền.
+404
+Item không tồn tại/không được tiết lộ
+Thông báo không tìm thấy, quay lại.
+409
+Conflict state/version
+Refresh trước khi user quyết định thử lại.
+429
+Giới hạn tần suất
+Thông báo chờ và retry an toàn.
+500/503
+Lỗi hệ thống
+Giữ dữ liệu nhập; retry khi hợp lệ, có event log.
+10.4. Event và realtime
+Event
+Nguồn
+Consumer / hệ quả
+workitem.created / assigned
+Task/Workflow
+Notification, My Work refresh, Audit.
+workitem.transitioned
+Workflow
+Timeline, dashboard counters, WebSocket event.
+approval.requested / decided
+Approval
+Approver inbox, requester notification.
+incident.reported / resolved
+Incident
+Supervisor dashboard, alerts, audit.
+inspection.failed
+Inspection
+Related WorkItem creation qua idempotent automation.
+material.request.updated
+Material Request
+Requester/technician/warehouse status update.
+sla.warning / breached
+SLA worker
+Push/in-app cảnh báo theo escalation policy.
+11. YÊU CẦU PHI CHỨC NĂNG (NFR)
+NFR dưới đây tách chỉ tiêu có nguồn proposal và ngưỡng nghiệm thu đề xuất [D]. Không tuyên bố hệ thống đạt ngưỡng trước khi benchmark. Các ngưỡng cần được nhóm điều chỉnh dựa trên môi trường demo.
+NFR ID
+ƯT
+Yêu cầu / cách xác minh
+Nguồn
+NFR-SEC-01
+P0
+Mọi API từ chối truy cập cross-tenant/cross-site ngoài scope; test negative 403/404.
+[P/C]
+NFR-SEC-02
+P0
+JWT/refresh được cấp, refresh/revoke theo thiết kế backend; token không lưu plaintext vào log.
+[P]
+NFR-SEC-03
+P0
+Rate limit login, file/AI endpoints; validation MIME, kích thước và quyền upload.
+[P]
+NFR-SEC-04
+P0
+QR không nhúng dữ liệu nhạy cảm trực tiếp; resolve qua API kiểm tra quyền.
+[P]
+NFR-SEC-05
+P0
+Audit các approve/assign/transition/close gồm actor, time, before/after; không sửa audit qua UI.
+[P/C]
+NFR-SEC-06
+P0
+Mobile không hiển thị dữ liệu cache của scope cũ sau khi chuyển role/site hoặc logout.
+[D]
+NFR-PERF-01
+P0
+Phân trang/filter danh sách Work Item và dashboard; không tải toàn bộ dữ liệu lớn về Mobile.
+[P]
+NFR-PERF-02
+P0
+Mục tiêu đề xuất p95 API tra cứu danh sách < 2.0 s ở tải demo được xác định, không tính mạng di động; đo bằng k6/JMeter.
+[D]
+NFR-PERF-03
+P0
+Ảnh/file upload bất đồng bộ, không chặn thay đổi UI khác và có trạng thái từng tệp.
+[D]
+NFR-PERF-04
+P1
+Load-test theo mức proposal 100/500/1000/2000 VU, báo throughput, p95, error, CPU/RAM.
+[P]
+NFR-REL-01
+P0
+Retry có idempotency key cho create/transition có nguy cơ trùng; không sinh hai phiếu từ một yêu cầu mạng retry.
+[P]
+NFR-REL-02
+P0
+Optimistic concurrency với version cho state transitions; concurrent update trả conflict thay vì overwrite.
+[P]
+NFR-REL-03
+P0
+Lỗi push/WebSocket không làm rollback trạng thái nghiệp vụ đã commit.
+[P/D]
+NFR-REL-04
+P1
+Offline queue hỗ trợ backoff, conflict detection, sync status và không âm thầm merge xung đột.
+[P]
+NFR-UX-01
+P0
+Mobile hỗ trợ các độ rộng màn hình Android mục tiêu; nội dung không cắt, CTA luôn thao tác được.
+[D]
+NFR-UX-02
+P0
+Action thường xuyên hoàn thành bằng số bước hợp lý; đo định tính trong usability test.
+[P]
+NFR-UX-03
+P0
+Tất cả màn quan trọng có loading/empty/error/validation/permission/success state.
+[C/D]
+NFR-UX-04
+P0
+Thông báo và lỗi bằng tiếng Việt rõ ràng; không hiển thị stack trace hoặc mã lỗi thô cho người dùng cuối.
+[D]
+NFR-UX-05
+P0
+Nút hành động quan trọng đủ lớn để chạm, không phụ thuộc màu sắc đơn độc.
+[P]
+NFR-DATA-01
+P0
+Thời gian lưu UTC server; hiển thị giờ địa phương và thông tin timezone hợp lý.
+[D]
+NFR-DATA-02
+P0
+Mọi form/inspection liên kết template_version; sửa mẫu không làm thay đổi bản ghi lịch sử.
+[D]
+NFR-DATA-03
+P0
+File lưu Object Storage/tham chiếu ngoài bảng nghiệp vụ, có giới hạn type/size và liên kết quyền tải.
+[P]
+NFR-OPS-01
+P0
+Có log request correlation ID, metric error rate và deployment có thể demo lặp lại.
+[P/D]
+NFR-OPS-02
+P0
+Tài liệu API, setup, seed data và test cases nhất quán với bản chạy.
+[P]
+NFR-PORT-01
+P0
+Ưu tiên Android Mobile cho đồ án; iOS nếu có môi trường và thời gian kiểm thử.
+[D]
+NFR-PORT-02
+P0
+Giao diện Web tối thiểu hỗ trợ quản trị trên trình duyệt desktop phổ biến.
+[D]
+11.1. Offline-first – ranh giới hành động
+Action
+MVP P0
+Khi triển khai P1
+Xem Work Item đã tải
+Online
+Cho đọc cache phù hợp scope.
+Draft báo sự cố, checklist, ảnh
+Online
+Cho lưu local queue với trạng thái pending.
+Approve/Reject
+Online
+Vẫn bắt buộc online.
+Assign/Reassign
+Online
+Vẫn bắt buộc online.
+Close/Verify
+Online
+Vẫn bắt buộc online.
+Đổi role/site/quyền
+Online
+Vẫn bắt buộc online; xóa cache không còn quyền.
+12. KẾ HOẠCH KIỂM THỬ VÀ NGHIỆM THU
+12.1. Nguyên tắc acceptance
+Mọi user story P0 phải có positive case, permission negative case, validation state và workflow concurrency case (khi có chuyển trạng thái). Prototype Figma cần cover normal + exception; code phải có test và seed demo tương ứng.
+AT
+Actor
+Tình huống
+Kết quả mong đợi
+Trace
+AT-01
+VP
+Tạo task và giao thành viên được phép
+Task hiển thị ở My Work assignee, có thông báo và audit.
+UC-02 / FR-WRK-02
+AT-02
+VP
+Thêm 2 subtask và checklist, gửi review
+Task không Done nếu điều kiện checklist bắt buộc chưa đạt.
+FR-WRK-05..08
+AT-03
+TP
+Lọc task quá hạn trong nhóm
+Thấy đúng nhân sự/task thuộc phòng ban, không lộ phòng khác.
+UC-03 / FR-DASH-02
+AT-04
+TP
+Reassign task của đội
+Ghi assignee cũ/mới, người mới nhận notification.
+FR-WRK-04
+AT-05
+VP
+Thử giao task ngoài scope
+UI không đề xuất target; API trả 403 nếu cố gọi.
+FR-AUTH-03
+AT-06
+CN
+Quét QR asset đúng site, báo sự cố có ảnh
+Incident REPORTED xuất hiện ở inbox điều phối.
+UC-05
+AT-07
+CN
+Quét QR asset ngoài site
+Không tiết lộ hồ sơ asset và không cho báo theo asset đó.
+FR-INC-01
+AT-08
+TC
+Triage và assign kỹ thuật
+Kỹ thuật thấy phiếu, có timeline và deadline.
+UC-06
+AT-09
+KT
+Sửa máy không cần vật tư
+Complete → Waiting Verify với evidence đầy đủ.
+UC-07
+AT-10
+KT/KHO
+Thiếu vật tư, tạo yêu cầu và xác nhận cấp phát
+MR liên kết repair; số lượng thực cấp và người nhận rõ.
+FR-MAT-01..04
+AT-11
+KHO/MH
+Kho không đáp ứng, chuyển người theo dõi mua
+Status chuyển đúng actor, không phát sinh PO/tồn kho giả.
+FR-MAT-03..05
+AT-12
+QC/TC
+Verify fail kết quả sửa
+Incident trở về xử lý, giữ lịch sử vòng trước.
+UC-08
+AT-13
+QLDC
+Mở dashboard dây chuyền được cấp
+KPI và drilldown khớp task/incident/inspection đúng line.
+FR-DASH-01..03
+AT-14
+QLPX
+Theo dõi nhiều dây chuyền trong xưởng
+Thấy line con đúng scope; không thấy phân xưởng khác.
+FR-ORG-02
+AT-15
+QLN
+Đổi sang site không có quyền
+Không được phép truy cập, dashboard cũ không còn được hiển thị.
+FR-AUTH-02..03
+AT-16
+QC
+Submit Inspection toàn Pass
+Phiếu PASSED; không tạo issue dư.
+UC-09
+AT-17
+QC
+Submit Fail và retry cùng key
+Một related Work Item duy nhất được sinh.
+FR-AUTO-01; NFR-REL-01
+AT-18
+VP/Approver
+Request → Approve → Delivered → Confirm
+Lịch sử đầy đủ, chỉ approver đúng step được xử lý.
+UC-04
+AT-19
+Không là approver
+Thử API approve request
+Từ chối 403, không đổi trạng thái.
+FR-APR-02
+AT-20
+Hai thiết bị
+Cập nhật cùng version WorkItem
+Một action hợp lệ, action stale nhận 409 và UI refresh.
+NFR-REL-02
+AT-21
+QT
+Thay đổi role hoặc membership trên Web
+Mobile reload permission, không còn CTA/ dữ liệu trái scope.
+FR-AUTH-04
+AT-22
+Người dùng
+Push mở chi tiết phiếu đã thu hồi quyền
+Ứng dụng không hiển thị phiếu, đưa thông báo không đủ quyền.
+FR-NOT-01
+AT-23
+KT
+Upload ảnh vượt giới hạn / sai loại
+Báo validation; không submit complete nếu evidence còn thiếu.
+NFR-SEC-03
+AT-24
+Manager
+Xem dashboard khi không có dữ liệu
+Empty state rõ; không sinh OEE, sản lượng giả.
+FR-DASH-03
+AT-25
+User P1
+Mất mạng lưu draft rồi sync khi có mạng
+Không mất draft; conflict được báo cho user.
+FR-SYN-01..03
+12.2. Demo end-to-end cuối kỳ
+1.  Công nhân quét QR trên Mobile, báo máy rung bất thường, kèm ảnh.
+2.  Trưởng ca trên Mobile/Web nhận phiếu, triage và phân công kỹ thuật, SLA bắt đầu theo policy.
+3.  Kỹ thuật nhận push, cập nhật chẩn đoán; phát sinh yêu cầu vật tư nếu cần.
+4.  Kho ghi nhận cấp vật tư; kỹ thuật xác nhận nhận và hoàn tất sửa chữa.
+5.  Người xác minh kiểm tra và đóng sự cố; audit/notification/dashboard phản ánh trạng thái mới.
+6.  Nhân viên văn phòng tạo task, trưởng bộ phận giao/review và theo dõi quá hạn; quy trình Internal Request và QC Inspection được demo độc lập.
+Đoạn demo offline/reconnect trong proposal được giữ là mục tiêu P1, không mặc định là blocker nghiệm thu P0 nếu nhóm ưu tiên hoàn thành các nghiệp vụ Mobile trước.
+13. MA TRẬN TRUY VẾT YÊU CẦU
+Bảng dưới chỉ ra nguồn và phần kiểm thử chủ chốt cho từng cụm FR. Các mã chi tiết tham khảo mục 5, UC mục 6 và danh mục màn mục 8.
+Capability
+FR
+UC
+UI
+AT
+Nguồn
+Auth, scope
+FR-AUTH-01..04, FR-ORG-01..02
+UC-01
+AUTH-01, CTX-01, ORG-01
+AT-05, 15, 21
+Proposal + Scope v1.2
+Task, subtask, project
+FR-WRK-01..10
+UC-02, 03, 10
+WORK-01..05, PROJ-01, TEAM-01..03
+AT-01..05
+Proposal + thống nhất Mobile
+Workflow, Approval, SLA
+FR-FLW-01..03, FR-APR-01..03, FR-SLA-01..02
+UC-04, 10
+APR-01..02, REQ-03
+AT-18..20
+Proposal
+Internal Request
+FR-REQ-01..05
+UC-04
+REQ-01..03
+AT-18
+Proposal
+QR/Incident/Asset
+FR-INC-01..07
+UC-05, 06, 08
+QR-01, AST-01, INC-01..04
+AT-06..09,12
+Proposal
+Maintenance/Material
+FR-MNT-01..02, FR-MAT-01..05
+UC-07
+MNT-01..02, MAT-01..03
+AT-10..11
+Proposal (Material Request) + chi tiết hóa
+Inspection
+FR-QC-01..04, FR-AUTO-01
+UC-09
+QC-01..02
+AT-16..17
+Proposal
+Manager Dashboard
+FR-DASH-01..03
+UC-03
+DASH-01, ORG-02
+AT-13..15,24
+Thống nhất Mobile v1.2
+Notification/Audit
+FR-NOT-01..02, FR-AUD-01..02
+Tất cả
+NOT-01, Timeline
+AT-21..22
+Proposal
+Offline P1
+FR-SYN-01..03
+—
+SYNC-01
+AT-25 (P1)
+Proposal SHOULD
+14. RỦI RO, VẤN ĐỀ MỞ VÀ CÂU HỎI KHẢO SÁT
+14.1. Vấn đề cần quyết định trước khi baseline
+ID
+Vấn đề mở
+Chủ trì
+Tình trạng
+OI-01
+Backend: Spring Boot trong sơ đồ vs Next.js trong bảng công nghệ proposal.
+Tech Lead
+Chưa chốt
+OI-02
+Role thực tế: TC, QLDC, QLPX, QLN có thể trùng nhiệm vụ/cấp bậc tùy nhà máy.
+BA/PO
+Cần khảo sát
+OI-03
+Ai có quyền verify và ai close Incident? Có thể cùng một người không?
+Nghiệp vụ sản xuất
+Cần khảo sát
+OI-04
+Các trường/ảnh bằng chứng bắt buộc khi báo lỗi, sửa máy, kiểm tra QC.
+BA/QA/KT
+Cần mẫu biểu
+OI-05
+SLA phản hồi/xử lý thực tế theo ca; có pause khi chờ vật tư?
+PO/Manager
+Chưa chốt
+OI-06
+Khi thiếu vật tư: kho xử lý ở FLOWSE hay qua hệ thống khác; có MH riêng không?
+PO/Kho
+Cần khảo sát
+OI-07
+Có cấp phát một phần hay vật tư thay thế không, có cần phiếu trả lại?
+PO/Kho
+Ngoài happy path P0
+OI-08
+Trưởng bộ phận có quyền giao task cho mọi user trong phòng hay phải qua nhóm dự án?
+PO
+Chưa chốt
+OI-09
+Task review bắt buộc cho mọi Task hay cấu hình từng workflow?
+BA/PO
+Chưa chốt
+OI-10
+Một asset có bao nhiêu incident mở song song; phát hiện trùng theo quy tắc nào?
+BA/KT
+Chưa chốt
+OI-11
+Offline-first có nâng thành P0 để demo không? Có thiết bị/mạng thử nghiệm không?
+Nhóm phát triển
+Quyết định timeline
+OI-12
+Phạm vi iOS/Android và ngưỡng performance môi trường demo.
+Tech Lead/QA
+Chưa chốt
+OI-13
+Tài liệu v1.2 trước đây thêm Finance/HR/Procurement: xác nhận loại khỏi MVP.
+PO
+Đề xuất khóa scope
+OI-14
+Dữ liệu nhân sự, ca và phân xưởng lấy từ seed nội bộ hay tích hợp bên ngoài?
+PO/Backend
+Chưa chốt
+14.2. Rủi ro và kiểm soát
+Rủi ro
+Tác động
+Biện pháp
+Mở rộng scope thành ERP/Lark mini
+Trễ tiến độ; module thiếu chiều sâu.
+Khoá 4 WF P0; mọi yêu cầu mới phải đi qua change request.
+Nghiệp vụ nhà máy giả định sai
+UI đẹp nhưng khó dùng.
+Review quy trình với ít nhất một người có kinh nghiệm hiện trường hoặc ghi rõ giả định.
+Quyền bị hardcode theo chức danh
+Rò rỉ dữ liệu/khó cấu hình.
+Dùng membership + scope + workflow guard, test 403.
+Offline sync phát sinh xung đột
+Mất/ghi đè dữ liệu.
+P1 chọn lọc, version và idempotency.
+Dashboard dùng chỉ số không có nguồn
+Sai sự thật nghiệp vụ.
+Chỉ KPI từ Work Item/Incident/Inspection.
+Mẫu workflow đổi khi có phiếu đang chạy
+Sai lịch sử/trạng thái.
+Workflow/form versioning, audit.
+14.3. Tiêu chí đóng SRS
+PO/nhóm phát triển chấp nhận danh mục P0 và ngoại phạm vi.
+Xác nhận vai trò cần build thật trên Mobile (đặc biệt KHO/MH actor hỗ trợ) và cây tổ chức mẫu.
+Chốt trạng thái / guard 4 workflow và mẫu biểu tối thiểu.
+Chốt UI catalog, Screen ID, CTA và quyền; đội Design có thể bắt đầu Figma từng flow.
+Gắn FR vào backlog, UC, API và test; các vấn đề mở OI có owner/decision date.
+PHỤ LỤC A. TỪ ĐIỂN THUẬT NGỮ
+Thuật ngữ
+Diễn giải
+Work Item
+Đơn vị công việc chung cho Task/Request/Incident/Inspection.
+Workflow
+Tập state/transition/rule kiểm soát vòng đời công việc.
+Approval Step
+Bước phê duyệt tại một thời điểm cụ thể trong workflow.
+Resource Scope
+Giới hạn dữ liệu theo tenant/site/org unit/project/asset.
+Role-adaptive UI
+Giao diện và quick action thay đổi theo role/ngữ cảnh.
+SLA
+Thời hạn phản hồi/xử lý; quy tắc bắt đầu, tạm dừng, cảnh báo.
+Incident
+Sự cố cần phân loại, phân công xử lý và xác minh.
+Inspection
+Một lần thực hiện checklist/kiểm tra theo mẫu.
+Evidence
+Ảnh/file/ghi chú dùng làm bằng chứng xử lý.
+Material Request
+Yêu cầu vật tư liên kết công việc; không đồng nghĩa Purchase Order.
+Idempotency Key
+Mã giữ cho retry không tạo hai nghiệp vụ.
+Audit Trail
+Lịch sử actor/action/time/before-after để truy vết.
+Optimistic Lock
+Cơ chế version để ngăn ghi đè dữ liệu cũ.
+NCR / CAPA
+Nghiệp vụ chất lượng nâng cao, ngoài MVP.
+ERP/MES/WMS/CMMS
+Các hệ thống nghiệp vụ chuyên dụng không thuộc phạm vi FLOWSE MVP.
+PHỤ LỤC B. PERMISSION KEY THAM CHIẾU
+Permission key
+Ý nghĩa / kiểm soát
+task.create
+Tạo task
+task.edit
+Chỉnh task theo quyền
+work.assign
+Phân công / reassign
+task.transition
+Chuyển trạng thái task
+work.comment
+Bình luận
+work.attach
+Đính file
+work.history.read
+Đọc timeline/audit trong scope
+project.read
+Xem project tham gia
+request.create
+Tạo request
+request.edit.own
+Bổ sung request của mình
+request.fulfill
+Xử lý request
+request.confirm
+Xác nhận bàn giao
+approval.inbox
+Xem inbox bước duyệt
+approval.decide
+Duyệt / từ chối
+asset.scan
+Quét QR asset
+asset.read
+Xem asset
+incident.report
+Báo sự cố
+incident.triage
+Triage sự cố
+incident.assign
+Assign incident
+maintenance.accept
+Nhận phiếu kỹ thuật
+maintenance.execute
+Cập nhật sửa chữa
+maintenance.complete
+Gửi hoàn tất sửa chữa
+incident.verify
+Xác minh kết quả
+incident.resolve
+Đóng sự cố
+inspection.read
+Xem phiếu kiểm tra
+inspection.fill
+Điền checklist
+inspection.submit
+Gửi inspection
+inspection.raise_issue
+Sinh/ liên kết Work Item từ Fail
+material.request.create
+Tạo yêu cầu vật tư
+material.request.approve
+Duyệt vật tư nếu được chỉ định
+material.fulfill
+Cấp phát vật tư
+material.procure.route
+Chuyển theo dõi mua
+purchase.followup
+Cập nhật theo dõi mua
+material.receive.confirm
+Xác nhận nhận vật tư
+dashboard.scope.read
+Dashboard theo đơn vị trong scope
+admin.membership.manage
+Cấp vai trò/phạm vi trên Web
+admin.workflow.manage
+Cấu hình workflow trên Web
+Permission key trong phụ lục là tập kiểm soát tham chiếu của SRS, tương thích về nghĩa với ma trận v1.2. Khóa cụ thể trong API/DB sẽ chốt khi thiết kế backend. Dấu ✓ trong role matrix không được dùng để bỏ qua kiểm tra scope hoặc state.
+PHỤ LỤC C. TÓM TẮT BÀN GIAO DESIGN MOBILE
+Ưu tiên
+Nhóm mockup bắt buộc
+Minh chứng
+1
+AUTH/CTX/HOME; WORK-01..05; TEAM-02/03
+Full flow tạo/giao task, subtask, review, reassign, dashboard nhóm.
+2
+QR-01/AST-01; INC-01..04; MNT-01..02
+Full flow báo sự cố QR → giao kỹ thuật → sửa chữa → verify.
+3
+MAT-01..03; APR-01..02; REQ-01..03
+Nhánh vật tư, Request approval, bàn giao, trạng thái trả về.
+4
+QC-01..02; DASH-01/ORG-01/02; NOT-01
+QC Fail; quản lý theo tổ/line/xưởng/site; thông báo/deep link.
+5
+Common UI states + phân quyền
+403, empty, 409, validation, upload fail, offline P1.
+Handoff Figma: đặt tên frame theo Screen ID, mỗi frame chứa Normal / Empty / Loading / Error / Permission / Validations cần thiết; prototype liên kết theo UC-01..10. Không tự tạo màn hình kế toán, nhân sự hoặc quản trị mua hàng như scope P0.

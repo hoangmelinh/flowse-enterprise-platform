@@ -29,6 +29,7 @@ import {
   incidentRoutes,
   syncRoutes,
   inspectionRoutes,
+  workItemRoutes,
 } from "./routes/index.js";
 import { protectedRoute } from "./middlewares/authMiddlewares.js";
 import { globalErrorHandler, notFoundHandler } from "./middlewares/errorMiddleware.js";
@@ -139,6 +140,7 @@ app.use('/api/v1/assets', assetRoutes);
 app.use('/api/v1/incidents', incidentRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/inspections', inspectionRoutes);
+app.use('/api/v1/work-items', workItemRoutes);
 
 // ── 404 handler (đặt sau tất cả routes) ────────────────────────
 app.use(notFoundHandler);
