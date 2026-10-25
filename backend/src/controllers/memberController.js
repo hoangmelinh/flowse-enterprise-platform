@@ -4,7 +4,7 @@ import { createInvitations, checkExistingInvitation, deleteInvitation, respondTo
 import jwt from 'jsonwebtoken';
 import { findWorkspaceById } from "../models/Workspaces.js";
 import { removeWorkspaceMember } from "../models/Workspaces.js";
-import { findUserById } from "../models/Users.js";
+import { findUserById, findUserByEmail } from "../models/Users.js";
 
 const escapeHtml = (value = "") =>
     String(value)
@@ -60,26 +60,31 @@ export const InviteMember = async (req, res) => {
         const invitationLink = `${clientUrl}/join-workspace?token=${inviteToken}`;
 
         // 4. Nếu người được mời đã có tài khoản, tạo ngay thông báo In-App và đẩy Realtime Socket
-        const invitedUser = await findUserByEmail(email);
-        if (invitedUser) {
-            const NotificationService = (await import("../services/notificationService.js")).default;
-            await NotificationService.createInAppNotification({
-                userId: invitedUser.user_id,
-                actorId: req.user.user_id,
-                entityId: workspace_id,
-                entityType: "WORKSPACE",
-                type: "WORKSPACE_INVITATION",
-                priority: "HIGH",
-                content: `${inviterName} đã mời bạn tham gia Workspace "${workspaceName}".`,
-                metadata: {
-                    workspaceId: workspace_id,
-                    workspaceName: workspaceName,
-                    inviterName: inviterName,
-                    actionUrl: `/join-workspace?token=${inviteToken}`,
-                    token: inviteToken,
-                    role: trimmedRole
-                }
-            });
+        let invitedUser = null;
+        try {
+            invitedUser = await findUserByEmail(email);
+            if (invitedUser) {
+                const NotificationService = (await import("../services/notificationService.js")).default;
+                await NotificationService.createInAppNotification({
+                    userId: invitedUser.user_id,
+                    actorId: req.user.user_id,
+                    entityId: workspace_id,
+                    entityType: "WORKSPACE",
+                    type: "WORKSPACE_INVITATION",
+                    priority: "HIGH",
+                    content: `${inviterName} đã mời bạn tham gia Workspace "${workspaceName}".`,
+                    metadata: {
+                        workspaceId: workspace_id,
+                        workspaceName: workspaceName,
+                        inviterName: inviterName,
+                        actionUrl: `/join-workspace?token=${inviteToken}`,
+                        token: inviteToken,
+                        role: trimmedRole
+                    }
+                });
+            }
+        } catch (notifErr) {
+            console.warn("[InviteMember] Lỗi tạo thông báo in-app (tiếp tục tạo invite link):", notifErr.message);
         }
 
         // 5. Gửi email nếu dịch vụ Resend đã được cấu hình

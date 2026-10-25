@@ -44,6 +44,9 @@ function getLoginRedirectUrl(): string {
 }
 
 function redirectToLogin(): void {
+    if (window.location.pathname === '/login' || window.location.pathname === '/register') {
+        return;
+    }
     window.location.href = getLoginRedirectUrl();
 }
 
@@ -51,7 +54,18 @@ function isRefreshRequest(config?: RetryableAxiosRequestConfig): boolean {
     return config?.url?.includes('/auth/refresh') ?? false;
 }
 
-function isTokenAuthError(status: number, payload: ApiErrorPayload): boolean {
+function isAuthEndpoint(config?: RetryableAxiosRequestConfig): boolean {
+    const url = config?.url || '';
+    return (
+        url.includes('/auth/signin') ||
+        url.includes('/auth/signup') ||
+        url.includes('/auth/google') ||
+        url.includes('/auth/refresh')
+    );
+}
+
+function isTokenAuthError(status: number, payload: ApiErrorPayload, config?: RetryableAxiosRequestConfig): boolean {
+    if (isAuthEndpoint(config)) return false;
     const message = payload.message.toLowerCase();
     return status === 401 || (status === 403 && message.includes('token'));
 }
@@ -109,11 +123,17 @@ function createAxiosInstance(baseURL: string): AxiosInstance {
             };
             const apiError = new ApiError(payload, status);
 
+            if (isAuthEndpoint(originalRequest)) {
+                const authErrorMsg = payload.message || (status === 401 ? 'Email hoặc mật khẩu không chính xác.' : 'Xác thực thất bại.');
+                toast.error(authErrorMsg, { id: 'auth-error' });
+                return Promise.reject(apiError);
+            }
+
             if (
                 originalRequest &&
                 !originalRequest._retry &&
                 !isRefreshRequest(originalRequest) &&
-                isTokenAuthError(status, payload)
+                isTokenAuthError(status, payload, originalRequest)
             ) {
                 originalRequest._retry = true;
 

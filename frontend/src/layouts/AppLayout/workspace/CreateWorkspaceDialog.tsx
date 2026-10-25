@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import type { AppDispatch, RootState } from '../../../store/configureStore';
 import { addWorkspace } from '../../../store/modules/workspaces';
 
+import { generateSlug } from '../../../utils/slugUtils';
+
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -21,16 +23,8 @@ export default function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
     const [slugTouched, setSlugTouched] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const workspaceSlugFromName = (name: string): string => {
-        const base = name
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-        return base.length > 0 ? base : 'workspace';
-    };
     const syncSlug = (n: string) => {
-        if (!slugTouched) setSlug(workspaceSlugFromName(n));
+        if (!slugTouched) setSlug(generateSlug(n));
     };
 
     const reset = () => {
@@ -43,7 +37,7 @@ export default function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
 
     const handleSubmit = async () => {
         const trimmedName = name.trim();
-        const trimmedSlug = slug.trim() || workspaceSlugFromName(trimmedName);
+        const trimmedSlug = slug.trim() || generateSlug(trimmedName);
         if (!trimmedName) return;
         setSubmitting(true);
         try {

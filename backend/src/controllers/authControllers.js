@@ -101,13 +101,13 @@ export const signIn = async (req, res) => {
     // lấy hash password từ database
     const user = await findUserByEmail(email);
     if (!user) {
-      return res.status(401).json({ message: "Sai email hoac password" });
+      return res.status(401).json({ message: "Email hoặc mật khẩu không chính xác" });
     }
 
     // so sánh password với hash password
     const passwordCorrect = await bcrypt.compare(password, user.password_hash);
     if (!passwordCorrect) {
-      return res.status(401).json({ message: "Sai email hoac password" });
+      return res.status(401).json({ message: "Email hoặc mật khẩu không chính xác" });
     }
 
     //nếu khớp, tạo token và trả về cho client

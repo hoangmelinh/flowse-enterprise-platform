@@ -77,6 +77,9 @@ const AssetManagementPage: React.FC = () => {
         name: values.name.trim(),
         location: values.location?.trim() || "Chưa xác định",
         department_id: values.department_id || 4,
+        specs: {
+          pm_cycle: values.pm_cycle?.trim() || "30 ngày",
+        },
       });
       message.success(`Đã thêm thiết bị mới ${values.name} (${values.asset_code}) thành công!`);
       setCreateModalOpen(false);
@@ -110,6 +113,11 @@ const AssetManagementPage: React.FC = () => {
           <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
             <MapPin className="w-3 h-3 text-gray-400" />
             {record.location || "Chưa xác định vị trí"}
+            {record.specs?.pm_cycle && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium text-[11px]">
+                PM: {record.specs.pm_cycle}
+              </span>
+            )}
           </div>
         </div>
       ),
@@ -345,13 +353,28 @@ const AssetManagementPage: React.FC = () => {
                     {qrContext.available_checklists.map((c: any) => (
                       <div
                         key={c.checklist_id}
-                        className="p-3 rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-950/20 text-xs flex items-center justify-between"
+                        className="p-3 rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-950/20 text-xs flex items-center justify-between gap-2"
                       >
                         <div>
                           <div className="font-semibold text-blue-900 dark:text-blue-300">{c.title}</div>
                           <div className="text-gray-500">{c.description || "Phiếu kiểm tra bảo trì định kỳ"}</div>
                         </div>
-                        <Tag color="blue">{c.item_count || 5} mục kiểm tra</Tag>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Tag color="blue">{c.item_count || 5} mục kiểm tra</Tag>
+                          <Button
+                            type="primary"
+                            size="small"
+                            className="bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold"
+                            icon={<ClipboardCheck className="w-3.5 h-3.5 inline mr-1" />}
+                            onClick={() => {
+                              setQrModalOpen(false);
+                              setSelectedAssetForInspection(selectedAsset);
+                              setInspectionModalOpen(true);
+                            }}
+                          >
+                            Làm kiểm tra ngay
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -426,6 +449,14 @@ const AssetManagementPage: React.FC = () => {
             rules={[{ required: true, message: "Vui lòng nhập vị trí phân xưởng" }]}
           >
             <Input placeholder="Ví dụ: Phân xưởng Cơ Khí Chính Xác - Khu Vực C2" />
+          </Form.Item>
+
+          <Form.Item
+            name="pm_cycle"
+            label="Chu kỳ bảo trì định kỳ (PM Cycle)"
+            initialValue="30 ngày"
+          >
+            <Input placeholder="Ví dụ: 30 ngày, 60 ngày, 1 quý..." />
           </Form.Item>
 
           <Form.Item

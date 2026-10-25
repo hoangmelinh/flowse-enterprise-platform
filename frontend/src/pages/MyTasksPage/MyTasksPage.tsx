@@ -79,8 +79,14 @@ export default function MyTasksPage() {
 
     // Gather status groups for the modal
     const modalGroups = useMemo(() => {
-        if (!Array.isArray(listTasks)) return [];
-        return listTasks.map((g: StatusGroup) => ({ id: g.id, name: g.name, color: g.color }));
+        if (Array.isArray(listTasks) && listTasks.length > 0) {
+            return listTasks.map((g: StatusGroup) => ({ id: g.id, name: g.name, color: g.color }));
+        }
+        return [
+            { id: 1, name: 'TO DO', color: '#9CA3AF' },
+            { id: 2, name: 'IN PROGRESS', color: '#2563EB' },
+            { id: 3, name: 'COMPLETE', color: '#22C55E' }
+        ];
     }, [listTasks]);
 
     useEffect(() => {
@@ -163,13 +169,20 @@ export default function MyTasksPage() {
     };
 
     const handleCreateTask = (payload: NewTaskData) => {
-        dispatch(fetchCreateTask({ list_id: payload.list_id, taskData: payload }))
+        const effectiveAssignees = payload.assignee_ids && payload.assignee_ids.length > 0
+            ? payload.assignee_ids
+            : (currentUserId ? [currentUserId] : []);
+
+        dispatch(fetchCreateTask({
+            list_id: payload.list_id,
+            taskData: { ...payload, assignee_ids: effectiveAssignees }
+        }))
             .unwrap()
             .then(() => {
-                toast.success(t('create.createSuccess', { defaultValue: 'Đã tạo task!' }));
+                toast.success(t('create.createSuccess', { defaultValue: 'Đã tạo công việc thành công!' }));
                 dispatch(fetchTasksForUser());
             })
-            .catch(() => toast.error(t('create.createFailed', { defaultValue: 'Tạo task thất bại' })));
+            .catch(() => toast.error(t('create.createFailed', { defaultValue: 'Tạo công việc thất bại' })));
         setIsCreateTaskOpen(false);
     };
 

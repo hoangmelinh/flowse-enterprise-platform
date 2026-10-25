@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, UserRound, X } from 'lucide-react';
 import { Modal, Input } from 'antd';
+import { toast } from 'sonner';
 import { sendInvitations } from '@/store/modules/workspaces';
 import type { AppDispatch } from '@/store/configureStore';
 import { useDispatch, useSelector } from 'react-redux';
@@ -39,6 +40,7 @@ export default function InvitePeopleModal({ open, onOpenChange }: InvitePeopleMo
     const [emails, setEmails] = useState('');
     const [role, setRole] = useState<InviteRole>('MEMBER');
     const [showRolePicker, setShowRolePicker] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const dispatch = useDispatch<AppDispatch>();
     const roleValue = useMemo(
         () => roleOptions.find((r) => r.id === role) ?? roleOptions[0],
@@ -46,16 +48,28 @@ export default function InvitePeopleModal({ open, onOpenChange }: InvitePeopleMo
     );
     const currentWorkspaceId = useSelector((state: { workspaces: WorkspacesState }) => state.workspaces.currentWorkspaceId);
     const handleSendInvite = async () => {
-
         if (!emails.trim()) {
+            toast.warning('Vui lòng nhập địa chỉ email');
             return;
         }
-        await dispatch(sendInvitations({
-            workspaceId: currentWorkspaceId?.toString() || '',
-            emails: emails.trim(),
-            role: role,
-        }));
-        onOpenChange(false);
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await dispatch(sendInvitations({
+                workspaceId: currentWorkspaceId?.toString() || '',
+                emails: emails.trim(),
+                role: role,
+            })).unwrap();
+            toast.success(`Đã gửi lời mời tham gia thành công tới ${emails.trim()}!`);
+            setEmails('');
+            onOpenChange(false);
+        } catch (error: unknown) {
+            console.error('Failed to send invitation:', error);
+            const msg = typeof error === 'string' ? error : 'Không thể gửi lời mời lúc này';
+            toast.error(msg);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -171,10 +185,11 @@ export default function InvitePeopleModal({ open, onOpenChange }: InvitePeopleMo
                     </button>
                     <button
                         type="button"
-                        className="rounded-xl border-0 bg-(--color-inverse-surface) px-5 py-2 text-[13px] font-bold text-white cursor-pointer"
+                        disabled={isSubmitting}
+                        className={`rounded-xl border-0 px-5 py-2 text-[13px] font-bold text-white transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed opacity-70' : 'bg-(--color-inverse-surface) cursor-pointer hover:opacity-90'}`}
                         onClick={handleSendInvite}
                     >
-                        Send invite
+                        {isSubmitting ? 'Sending...' : 'Send invite'}
                     </button>
                 </div>
             </div>

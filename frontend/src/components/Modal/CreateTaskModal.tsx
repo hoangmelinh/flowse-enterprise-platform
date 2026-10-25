@@ -48,12 +48,19 @@ export default function CreateTaskModal({
     const { t } = useTranslation('tasks');
     const { t: tc } = useTranslation('common');
 
+    const DEFAULT_STATUS_GROUPS = [
+        { id: 1, name: 'TO DO', color: '#9CA3AF' },
+        { id: 2, name: 'IN PROGRESS', color: '#2563EB' },
+        { id: 3, name: 'COMPLETE', color: '#22C55E' }
+    ];
+    const effectiveGroups = groups.length > 0 ? groups : DEFAULT_STATUS_GROUPS;
+
     const [itemType, setItemType] = useState<ItemType>('task');
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
 
     // Task fields
-    const [statusId, setStatusId] = useState<number>(0);
+    const [statusId, setStatusId] = useState<number>(effectiveGroups[0]?.id || 1);
     const [priority, setPriority] = useState<string>('Normal');
     const [dueDate, setDueDate] = useState<string | null>(null);
     const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
@@ -76,7 +83,8 @@ export default function CreateTaskModal({
             setItemType('task');
             setName('');
             setDescription('');
-            setStatusId(groups.length > 0 ? groups[0].id : 0);
+            const initialStatusId = groups.length > 0 ? groups[0].id : DEFAULT_STATUS_GROUPS[0].id;
+            setStatusId(initialStatusId);
             setPriority('Normal');
             setDueDate(null);
             setAssigneeIds([]);
@@ -90,7 +98,7 @@ export default function CreateTaskModal({
 
     if (!isOpen) return null;
 
-    const currentStatus = groups.find(s => s.id === statusId) || groups[0] || { id: 0, name: 'No Status', color: '#ccc' };
+    const currentStatus = effectiveGroups.find(s => s.id === statusId) || effectiveGroups[0];
     const currentPriority = PRIORITY_OPTIONS.find(p => p.value === priority) || PRIORITY_OPTIONS[2];
     const currentMilestoneStatus = MILESTONE_STATUS_OPTIONS.find(s => s.value === milestoneStatus) || MILESTONE_STATUS_OPTIONS[0];
 
@@ -98,12 +106,12 @@ export default function CreateTaskModal({
         if (!name.trim()) return;
 
         if (itemType === 'task') {
-            if (!listId || !statusId) return;
+            if (!listId) return;
             onCreate({
                 name: name.trim(),
                 description: description.trim() || null,
                 list_id: listId,
-                status_id: statusId,
+                status_id: statusId || effectiveGroups[0]?.id || 1,
                 priority: priority,
                 due_date: dueDate ? new Date(dueDate).toISOString() : null,
                 assignee_ids: assigneeIds,
@@ -138,7 +146,7 @@ export default function CreateTaskModal({
     const submitLabel = isMilestone ? t('create.createMilestone') : t('create.createTask');
     const submitDisabled = isMilestone
         ? !name.trim() || !listId || isCreatingMilestone
-        : !name.trim() || !listId || !statusId;
+        : !name.trim() || !listId;
 
     return (
         <div className="fixed inset-0 z-2000 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -266,7 +274,7 @@ export default function CreateTaskModal({
                                 </button>
                                 {activeDropdown === 'status' && (
                                     <div className="absolute bottom-full left-0 mb-1 w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-xl">
-                                        {groups.map(s => (
+                                        {effectiveGroups.map(s => (
                                             <button key={s.id} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-caption font-medium border-0 bg-transparent text-[var(--color-on-surface)] hover:bg-[var(--color-primary-bg)] cursor-pointer" onClick={() => { setStatusId(s.id); setActiveDropdown(null); }}>
                                                 <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} /> {s.name}
                                             </button>

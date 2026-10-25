@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store/configureStore';
 import { addWorkspace } from '@/store/modules/workspaces';
+import { generateSlug } from '@/utils/slugUtils';
 
 
 export default function WorkspaceSetupPage() {
@@ -16,13 +17,7 @@ export default function WorkspaceSetupPage() {
     const [isCreating, setIsCreating] = useState(false);
     const handleNameChange = (val: string) => {
         setName(val);
-        const autoSlug = val
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .slice(0, 40);
-        setSlug(autoSlug);
+        setSlug(generateSlug(val, 40));
     };
 
     const handleNext = async () => {
@@ -36,7 +31,7 @@ export default function WorkspaceSetupPage() {
             await dispatch(
                 addWorkspace({
                     name: name.trim(),
-                    slug: slug || name.trim().toLowerCase().replace(/\s+/g, '-'),
+                    slug: slug.trim() || generateSlug(name.trim(), 40),
                     description: '',
                 }),
             ).unwrap();
