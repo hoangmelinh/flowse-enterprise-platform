@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../../../core/theme/colors';
-import { typography, spacing, borderRadius } from '../../../core/theme';
+import { View, StyleSheet } from 'react-native';
+import { space, radius, useColors } from '../../../core/theme';
 import { SLAStatus } from '../../../domain/entities/workitem';
-import { Clock, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { Clock, TriangleAlert, CircleAlert, CircleCheck } from 'lucide-react-native';
+import { AppText } from '../ui';
 
 interface SLABadgeProps {
   status: SLAStatus;
@@ -11,6 +11,7 @@ interface SLABadgeProps {
 }
 
 export const SLABadge: React.FC<SLABadgeProps> = ({ status, deadlineAt }) => {
+  const c = useColors();
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
@@ -36,69 +37,35 @@ export const SLABadge: React.FC<SLABadgeProps> = ({ status, deadlineAt }) => {
     return () => clearInterval(interval);
   }, [deadlineAt]);
 
-  const getBadgeConfig = () => {
-    switch (status) {
-      case 'IN_SLA':
-        return {
-          bg: colors.sla.inSlaBg,
-          text: colors.sla.inSla,
-          label: 'Trong SLA',
-          Icon: Clock,
-        };
-      case 'AT_RISK':
-        return {
-          bg: colors.sla.atRiskBg,
-          text: colors.sla.atRisk,
-          label: 'Nguy cơ trễ',
-          Icon: AlertTriangle,
-        };
-      case 'BREACHED':
-        return {
-          bg: colors.sla.breachedBg,
-          text: colors.sla.breached,
-          label: 'Vi phạm SLA',
-          Icon: AlertCircle,
-        };
-      case 'COMPLETED':
-      default:
-        return {
-          bg: '#F1F5F9',
-          text: '#64748B',
-          label: 'Hoàn tất',
-          Icon: CheckCircle2,
-        };
-    }
-  };
-
-  const config = getBadgeConfig();
+  const config = BADGE[status] ?? BADGE.COMPLETED;
   const IconComponent = config.Icon;
 
   return (
-    <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.text }]}>
-      <IconComponent size={14} color={config.text} style={styles.icon} />
-      <Text style={[styles.label, { color: config.text }]}>
+    <View style={[styles.container, { backgroundColor: c[config.bg] }]}>
+      <IconComponent size={14} color={c[config.tone]} />
+      <AppText variant="label" tone={config.tone}>
         {config.label}
-        {timeLeft ? ` • ${timeLeft}` : ''}
-      </Text>
+        {timeLeft && status !== 'COMPLETED' ? ` · ${timeLeft}` : ''}
+      </AppText>
     </View>
   );
 };
+
+const BADGE = {
+  IN_SLA: { bg: 'successSoft', tone: 'success', label: 'Trong SLA', Icon: Clock },
+  AT_RISK: { bg: 'warningSoft', tone: 'warning', label: 'Nguy cơ trễ', Icon: TriangleAlert },
+  BREACHED: { bg: 'dangerSoft', tone: 'danger', label: 'Vi phạm SLA', Icon: CircleAlert },
+  COMPLETED: { bg: 'subtle', tone: 'muted', label: 'Hoàn tất', Icon: CircleCheck },
+} as const;
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
+    gap: space.xs,
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
     alignSelf: 'flex-start',
-  },
-  icon: {
-    marginRight: 4,
-  },
-  label: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
   },
 });

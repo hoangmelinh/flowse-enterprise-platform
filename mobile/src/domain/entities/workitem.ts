@@ -43,6 +43,8 @@ export interface WorkItem {
   description?: string;
   priority: WorkItemPriority;
   statusId?: number;
+  statusName?: string;
+  dueDate?: string;
   listId: number;
   creatorId: number;
   creatorName?: string;

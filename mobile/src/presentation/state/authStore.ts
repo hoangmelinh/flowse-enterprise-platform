@@ -11,6 +11,8 @@ interface AuthState {
   workspaces: Workspace[];
   capabilities: UserCapabilities;
   isLoading: boolean;
+  // true sau lần kiểm tra phiên đầu tiên lúc mở app
+  isInitialized: boolean;
   error: string | null;
 
   // Actions
@@ -48,6 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   workspaces: [],
   capabilities: computeCapabilities('member'),
   isLoading: true,
+  isInitialized: false,
   error: null,
 
   login: async (usernameOrEmail, password) => {
@@ -120,6 +123,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch {
       set({ isLoading: false, user: null, token: null });
+    } finally {
+      set({ isInitialized: true });
     }
   },
 

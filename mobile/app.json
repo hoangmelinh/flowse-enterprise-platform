@@ -4,23 +4,12 @@
     "slug": "flowse-mobile",
     "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.flowse.enterprise"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
-      },
       "package": "com.flowse.enterprise",
       "permissions": [
         "CAMERA",
@@ -38,9 +27,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Flowse cần quyền truy cập ảnh để đính kèm bằng chứng báo sự cố hoặc nghiệm thu."
+          "photosPermission": "Flowse cần quyền truy cập ảnh để đính kèm bằng chứng báo sự cố hoặc nghiệm thu.",
+          "cameraPermission": "Flowse cần camera để chụp ảnh sự cố và bằng chứng nghiệm thu."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-font"
     ]
   }
 }

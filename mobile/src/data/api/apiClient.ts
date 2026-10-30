@@ -1,11 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import config from '../../core/config';
+import { demoAdapter } from './demoAdapter';
 import secureStorage from '../local/secureStorage';
 import { AuthError, ConflictError, NetworkError, PermissionError } from '../../core/errors/AppError';
 
 export const apiClient = axios.create({
   baseURL: config.apiBaseUrl,
   timeout: config.apiTimeoutMs,
+  adapter: config.demo ? demoAdapter : undefined,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
