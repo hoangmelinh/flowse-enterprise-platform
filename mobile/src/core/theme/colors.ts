@@ -1,76 +1,47 @@
 /**
- * Flowse 2.0 Mobile Enterprise Theme Colors
- * Thiết kế chuẩn UI công nghiệp cao cấp: Tối ưu tương phản, rõ ràng khi làm việc ngoài hiện trường.
+ * Flowse 2.0 · Minimal — đồng bộ 1-1 với collection biến "Flowse 2.0 · Minimal" trong Figma.
+ * Đổi màu ở Figma thì cập nhật lại đúng tên token tại đây.
  */
-
-export const colors = {
-  // Brand colors
-  primary: '#2563EB',       // Blue 600 - Màu nhận diện chính
-  primaryDark: '#1D4ED8',   // Blue 700
-  primaryLight: '#60A5FA',  // Blue 400
-  accent: '#06B6D4',        // Cyan 500
-
-  // SLA Status Colors (Đồng hồ đếm ngược SLA)
-  sla: {
-    inSla: '#10B981',       // Xanh lục - An toàn
-    inSlaBg: '#ECFDF5',
-    atRisk: '#F59E0B',      // Vàng hổ phách - Cảnh báo nguy cơ (>80%)
-    atRiskBg: '#FFFBEB',
-    breached: '#EF4444',    // Đỏ - Đã vi phạm SLA
-    breachedBg: '#FEF2F2',
-  },
-
-  // Work Item Types (Màu phân biệt loại đầu việc)
-  workItemType: {
-    TASK: '#3B82F6',        // Xanh dương
-    INCIDENT: '#EF4444',    // Đỏ còi báo động
-    INSPECTION: '#8B5CF6',  // Tím kiểm định
-    REQUEST: '#F59E0B',     // Cam yêu cầu phê duyệt
-  },
-
-  // Priority Colors
-  priority: {
-    urgent: '#DC2626',      // Khẩn cấp
-    high: '#EA580C',        // Cao
-    normal: '#3B82F6',      // Bình thường
-    low: '#6B7280',         // Thấp
-  },
-
-  // Neutral / Industrial Dark & Light Palette
-  neutral: {
-    white: '#FFFFFF',
-    background: '#0B0F19',  // Dark slate nền chính hiện đại
-    card: '#161F30',        // Thẻ công việc tối
-    cardBorder: '#233047',  // Viền phân tách thẻ
-    textPrimary: '#F8FAFC', // Chữ sáng nổi bật
-    textSecondary: '#94A3B8', // Chữ phụ
-    textMuted: '#64748B',   // Chữ mờ / placeholder
-    divider: '#1E293B',
-    surfaceHover: '#1E293B',
-  },
-
-  // Light Mode Fallback
+export const palette = {
   light: {
-    background: '#F8FAFC',
-    card: '#FFFFFF',
-    cardBorder: '#E2E8F0',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textMuted: '#94A3B8',
+    bg: '#F6F6F4',
+    surface: '#FFFFFF',
+    subtle: '#EFEFEC',
+    ink: '#141414',
+    muted: '#66666B',
+    line: '#E6E5E1',
+    accent: '#0E7C74',
+    accentSoft: '#E2F1EF',
+    onAccent: '#FFFFFF',
+    danger: '#BF3A2E',
+    dangerSoft: '#FBEAE7',
+    warning: '#A35A00',
+    warningSoft: '#FCF0DE',
+    success: '#1F7A3E',
+    successSoft: '#E4F3E9',
+    progress: '#2F5FD0',
+    progressSoft: '#E8EEFB',
   },
-
-  // System States
-  status: {
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#0EA5E9',
+  dark: {
+    bg: '#111111',
+    surface: '#1A1A1A',
+    subtle: '#242424',
+    ink: '#F2F2F0',
+    muted: '#A3A3A8',
+    line: '#2E2E2E',
+    accent: '#3DBFB2',
+    accentSoft: '#11302D',
+    onAccent: '#0B1F1D',
+    danger: '#F07B70',
+    dangerSoft: '#3A1714',
+    warning: '#E8A23C',
+    warningSoft: '#36260E',
+    success: '#5CC98A',
+    successSoft: '#13301E',
+    progress: '#7FA3F5',
+    progressSoft: '#18223A',
   },
+} as const;
 
-  // Offline banner
-  offline: {
-    bannerBg: '#78350F',
-    bannerText: '#FEF3C7',
-    badge: '#D97706',
-  }
-};
+export type Colors = { [K in keyof typeof palette.light]: string };
+export type ColorToken = keyof Colors;
