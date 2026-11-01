@@ -144,7 +144,6 @@ export const LaunchScreen: React.FC<{ onDone: () => void }> = ({ onDone }) => {
     <Animated.View
       style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }, rootStyle]}
       accessibilityLabel="Flowse đang khởi động"
-      pointerEvents="none"
     >
       <View style={styles.stage}>
         <View style={styles.scene}>

@@ -34,3 +34,6 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 *.local
+
+# graphify knowledge graph output (local only)
+graphify-out/

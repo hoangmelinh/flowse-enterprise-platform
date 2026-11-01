@@ -5,6 +5,7 @@ import { Routes } from '../../../core/constants/routes';
 import { useAuthStore } from '../../state/authStore';
 import { AppText, BottomBar, Button, Group, Row, ScrollPage } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import { FigmaAnim } from '../../components/anim/FigmaAnim';
 
 /** A09 — Chọn nơi làm việc (dữ liệu thật từ /workspaces). */
 export const ContextSelectScreen: React.FC<ScreenProps<typeof Routes.CONTEXT_SELECT>> = ({ navigation }) => {
@@ -29,6 +30,7 @@ export const ContextSelectScreen: React.FC<ScreenProps<typeof Routes.CONTEXT_SEL
         </BottomBar>
       }
     >
+      <FigmaAnim kind="welcome" />
       <AppText tone="muted">{`Bạn có ${workspaces.length} nơi làm việc. Chọn cho phiên này, đổi lại bất cứ lúc nào trong mục Tôi.`}</AppText>
       <Group>
         {workspaces.map((w) => (

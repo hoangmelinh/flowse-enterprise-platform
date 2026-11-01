@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, FlatList, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, ScrollView, ActivityIndicator, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import {
   Circle,
   CircleAlert,
@@ -16,6 +16,8 @@ import {
   SquareCheckBig,
   WifiOff,
   Search,
+  ListChecks,
+  SlidersHorizontal,
 } from 'lucide-react-native';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
@@ -24,7 +26,7 @@ import { WorkItem } from '../../../domain/entities/workitem';
 import { WorkItemRepositoryImpl } from '../../../data/repositories/WorkItemRepositoryImpl';
 import { comments, people, spaces, spaceTree } from '../../../data/demo/fixtures';
 import {
-  AppText, Avatar, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KV, Row,
+  AppText, Avatar, Banner, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KV, Row,
   Screen, ScreenHeader, ScrollPage, Segmented, SectionHeader, Stat, StatRow, Tag,
 } from '../../components/ui';
 import { WorkflowTransitionBar } from '../../components/workflow/WorkflowTransitionBar';
@@ -58,7 +60,12 @@ export const WorkItemsScreen: React.FC = () => {
       <ScreenHeader
         title="Công việc"
         caption={`${data.length} việc của tôi`}
-        right={<IconButton icon={Layers} label="Không gian" onPress={() => nav.navigate(Routes.SPACES)} />}
+        right={
+          <View style={s.headerIcons}>
+            <IconButton icon={SlidersHorizontal} label="Lọc" onPress={() => nav.navigate(Routes.WORK_FILTER)} />
+            <IconButton icon={Layers} label="Không gian" onPress={() => nav.navigate(Routes.SPACES)} />
+          </View>
+        }
       />
       <View style={s.filters}>
         <Chips items={['Tất cả', 'Quá hạn', 'Hôm nay', 'Chờ review']} value={filter} onChange={setFilter} />
@@ -74,7 +81,7 @@ export const WorkItemsScreen: React.FC = () => {
           contentContainerStyle={s.list}
           onRefresh={refetch}
           refreshing={isRefetching}
-          ListEmptyComponent={<EmptyState icon={SquareCheckBig} title="Không có việc phù hợp" body="Thử bỏ bộ lọc." />}
+          ListEmptyComponent={<EmptyState icon={SquareCheckBig} title="Không có việc phù hợp" body={`Không có việc nào khớp bộ lọc "${filter}". Thử bỏ một bộ lọc.`} actionTitle="Xóa tất cả bộ lọc" onAction={() => setFilter('Tất cả')} />}
           renderItem={({ item, index }) => {
             const d = dueInfo(item);
             return (
@@ -142,6 +149,8 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
           <Group>
             <Row icon={MessageSquare} title="Trao đổi" subtitle="3 bình luận · 1 tệp" onPress={() => navigation.navigate(Routes.COMMENTS, { code: `VP-${w.id}` })} />
             <Row icon={UserPlus} title="Giao / chuyển việc" subtitle="Chọn người trong không gian" onPress={() => navigation.navigate(Routes.ASSIGN_SHEET, { title: w.title })} />
+            <Row icon={ListChecks} title="Việc con & checklist" subtitle="3/5 việc con · 4/6 mục" onPress={() => navigation.navigate(Routes.SUBTASKS)} />
+            {w.statusName === 'Chờ review' ? <Row icon={CircleCheck} iconTone="warning" title="Review kết quả" subtitle="Bạn là người review" onPress={() => navigation.navigate(Routes.REVIEW)} /> : null}
           </Group>
           {move.isSuccess ? <AppText variant="caption" tone="success">Đã cập nhật trạng thái.</AppText> : null}
         </>
@@ -156,6 +165,15 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
 export const CreateWorkItemScreen: React.FC<ScreenProps<typeof Routes.CREATE_WORK_ITEM>> = ({ navigation }) => {
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
+  // K07: hỏi trước khi rời form đang nhập; bấm Tạo (REPLACE sang màn hoàn tất) thì cho qua
+  usePreventRemove(!!(title.trim() || desc.trim()), ({ data }) => {
+    if (data.action.type === 'REPLACE') return navigation.dispatch(data.action);
+    Alert.alert('Bạn có thay đổi chưa lưu', 'Lưu nháp để tiếp tục sau, hoặc bỏ thay đổi.', [
+      { text: 'Ở lại', style: 'cancel' },
+      { text: 'Bỏ thay đổi', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+      { text: 'Lưu nháp', onPress: () => navigation.dispatch(data.action) },
+    ]);
+  });
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollPage
@@ -176,7 +194,7 @@ export const CreateWorkItemScreen: React.FC<ScreenProps<typeof Routes.CREATE_WOR
         <Field label="Tên công việc" value={title} onChangeText={setTitle} placeholder="Ví dụ: Xác nhận định mức chỉ may lô 2" />
         <Field label="Mô tả" value={desc} onChangeText={setDesc} placeholder="Thêm chi tiết (không bắt buộc)" multiline />
         <Group>
-          <Row icon={Folder} title="Danh sách" subtitle="Đơn hàng AP-1126" />
+          <Row icon={Folder} title="Danh sách" subtitle="Đơn hàng AP-1126" onPress={() => navigation.navigate(Routes.PICK_PROJECT)} />
           <Row icon={UserPlus} title="Người làm" subtitle="Chưa chọn" onPress={() => navigation.navigate(Routes.ASSIGN_SHEET)} />
           <Row icon={Calendar} title="Hạn" subtitle="31/10 · 12:00" />
           <Row icon={Flag} title="Ưu tiên" subtitle="Cao" />
@@ -189,16 +207,18 @@ export const CreateWorkItemScreen: React.FC<ScreenProps<typeof Routes.CREATE_WOR
   );
 };
 
-/** C08 — Sheet giao việc (form sheet native). */
+/** C08 / C15 — Sheet giao việc; người ngoài phạm vi thì gửi yêu cầu phối hợp thay vì giao thẳng. */
 export const AssignSheet: React.FC<ScreenProps<typeof Routes.ASSIGN_SHEET>> = ({ navigation }) => {
   const s = useStyles();
   const c = useColors();
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState(people[0].id);
-  const list = people.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
-  const chosen = people.find((p) => p.id === picked);
+  const all = [...people, { id: 99, name: 'Hồ Thị Lan', sub: 'Dây chuyền A1 · ngoài phạm vi giao việc của bạn' }];
+  const list = all.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
+  const chosen = all.find((p) => p.id === picked);
+  const outside = picked === 99;
   return (
-    <View style={s.sheet}>
+    <ScrollView style={s.sheetBg} contentContainerStyle={s.sheet}>
       <AppText variant="heading">Giao cho</AppText>
       <Field label="Tìm người" icon={Search} value={q} onChangeText={setQ} placeholder="Tìm người trong Kế hoạch SX" />
       <Group>
@@ -207,14 +227,20 @@ export const AssignSheet: React.FC<ScreenProps<typeof Routes.ASSIGN_SHEET>> = ({
             key={p.id}
             title={p.name}
             subtitle={p.sub}
+            subtitleTone={p.id === 99 ? 'warning' : 'muted'}
             chevron={false}
             trailing={p.id === picked ? <CircleCheck size={22} color={c.accent} /> : <Circle size={22} color={c.muted} />}
             onPress={() => setPicked(p.id)}
           />
         ))}
       </Group>
-      <Button title={`Giao cho ${chosen?.name ?? ''}`} disabled={!chosen} onPress={navigation.goBack} />
-    </View>
+      {outside ? <Banner tone="warning" text="Hồ Thị Lan thuộc Dây chuyền A1. Gửi yêu cầu phối hợp tới Trưởng dây chuyền A1 để giao cho Hồ Thị Lan." /> : null}
+      <Button
+        title={outside ? 'Gửi yêu cầu phối hợp' : `Giao cho ${chosen?.name ?? ''}`}
+        disabled={!chosen}
+        onPress={() => (outside ? navigation.replace(Routes.SUCCESS, { title: 'Đã gửi yêu cầu phối hợp', body: 'Trưởng dây chuyền A1 nhận yêu cầu giao việc cho Hồ Thị Lan.', kind: 'Phối hợp', code: 'PH-2610-006' }) : navigation.goBack())}
+      />
+    </ScrollView>
   );
 };
 
@@ -257,7 +283,7 @@ export const SpacesScreen: React.FC<ScreenProps<typeof Routes.SPACES>> = ({ navi
       <Segmented items={['Không gian', 'Dự án']} value={tab} onChange={setTab} />
       <Group>
         {list.map((x) => (
-          <Row key={x.id} icon={Layers} iconTone="accent" title={x.name} subtitle={x.sub} onPress={() => navigation.navigate(Routes.SPACE_DETAIL, { spaceId: x.id, name: x.name })} />
+          <Row key={x.id} icon={Layers} iconTone="accent" title={x.name} subtitle={x.sub} onPress={() => (x.project ? navigation.navigate(Routes.PROJECT_DETAIL, { name: x.name }) : navigation.navigate(Routes.SPACE_DETAIL, { spaceId: x.id, name: x.name }))} />
         ))}
       </Group>
       <AppText variant="caption" tone="muted">
@@ -283,7 +309,7 @@ export const SpaceDetailScreen: React.FC<ScreenProps<typeof Routes.SPACE_DETAIL>
           icon={n.kind === 'folder' ? Folder : List}
           title={n.name}
           subtitle={n.kind === 'folder' ? `Thư mục · ${n.count} việc` : `${n.count} việc`}
-          onPress={() => navigation.navigate(Routes.MAIN_TABS, { screen: Routes.WORK_ITEMS })}
+          onPress={() => navigation.navigate(Routes.LIST_VIEW, { name: n.name })}
         />
       ))}
     </Group>
@@ -293,13 +319,15 @@ export const SpaceDetailScreen: React.FC<ScreenProps<typeof Routes.SPACE_DETAIL>
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
     filters: { paddingLeft: space.xl, paddingBottom: space.md },
+    headerIcons: { flexDirection: 'row' },
     loading: { marginTop: 40 },
     list: { paddingHorizontal: space.xl, paddingBottom: 100 },
     // Mỗi dòng là ô riêng của FlatList; bo góc đầu/cuối để trông như một Group liền khối
     cell: { backgroundColor: c.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: c.line, borderTopWidth: StyleSheet.hairlineWidth },
     first: { borderTopWidth: 1, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, overflow: 'hidden' },
     last: { borderBottomWidth: 1, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: 'hidden' },
-    sheet: { flex: 1, gap: space.lg, padding: space.xl, backgroundColor: c.bg },
+    sheetBg: { flex: 1, backgroundColor: c.bg },
+    sheet: { gap: space.lg, padding: space.xl },
     thread: { gap: space.xl, padding: space.xl },
     msg: { flexDirection: 'row', gap: 10 },
   })

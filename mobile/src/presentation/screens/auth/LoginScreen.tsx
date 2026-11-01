@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Routes } from '../../../core/constants/routes';
+import { usePrefs } from '../../state/prefsStore';
 import { AtSign, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { space, Colors, makeStyles, useColors } from '../../../core/theme';
 import config from '../../../core/config';
@@ -14,6 +17,17 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, error } = useAuthStore();
+  const nav = useNavigation<any>();
+  const expired = usePrefs((p) => p.sessionExpired);
+
+  useEffect(() => {
+    if (error?.includes('tạm khóa')) nav.navigate(Routes.ACCOUNT_LOCKED);
+  }, [error, nav]);
+  useEffect(() => {
+    if (!expired) return;
+    usePrefs.getState().set({ sessionExpired: false });
+    nav.navigate(Routes.SESSION_EXPIRED);
+  }, [expired, nav]);
 
   const canSubmit = !!email.trim() && !!password && !isLoading;
   const submit = () => {
@@ -32,7 +46,7 @@ export const LoginScreen: React.FC = () => {
             <AppText tone="muted">Dùng tài khoản công ty được cấp.</AppText>
           </View>
 
-          {config.demo ? <Banner text="Chế độ xem thử: nhập email và mật khẩu bất kỳ để vào app." /> : null}
+          {config.demo ? <Banner text={'Chế độ xem thử: nhập email và mật khẩu bất kỳ. Mật khẩu "sai" hoặc "khoa" để xem màn lỗi.'} /> : null}
           {error ? <Banner tone="danger" text={error} /> : null}
 
           <Field
@@ -71,11 +85,10 @@ export const LoginScreen: React.FC = () => {
             }
           />
 
-          {/* shortcut: backend chưa có API quên mật khẩu, nên hướng dẫn liên hệ quản trị (như A07); làm A04–A06 khi có API */}
           <Pressable
             accessibilityRole="link"
             style={styles.forgot}
-            onPress={() => Alert.alert('Quên mật khẩu', 'Liên hệ quản trị viên công ty để đặt lại mật khẩu.')}
+            onPress={() => nav.navigate(Routes.FORGOT_PASSWORD)}
           >
             <AppText variant="label" tone="accent">
               Quên mật khẩu?

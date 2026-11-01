@@ -11,6 +11,8 @@ import {
   AppText, Banner, BottomBar, Button, Chips, Fab, Field, Group, KV, PressableScale, Row, Screen, ScreenHeader, ScrollPage, SectionHeader, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import { FigmaAnim } from '../../components/anim/FigmaAnim';
+import { useAuthStore } from '../../state/authStore';
 
 /* ───────── F · Kiểm tra chất lượng ───────── */
 
@@ -42,7 +44,7 @@ export const InspectionRunnerScreen: React.FC<ScreenProps<typeof Routes.INSPECTI
           <Button
             title={missing ? `Còn ${missing} mục chưa kiểm tra` : 'Gửi kết quả'}
             disabled={missing > 0}
-            onPress={() => navigation.replace(Routes.INSPECTION_RESULT, { passed: Object.values(ans).filter(Boolean).length, total: checklist.length })}
+            onPress={() => navigation.navigate(Routes.INSPECTION_SUBMIT, { passed: Object.values(ans).filter(Boolean).length, total: checklist.length })}
           />
         </BottomBar>
       }
@@ -88,11 +90,12 @@ export const InspectionResultScreen: React.FC<ScreenProps<typeof Routes.INSPECTI
       onBack={navigation.goBack}
       footer={
         <BottomBar>
-          {!ok && <Button title="Ghi nhận không phù hợp (NCR)" variant="danger" onPress={() => navigation.popToTop()} />}
+          {!ok && <Button title="Ghi nhận không phù hợp (NCR)" variant="danger" onPress={() => navigation.replace(Routes.NCR_NEW)} />}
           <Button title="Về trang chủ" variant={ok ? 'primary' : 'secondary'} onPress={() => navigation.popToTop()} />
         </BottomBar>
       }
     >
+      <FigmaAnim kind="scan" />
       <Banner tone={ok ? 'accent' : 'danger'} text={`${ok ? 'Đạt' : 'Chưa đạt'} · ${passed}/${total} tiêu chí đạt`} />
       <Group>
         <KV label="Người kiểm tra" value="Trần Thị Ngọc" />
@@ -185,9 +188,10 @@ export const RequestDetailScreen: React.FC<ScreenProps<typeof Routes.REQUEST_DET
           {toReceive ? (
             <Button
               title="Xác nhận đã nhận đủ"
-              onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã nhận đủ · yêu cầu đã đóng', body: 'Người giao và bộ phận xử lý nhận thông báo.', kind: 'Hành chính, IT', code: r.code })}
+              onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã nhận đủ · yêu cầu đã đóng', body: 'Người giao và bộ phận xử lý nhận thông báo.', kind: 'Hành chính, IT', code: r.code, rows: [['Thiết bị', 'Dell Latitude 5440'], ['Mã tài sản', 'IT-LT-0412'], ['Người giao', 'Phan Minh Trí · 09:30']] })}
             />
           ) : null}
+          {r.tone === 'danger' ? <Button title="Bổ sung và gửi lại" onPress={() => navigation.navigate(Routes.REQUEST_EDIT, { requestId: r.id })} /> : null}
           <Button title="Trao đổi" variant="secondary" onPress={() => navigation.navigate(Routes.COMMENTS, { code: r.code })} />
         </BottomBar>
       }
@@ -213,19 +217,23 @@ export const RequestDetailScreen: React.FC<ScreenProps<typeof Routes.REQUEST_DET
 /** G07 — Cần tôi duyệt. */
 export const ApprovalsScreen: React.FC<ScreenProps<typeof Routes.APPROVALS>> = ({ navigation }) => {
   const [f, setF] = useState('Chờ tôi 3');
+  const user = useAuthStore((st) => st.user);
   return (
     <ScrollPage title="Duyệt" caption="Phòng Kế hoạch" onBack={navigation.goBack}>
       <Chips items={['Chờ tôi 3', 'Đã duyệt', 'Đã từ chối']} value={f} onChange={setF} />
       {f.startsWith('Chờ') ? (
         <Group>
           {approvals.map((a) => (
-            <Row key={a.id} title={a.title} subtitle={`${a.who} · ${a.amount} · ${a.due}`} subtitleTone={a.tone} onPress={() => navigation.navigate(Routes.APPROVAL_DECISION, { approvalId: a.id })} />
+            <Row key={a.id} title={a.title} subtitle={`${a.who} · ${a.amount} · ${a.due}`} subtitleTone={a.tone} onPress={() => (a.who === user?.name ? navigation.navigate(Routes.STATE, { k: 'K12' }) : navigation.navigate(Routes.APPROVAL_DECISION, { approvalId: a.id }))} />
           ))}
         </Group>
       ) : (
         <AppText variant="caption" tone="muted">Chưa có phiếu trong 7 ngày gần đây.</AppText>
       )}
       <AppText variant="caption" tone="muted">Chỉ hiện phiếu bạn là người duyệt của bước hiện tại.</AppText>
+      <Group>
+        <Row title="Ủy quyền duyệt" subtitle="Khi vắng mặt" onPress={() => navigation.navigate(Routes.DELEGATION)} />
+      </Group>
     </ScrollPage>
   );
 };
@@ -243,7 +251,7 @@ export const ApprovalDecisionScreen: React.FC<ScreenProps<typeof Routes.APPROVAL
         <BottomBar>
           <Button
             title="Duyệt"
-            onPress={() => navigation.replace(Routes.SUCCESS, { title: `Đã duyệt ${a.code}`, body: 'Chuyển sang bước tiếp theo. Người đề nghị đã được báo.', kind: 'Phê duyệt', code: a.code, primary: 'Phiếu tiếp theo' })}
+            onPress={() => navigation.replace(Routes.SUCCESS, { title: `Đã duyệt ${a.code}`, body: 'Chuyển sang bước tiếp theo. Người đề nghị đã được báo.', kind: 'Phê duyệt', code: a.code, primary: `Phiếu tiếp theo (${approvals.length - 1})`, anim: 'stamp' })}
           />
           <Button title="Từ chối" variant="secondary" onPress={() => navigation.navigate(Routes.REJECT_REASON, { approvalId: a.id })} />
         </BottomBar>

@@ -21,7 +21,8 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
 
   async getAvailableTransitions(workItemId: number): Promise<WorkflowTransition[]> {
     const res = await apiClient.get(`/workflows/tasks/${workItemId}/transitions`);
-    return (res.data || []).map((t: any) => ({
+    // backend trả { success, data: [...] }
+    return (res.data?.data ?? res.data ?? []).map((t: any) => ({
       id: t.transition_id,
       transitionName: t.transition_name,
       fromStateId: t.from_state_id,

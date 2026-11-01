@@ -13,8 +13,8 @@ import {
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 
-/** E01 — Quét mã thiết bị (tab hiện trường). Camera chỉ bật khi tab đang mở để tiết kiệm pin. */
-export const QRScannerScreen: React.FC = () => {
+/** E01 — Quét mã thiết bị: tab của vai trò hiện trường, hoặc màn riêng (có nút quay lại) mở từ vai trò khác. Camera chỉ bật khi màn đang mở để tiết kiệm pin. */
+export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const s = useStyles();
   const c = useColors();
   const nav = useNavigation<any>();
@@ -26,13 +26,17 @@ export const QRScannerScreen: React.FC = () => {
   const open = (code: string) => {
     if (handled.current || !code.trim()) return;
     handled.current = true; // chặn quét lặp nhiều lần trong 1 lần đưa mã vào khung
-    nav.navigate(Routes.ASSET_DETAIL, { assetCode: code.trim().toUpperCase() });
+    const v = code.trim().toUpperCase();
+    // K10: không đúng dạng mã thiết bị Flowse (VD BT-07); K09: mã của nhà máy khác (tiền tố DN-)
+    if (!/^[A-Z]{1,4}-[A-Z0-9-]{1,10}$/.test(v)) nav.navigate(Routes.STATE, { k: 'K10' });
+    else if (v.startsWith('DN-')) nav.navigate(Routes.STATE, { k: 'K09' });
+    else nav.navigate(Routes.ASSET_DETAIL, { assetCode: v });
     setTimeout(() => (handled.current = false), 1200);
   };
 
   return (
     <Screen>
-      <ScreenHeader title="Quét mã" caption="Đưa mã QR trên thiết bị vào khung" />
+      <ScreenHeader title="Quét mã" caption="Đưa mã QR trên thiết bị vào khung" onBack={onBack} />
       <View style={s.scanBody}>
         {!perm ? null : perm.granted ? (
           <View style={s.camera}>
@@ -72,7 +76,7 @@ export const AssetDetailScreen: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>
       footer={
         <BottomBar>
           <Button title="Báo sự cố" variant="danger" icon={<TriangleAlert size={18} color={c.onAccent} />} onPress={() => navigation.navigate(Routes.REPORT_INCIDENT, { assetCode: code })} />
-          <Button title="Xem hướng dẫn vận hành" variant="secondary" icon={<BookOpen size={18} color={c.ink} />} />
+          <Button title="Xem hướng dẫn vận hành" variant="secondary" icon={<BookOpen size={18} color={c.ink} />} onPress={() => navigation.navigate(Routes.SOP)} />
         </BottomBar>
       }
     >
@@ -117,7 +121,10 @@ export const ReportIncidentScreen: React.FC<ScreenProps<typeof Routes.REPORT_INC
   const similar = incidents.find((i) => i.asset === code);
 
   const addPhoto = async () => {
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.6 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.6 }));
+    const cam = await ImagePicker.requestCameraPermissionsAsync();
+    const res = cam.granted
+      ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
     if (!res.canceled) setPhotos((p) => [...p, res.assets[0].uri].slice(0, 3));
   };
 
@@ -137,7 +144,8 @@ export const ReportIncidentScreen: React.FC<ScreenProps<typeof Routes.REPORT_INC
                 body: 'Trần Quốc Dũng nhận thông báo lúc này. Bạn sẽ được báo khi có người tiếp nhận.',
                 kind: 'Sự cố',
                 code: 'SC-2610-031',
-                primary: 'Xem phiếu SC-2610-031',
+                anim: 'send',
+                rows: [['Mã phiếu', 'SC-2610-031'], ['Thiết bị', code], ['Mức ảnh hưởng', 'Chạy chậm']],
               })
             }
           />
@@ -175,7 +183,7 @@ export const IncidentsScreen: React.FC = () => {
   const list = incidents.filter((i) => (f === 'Chờ xác minh' ? i.state === 'Chờ xác minh' : f === 'Đã đóng' ? false : i.state !== 'Chờ xác minh'));
   return (
     <Screen>
-      <ScreenHeader title="Sự cố" caption="Dây chuyền A2 · Trưởng ca" right={<IconButton icon={ScanLine} label="Quét mã" onPress={() => nav.navigate(Routes.MAIN_TABS, { screen: Routes.QR_SCANNER })} />} />
+      <ScreenHeader title="Sự cố" caption="Dây chuyền A2 · Trưởng ca" right={<IconButton icon={ScanLine} label="Quét mã" onPress={() => nav.navigate(Routes.SCAN)} />} />
       <ScrollView contentContainerStyle={{ gap: space.lg, paddingHorizontal: space.xl, paddingBottom: 100 }}>
         <Chips items={['Mở', 'Chờ xác minh', 'Đã đóng']} value={f} onChange={setF} />
         {list.length ? (
@@ -204,7 +212,24 @@ export const IncidentDetailScreen: React.FC<ScreenProps<typeof Routes.INCIDENT_D
       onBack={navigation.goBack}
       footer={
         <BottomBar>
-          <Button title="Phân công kỹ thuật" onPress={() => navigation.navigate(Routes.INCIDENT_TRIAGE, { incidentId: i.id })} />
+          {i.state === 'Chờ xác minh' ? (
+            <Button
+              title="Xác minh và đóng sự cố"
+              onPress={() =>
+                navigation.replace(Routes.SUCCESS, {
+                  title: `${i.code} đã đóng`,
+                  body: 'Tổng thời gian xử lý 1 giờ 12 phút, trong SLA 2 giờ. Có thể yêu cầu mở lại trong 24 giờ nếu sự cố tái diễn.',
+                  kind: 'Sự cố',
+                  code: i.code,
+                  anim: 'close',
+                  primary: 'Về danh sách sự cố',
+                })
+              }
+            />
+          ) : (
+            <Button title="Mở phiếu sửa chữa" onPress={() => navigation.navigate(Routes.REPAIR_ORDER, { incidentId: i.id })} />
+          )}
+          <Button title="Phân công kỹ thuật" variant="secondary" onPress={() => navigation.navigate(Routes.INCIDENT_TRIAGE, { incidentId: i.id })} />
           <Button title="Trao đổi" variant="secondary" onPress={() => navigation.navigate(Routes.COMMENTS, { code: i.code })} />
         </BottomBar>
       }
@@ -238,10 +263,19 @@ export const IncidentDetailScreen: React.FC<ScreenProps<typeof Routes.INCIDENT_D
 };
 
 /** E08 / E08b — Sheet phân công nhanh (có trạng thái không ai rảnh). */
-export const IncidentTriageSheet: React.FC<ScreenProps<typeof Routes.INCIDENT_TRIAGE>> = ({ navigation }) => {
+export const IncidentTriageSheet: React.FC<ScreenProps<typeof Routes.INCIDENT_TRIAGE>> = ({ route, navigation }) => {
   const s = useStyles();
   const c = useColors();
-  const techs = people.slice(2).concat({ id: 9, name: 'Hồ Văn Bảo', sub: 'Nghỉ ca này' });
+  // E08b: sự cố quá SLA (SC-2610-019) mô phỏng lúc cả tổ đều bận
+  const noneFree = route.params.incidentId === 19;
+  const [fallback, setFallback] = useState('Xếp hàng chờ');
+  const techs = noneFree
+    ? [
+        { id: 4, name: 'Lê Đức Thành', sub: 'Đang sửa BT-11 · bận đến 10:30' },
+        { id: 6, name: 'Nguyễn Hoàng Nam', sub: 'Đang bảo trì định kỳ · bận đến 11:00' },
+        { id: 9, name: 'Hồ Văn Bảo', sub: 'Nghỉ ca này' },
+      ]
+    : people.slice(2).concat({ id: 9, name: 'Hồ Văn Bảo', sub: 'Nghỉ ca này' });
   const [picked, setPicked] = useState(techs[0].id);
   const [due, setDue] = useState('30 phút');
   return (
@@ -256,15 +290,25 @@ export const IncidentTriageSheet: React.FC<ScreenProps<typeof Routes.INCIDENT_TR
               title={p.name}
               subtitle={p.sub}
               chevron={false}
-              trailing={p.id === picked ? <CircleCheck size={22} color={c.accent} /> : <Circle size={22} color={c.muted} />}
-              onPress={off ? undefined : () => setPicked(p.id)}
+              trailing={noneFree ? undefined : p.id === picked ? <CircleCheck size={22} color={c.accent} /> : <Circle size={22} color={c.muted} />}
+              onPress={off || noneFree ? undefined : () => setPicked(p.id)}
             />
           );
         })}
       </Group>
-      <AppText variant="label" tone="muted">Hạn xử lý</AppText>
-      <Chips items={['30 phút', '1 giờ', 'Trong ca']} value={due} onChange={setDue} />
-      <Button title={`Giao cho ${techs.find((t) => t.id === picked)?.name}`} onPress={navigation.goBack} />
+      {noneFree ? (
+        <>
+          <Banner tone="warning" text="Không có kỹ thuật viên rảnh trong ca. Chọn cách xử lý:" />
+          <Chips items={['Gọi ca chiều', 'Xếp hàng chờ', 'Báo trưởng ca']} value={fallback} onChange={setFallback} />
+          <Button title={`${fallback} · ưu tiên cao`} onPress={navigation.goBack} />
+        </>
+      ) : (
+        <>
+          <AppText variant="label" tone="muted">Hạn xử lý</AppText>
+          <Chips items={['30 phút', '1 giờ', 'Trong ca']} value={due} onChange={setDue} />
+          <Button title={`Giao cho ${techs.find((t) => t.id === picked)?.name}`} onPress={navigation.goBack} />
+        </>
+      )}
     </View>
   );
 };

@@ -1,6 +1,8 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Routes } from '../../core/constants/routes';
+import type { FigmaAnimKind } from '../components/anim/FigmaAnim';
+import type { StateKey } from '../screens/common/StateScreen';
 
 export type MainTabParamList = {
   [Routes.HOME]: undefined;
@@ -13,7 +15,16 @@ export type MainTabParamList = {
 };
 
 /** Màn hoàn tất dùng chung: phiếu bay vào khay rồi hiện dấu tích */
-export type SuccessParams = { title: string; body: string; kind: string; code: string; primary?: string };
+export type SuccessParams = {
+  title: string;
+  body: string;
+  kind: string;
+  code: string;
+  primary?: string;
+  /** Cảnh riêng của luồng ('stamp' = người đóng dấu G10); bỏ trống dùng hoạt ảnh phiếu bay vào khay */
+  anim?: FigmaAnimKind | 'stamp';
+  rows?: [string, string][];
+};
 
 export type RootStackParamList = {
   [Routes.AUTH_STACK]: undefined;
@@ -44,8 +55,56 @@ export type RootStackParamList = {
   [Routes.SYNC_QUEUE]: undefined;
   [Routes.CHAT]: { conversationId: number; name: string };
   [Routes.NOTIFICATION_SETTINGS]: undefined;
-  [Routes.FLOWSE_AI]: undefined;
+  [Routes.FLOWSE_AI]: { applied?: boolean } | undefined;
   [Routes.SUCCESS]: SuccessParams;
+  [Routes.REPAIR_ORDER]: { incidentId: number };
+  [Routes.HANDOVER_RECEIVE]: undefined;
+  [Routes.MATERIAL_ISSUE]: undefined;
+  [Routes.PRODUCTION]: undefined;
+  [Routes.SEARCH]: undefined;
+  [Routes.FORGOT_PASSWORD]: undefined;
+  [Routes.CHECK_EMAIL]: { email: string };
+  [Routes.NEW_PASSWORD]: undefined;
+  [Routes.ACCOUNT_LOCKED]: undefined;
+  [Routes.SESSION_EXPIRED]: undefined;
+  [Routes.PERMISSIONS]: undefined;
+  [Routes.ROLE_PICKER]: undefined;
+  [Routes.LIST_VIEW]: { name: string; view?: number };
+  [Routes.SUBTASKS]: undefined;
+  [Routes.REVIEW]: undefined;
+  [Routes.PROJECT_DETAIL]: { name: string };
+  [Routes.PICK_PROJECT]: undefined;
+  [Routes.WORK_FILTER]: undefined;
+  [Routes.TEAM]: undefined;
+  [Routes.MEMBER_WORK]: { name: string };
+  [Routes.REASSIGN]: { title: string; from: string };
+  [Routes.UNITS]: undefined;
+  [Routes.LINE_DETAIL]: undefined;
+  [Routes.FIELD_WORK]: undefined;
+  [Routes.SHIFT_TRANSFER]: undefined;
+  [Routes.PM_LIST]: undefined;
+  [Routes.SOP]: undefined;
+  [Routes.INSPECTION_SUBMIT]: { passed: number; total: number };
+  [Routes.NCR_NEW]: undefined;
+  [Routes.NCR_DETAIL]: undefined;
+  [Routes.LOT_TRACE]: undefined;
+  [Routes.REQUEST_EDIT]: { requestId: number };
+  [Routes.DELEGATION]: undefined;
+  [Routes.MATERIAL_REQUEST]: undefined;
+  [Routes.PURCHASE_UPDATE]: undefined;
+  [Routes.MATERIAL_DETAIL]: { materialId: number };
+  [Routes.VERSION_COMPARE]: undefined;
+  [Routes.EMERGENCY]: undefined;
+  [Routes.HAZARD_REPORT]: undefined;
+  [Routes.HANDOVER_LOG]: undefined;
+  [Routes.HANDOVER_DETAIL]: undefined;
+  [Routes.APPEARANCE]: undefined;
+  [Routes.NEW_MESSAGE]: undefined;
+  [Routes.CHANNEL_MEMBERS]: { name: string };
+  [Routes.STATE]: { k: StateKey };
+  [Routes.SCAN]: undefined;
+  [Routes.AI_REVIEW]: undefined;
+  [Routes.AI_HISTORY]: undefined;
 };
 
 export type ScreenProps<R extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, R>;

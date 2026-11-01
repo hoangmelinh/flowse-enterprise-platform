@@ -12,7 +12,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CircleCheck, FileText } from 'lucide-react-native';
 import { radius, space, Colors, makeStyles, useColors } from '../../../core/theme';
-import { AppText, BottomBar, Button, Screen } from '../../components/ui';
+import { AppText, BottomBar, Button, Group, KV, Screen } from '../../components/ui';
+import { FigmaAnim } from '../../components/anim/FigmaAnim';
+import { StampAnim } from '../../components/anim/StampAnim';
 import { ScreenProps } from '../../navigation/types';
 import { Routes } from '../../../core/constants/routes';
 
@@ -21,7 +23,7 @@ import { Routes } from '../../../core/constants/routes';
  * phiếu bay theo đường cong vào khay "Hoàn tất" → dấu tích. Chỉ transform/opacity trên luồng UI.
  */
 export const SuccessScreen: React.FC<ScreenProps<typeof Routes.SUCCESS>> = ({ route, navigation }) => {
-  const { title, body, kind, code, primary } = route.params;
+  const { title, body, kind, code, primary, anim, rows } = route.params;
   const s = useStyles();
   const c = useColors();
   const reduce = useReducedMotion();
@@ -31,8 +33,8 @@ export const SuccessScreen: React.FC<ScreenProps<typeof Routes.SUCCESS>> = ({ ro
   useEffect(() => {
     if (reduce) return;
     p.value = withTiming(1, { duration: 900, easing: Easing.inOut(Easing.cubic) });
-    copy.value = withDelay(650, withTiming(1, { duration: 300 }));
-  }, [p, copy, reduce]);
+    copy.value = withDelay(anim ? 900 : 650, withTiming(1, { duration: 300 }));
+  }, [p, copy, reduce, anim]);
 
   // Đường bay: góc dưới trái → đỉnh cung → giữa khay
   const card = useAnimatedStyle(() => {
@@ -59,32 +61,38 @@ export const SuccessScreen: React.FC<ScreenProps<typeof Routes.SUCCESS>> = ({ ro
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={s.body}>
-        <View style={s.scene}>
-          <View style={s.trayBack} />
-          <Animated.View style={[s.card, card]}>
-            <View style={s.cardHead}>
-              <View style={s.dot}>
-                <FileText size={13} color={c.onAccent} />
+        {anim === 'stamp' ? (
+          <StampAnim />
+        ) : anim ? (
+          <FigmaAnim kind={anim} />
+        ) : (
+          <View style={s.scene}>
+            <View style={s.trayBack} />
+            <Animated.View style={[s.card, card]}>
+              <View style={s.cardHead}>
+                <View style={s.dot}>
+                  <FileText size={13} color={c.onAccent} />
+                </View>
+                <AppText variant="micro" numberOfLines={1} style={s.flex}>
+                  {kind}
+                </AppText>
               </View>
-              <AppText variant="micro" numberOfLines={1} style={s.flex}>
-                {kind}
+              <View style={[s.line, { width: 92 }]} />
+              <View style={[s.line, { width: 66 }]} />
+              <AppText variant="micro" tone="muted">
+                {code}
+              </AppText>
+            </Animated.View>
+            <View style={s.trayFront}>
+              <AppText variant="label" tone="onAccent">
+                Hoàn tất
               </AppText>
             </View>
-            <View style={[s.line, { width: 92 }]} />
-            <View style={[s.line, { width: 66 }]} />
-            <AppText variant="micro" tone="muted">
-              {code}
-            </AppText>
-          </Animated.View>
-          <View style={s.trayFront}>
-            <AppText variant="label" tone="onAccent">
-              Hoàn tất
-            </AppText>
+            <Animated.View style={[s.check, check]}>
+              <CircleCheck size={30} color={c.success} fill={c.surface} />
+            </Animated.View>
           </View>
-          <Animated.View style={[s.check, check]}>
-            <CircleCheck size={30} color={c.success} fill={c.surface} />
-          </Animated.View>
-        </View>
+        )}
         <Animated.View style={[s.copy, text]}>
           <AppText variant="heading" style={s.center} accessibilityRole="header">
             {title}
@@ -92,6 +100,13 @@ export const SuccessScreen: React.FC<ScreenProps<typeof Routes.SUCCESS>> = ({ ro
           <AppText variant="caption" tone="muted" style={s.center}>
             {body}
           </AppText>
+          {rows?.length ? (
+            <Group style={s.rows}>
+              {rows.map(([k, v]) => (
+                <KV key={k} label={k} value={v} />
+              ))}
+            </Group>
+          ) : null}
         </Animated.View>
       </View>
       <BottomBar>
@@ -123,7 +138,8 @@ const useStyles = makeStyles((c: Colors) =>
     dot: { width: 24, height: 24, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
     line: { height: 4, borderRadius: 2, backgroundColor: c.line },
     check: { position: 'absolute', left: 262, top: 52 },
-    copy: { gap: space.sm, maxWidth: 340 },
+    copy: { gap: space.sm, width: '100%', maxWidth: 340, alignSelf: 'center' },
+    rows: { marginTop: space.md },
     center: { textAlign: 'center' },
   })
 );

@@ -3,6 +3,7 @@ import config from '../../core/config';
 import { demoAdapter } from './demoAdapter';
 import secureStorage from '../local/secureStorage';
 import { AuthError, ConflictError, NetworkError, PermissionError } from '../../core/errors/AppError';
+import { usePrefs } from '../../presentation/state/prefsStore';
 
 export const apiClient = axios.create({
   baseURL: config.apiBaseUrl,
@@ -39,6 +40,7 @@ apiClient.interceptors.response.use(
 
     if (status === 401) {
       secureStorage.removeToken();
+      if (!error.config?.url?.includes('/auth/')) usePrefs.getState().set({ sessionExpired: true });
       return Promise.reject(new AuthError(msg, status));
     }
 

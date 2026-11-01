@@ -10,10 +10,31 @@ interface ScreenHeaderProps {
   /** Có onBack: header điều hướng (tiêu đề giữa). Không có: header lớn của tab. */
   onBack?: () => void;
   right?: React.ReactNode;
+  /** Header lớn 2 hàng (trang Hôm nay): `right` nằm cạnh caption, `titleRight` nằm cạnh tiêu đề. */
+  titleRight?: React.ReactNode;
 }
 
-export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, caption, onBack, right }) => {
+export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, caption, onBack, right, titleRight }) => {
   const c = useColors();
+
+  if (!onBack && titleRight) {
+    return (
+      <View style={styles.stack}>
+        <View style={styles.row}>
+          <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.flex}>
+            {caption}
+          </AppText>
+          {right}
+        </View>
+        <View style={styles.row}>
+          <AppText variant="title" accessibilityRole="header" numberOfLines={1} style={styles.flex}>
+            {title}
+          </AppText>
+          {titleRight}
+        </View>
+      </View>
+    );
+  }
 
   if (!onBack) {
     return (
@@ -70,6 +91,8 @@ const styles = StyleSheet.create({
     paddingBottom: space.md,
     paddingHorizontal: space.xl,
   },
+  stack: { paddingBottom: space.md, paddingHorizontal: space.xl },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   flex: { flex: 1, gap: 2 },
   center: { alignItems: 'center' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

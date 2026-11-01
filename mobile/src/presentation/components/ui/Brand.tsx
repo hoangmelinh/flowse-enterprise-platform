@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Polygon } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { radius, Colors, makeStyles } from '../../../core/theme';
 import { AppText } from './AppText';
+import { PressableScale } from './PressableScale';
 
 // Logo khối Flowse: Không gian → Thư mục → Danh sách → Công việc (dưới lên), cùng bộ màu khối C01.
 const BLOCKS = [
@@ -57,3 +60,66 @@ export const GoogleLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });
+
+/** Ngôi sao Flowse AI tô gradient cùng bộ màu viền L01 (xanh ngọc → xanh dương → tím → hồng). */
+export const AISparkle: React.FC<{ size?: number }> = ({ size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Defs>
+      <LinearGradient id="ai" x1="0" y1="0" x2="1" y2="1">
+        <Stop offset="0" stopColor="#2DD4BF" />
+        <Stop offset="0.4" stopColor="#3B82F6" />
+        <Stop offset="0.75" stopColor="#8B5CF6" />
+        <Stop offset="1" stopColor="#EC4899" />
+      </LinearGradient>
+    </Defs>
+    <Path d="M11 2C11.7 7.6 13.9 9.8 19.5 10.5C13.9 11.2 11.7 13.4 11 19C10.3 13.4 8.1 11.2 2.5 10.5C8.1 9.8 10.3 7.6 11 2Z" fill="url(#ai)" />
+    <Path d="M19 14.5C19.25 16.6 19.9 17.25 22 17.5C19.9 17.75 19.25 18.4 19 20.5C18.75 18.4 18.1 17.75 16 17.5C18.1 17.25 18.75 16.6 19 14.5Z" fill="url(#ai)" />
+  </Svg>
+);
+
+/** Nút mở Flowse AI ở đầu trang chủ: ngôi sao + chữ, viền gradient quay chậm. */
+export const AIButton: React.FC<{ onPress: () => void }> = ({ onPress }) => {
+  const s = useStyles();
+  const reduce = useReducedMotion();
+  const spin = useSharedValue(0);
+  useEffect(() => {
+    if (reduce) return;
+    spin.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false);
+    return () => cancelAnimation(spin);
+  }, [reduce, spin]);
+  // Tấm gradient lớn xoay phía sau, viên nhộng cắt đi chỉ còn lộ viền 1.5px
+  const rotate = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value * 360}deg` }] }));
+  return (
+    <PressableScale accessibilityRole="button" accessibilityLabel="Mở Flowse AI" onPress={onPress} hitSlop={10} style={s.ring}>
+      <Animated.View style={[s.spinner, rotate]}>
+        <Svg width={SPIN} height={SPIN}>
+          <Defs>
+            <LinearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#2DD4BF" />
+              <Stop offset="0.35" stopColor="#3B82F6" />
+              <Stop offset="0.65" stopColor="#8B5CF6" />
+              <Stop offset="1" stopColor="#EC4899" />
+            </LinearGradient>
+          </Defs>
+          <Rect width={SPIN} height={SPIN} fill="url(#ring)" />
+        </Svg>
+      </Animated.View>
+      <View style={s.ai}>
+        <AISparkle size={12} />
+        <AppText variant="label" style={{ fontSize: 11, lineHeight: 14 }}>
+          Flowse AI
+        </AppText>
+      </View>
+    </PressableScale>
+  );
+};
+
+const SPIN = 120;
+
+const useStyles = makeStyles((c: Colors) =>
+  StyleSheet.create({
+    ring: { height: 26, padding: 1.5, borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.line },
+    spinner: { position: 'absolute', width: SPIN, height: SPIN, top: '50%', left: '50%', marginTop: -SPIN / 2, marginLeft: -SPIN / 2 },
+    ai: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, borderRadius: radius.full, backgroundColor: c.surface },
+  })
+);

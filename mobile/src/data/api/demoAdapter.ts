@@ -72,6 +72,12 @@ export const demoAdapter: AxiosAdapter = async (config: InternalAxiosRequestConf
   const method = (config.method || 'get').toUpperCase();
   const key = `${method} ${path}`;
   const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
+  // Xem thử A03/A07: mật khẩu "sai" hoặc "khoa" trả lỗi như backend thật
+  if (key === 'POST /auth/signin' && (body?.password === 'sai' || body?.password === 'khoa')) {
+    const locked = body.password === 'khoa';
+    const message = locked ? 'Tài khoản tạm khóa sau 5 lần sai' : 'Sai email hoặc mật khẩu';
+    throw new AxiosError(message, 'ERR_BAD_REQUEST', config, null, { data: { message }, status: locked ? 423 : 401, statusText: '', headers: {}, config });
+  }
   const hit = patterns.find(([m, re]) => m === method && re.test(path));
   const handler = routes[key] ?? (hit ? () => hit[2](path.match(hit[1])!, body) : undefined);
   const response: AxiosResponse = {

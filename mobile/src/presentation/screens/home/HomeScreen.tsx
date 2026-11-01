@@ -1,18 +1,18 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, RefreshControl, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
-import { Circle, CircleAlert, SquareCheckBig, WifiOff, Stamp, FileText } from 'lucide-react-native';
-import { myRequests } from '../../../data/demo/fixtures';
+import { Circle, CircleAlert, SquareCheckBig, WifiOff, Stamp, FileText, Search } from 'lucide-react-native';
+import { approvals, myRequests } from '../../../data/demo/fixtures';
+import { useMyWork } from '../work/WorkScreens';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { dueBucket } from '../../../core/utils/dueDate';
 import { WorkItem } from '../../../domain/entities/workitem';
-import { WorkItemRepositoryImpl } from '../../../data/repositories/WorkItemRepositoryImpl';
 import { useAuthStore } from '../../state/authStore';
-import { AppText, Group, Row, EmptyState, FlowseMark, ScreenHeader, Screen, SectionHeader } from '../../components/ui';
+import { usePrefs } from '../../state/prefsStore';
+import { RoleHome } from './RoleHomes';
+import { AIButton, AppText, Group, Row, EmptyState, FlowseMark, ScreenHeader, Screen, SectionHeader, IconButton } from '../../components/ui';
 
-const workItemRepo = new WorkItemRepositoryImpl();
 
 const dueLabel = (item: WorkItem) => {
   const bucket = dueBucket(item.dueDate);
@@ -21,16 +21,20 @@ const dueLabel = (item: WorkItem) => {
   return { text: item.statusName || 'Đang mở', tone: 'muted' as const };
 };
 
-/** B01 — Trang chủ "Hôm nay". */
+/** Trang chủ: B01 cho văn phòng, B02–B12 theo vai trò (chọn thử ở Tôi → Trang chủ theo vai trò). */
 export const HomeScreen: React.FC = () => {
+  const field = useAuthStore((s) => s.capabilities.canExecuteRepair && !s.capabilities.canAssignWork);
+  const role = usePrefs((s) => s.homeRole) ?? (field ? 'KT' : 'VP');
+  return role === 'VP' ? <OfficeHome /> : <RoleHome role={role} />;
+};
+
+/** B01 — Trang chủ "Hôm nay". */
+const OfficeHome: React.FC = () => {
   const styles = useStyles();
   const c = useColors();
   const navigation = useNavigation<any>();
   const { user, currentWorkspace, capabilities } = useAuthStore();
-  const { data = [], isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['my-work'],
-    queryFn: () => workItemRepo.getMyWorkItems(),
-  });
+  const { data = [], isLoading, isError, refetch, isRefetching } = useMyWork();
 
   const open = useMemo(() => data.filter((w) => !w.currentState?.isTerminal), [data]);
   const dueToday = open.filter((w) => dueBucket(w.dueDate) === 'today').length;
@@ -46,7 +50,8 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <Screen>
-      <ScreenHeader caption={caption} title={`Chào ${firstName}`} />
+      <ScreenHeader caption={caption} title={`Chào ${firstName}`} right={<IconButton icon={Search} label="Tìm kiếm" onPress={() => navigation.navigate(Routes.SEARCH)} />}
+        titleRight={<AIButton onPress={() => navigation.navigate(Routes.FLOWSE_AI)} />} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} tintColor={c.muted} />}
@@ -116,7 +121,7 @@ export const HomeScreen: React.FC = () => {
 
         {capabilities.canApprove ? (
           <Group>
-            <Row icon={Stamp} iconTone="accent" title="Cần tôi duyệt" subtitle="3 phiếu · 1 cần trước 12:00" subtitleTone="warning" onPress={() => navigation.navigate(Routes.APPROVALS)} />
+            <Row icon={Stamp} iconTone="accent" title="Cần tôi duyệt" subtitle={`${approvals.length} phiếu đang chờ`} subtitleTone="warning" onPress={() => navigation.navigate(Routes.APPROVALS)} />
           </Group>
         ) : null}
 

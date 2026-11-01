@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Package, CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react-native';
 import { Routes } from '../../../core/constants/routes';
 import { handover, materials, syncQueue } from '../../../data/demo/fixtures';
 import { AppText, Banner, BottomBar, Button, Field, Group, Row, ScrollPage, SectionHeader, Tag } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import { FigmaAnim } from '../../components/anim/FigmaAnim';
 
 /** H02 — Theo dõi vật tư. */
 export const MaterialsScreen: React.FC<ScreenProps<typeof Routes.MATERIALS>> = ({ navigation }) => (
@@ -13,13 +14,13 @@ export const MaterialsScreen: React.FC<ScreenProps<typeof Routes.MATERIALS>> = (
     onBack={navigation.goBack}
     footer={
       <BottomBar>
-        <Button title="Đề nghị vật tư" onPress={() => navigation.navigate(Routes.REQUEST_FORM, { typeKey: 'material' })} />
+        <Button title="Đề nghị vật tư" onPress={() => navigation.navigate(Routes.MATERIAL_REQUEST)} />
       </BottomBar>
     }
   >
     <Group>
       {materials.map((m) => (
-        <Row key={m.id} icon={Package} title={m.title} subtitle={`${m.code} · ${m.sub}`} subtitleTone={m.tone} />
+        <Row key={m.id} icon={Package} title={m.title} subtitle={`${m.code} · ${m.sub}`} subtitleTone={m.tone} onPress={() => navigation.navigate(Routes.MATERIAL_DETAIL, { materialId: m.id })} />
       ))}
     </Group>
     <AppText variant="caption" tone="muted">Kho cấp trước phần đang có; phần thiếu tự chuyển Mua hàng.</AppText>
@@ -38,7 +39,7 @@ export const HandoverScreen: React.FC<ScreenProps<typeof Routes.HANDOVER>> = ({ 
         <BottomBar>
           <Button
             title={`Gửi cho ${handover.to.toLowerCase()}`}
-            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã gửi cho ca chiều', body: 'Ca sáng chỉ được chốt khi ca chiều xác nhận.', kind: 'Bàn giao ca', code: 'BG-2610-030' })}
+            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã gửi cho ca chiều', body: 'Ca sáng chỉ được chốt khi ca chiều xác nhận.', kind: 'Bàn giao ca', code: 'BG-2610-030', anim: 'handover', rows: [['Việc chuyển sang', '2 việc'], ['Sự cố mở', 'BT-07 · chờ vòng bi'], ['Ca nhận', 'Ca chiều · 14:00–22:00']] })}
           />
         </BottomBar>
       }
@@ -54,33 +55,43 @@ export const HandoverScreen: React.FC<ScreenProps<typeof Routes.HANDOVER>> = ({ 
   );
 };
 
-/** I03 / I04 — Hàng đợi đồng bộ khi mất mạng. */
-export const SyncQueueScreen: React.FC<ScreenProps<typeof Routes.SYNC_QUEUE>> = ({ navigation }) => (
-  <ScrollPage
-    title="Đồng bộ"
-    caption="Bản nháp trên máy"
-    onBack={navigation.goBack}
-    footer={
-      <BottomBar>
-        <Button title="Thử lại 2 mục" />
-        <Button title="Xem xung đột" variant="secondary" />
-      </BottomBar>
-    }
-  >
-    <Banner text="Ảnh và ghi chú vẫn giữ trên máy, không bị xoá." />
-    <Group>
-      {syncQueue.map((q) => (
-        <Row
-          key={q.title}
-          icon={q.tone === 'success' ? CircleCheck : q.tone === 'warning' ? TriangleAlert : CircleAlert}
-          iconTone={q.tone}
-          title={q.title}
-          subtitle={q.sub}
-          subtitleTone={q.tone}
-          trailing={<Tag label={q.state} tone={q.tone} />}
-          chevron={false}
-        />
-      ))}
-    </Group>
-  </ScrollPage>
-);
+/** I04 — Hàng đợi đồng bộ: gói dữ liệu bay lên máy chủ trong lúc thử lại. */
+export const SyncQueueScreen: React.FC<ScreenProps<typeof Routes.SYNC_QUEUE>> = ({ navigation }) => {
+  const [state, setState] = useState<'idle' | 'syncing' | 'done'>('idle');
+  useEffect(() => {
+    if (state !== 'syncing') return;
+    // shortcut: mô phỏng gửi lại; nối hàng đợi offline thật (SQLite + retry) khi có
+    const t = setTimeout(() => setState('done'), 2400);
+    return () => clearTimeout(t);
+  }, [state]);
+  return (
+    <ScrollPage
+      title="Đồng bộ"
+      caption="Bản nháp trên máy"
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          <Button title={state === 'syncing' ? 'Đang đồng bộ…' : 'Thử lại 2 mục'} loading={state === 'syncing'} disabled={state === 'done'} onPress={() => setState('syncing')} />
+          <Button title="Xem xung đột" variant="secondary" onPress={() => navigation.navigate(Routes.VERSION_COMPARE)} />
+        </BottomBar>
+      }
+    >
+      {state === 'syncing' ? <FigmaAnim kind="sync" loop /> : null}
+      <Banner tone={state === 'done' ? 'accent' : 'warning'} text={state === 'done' ? 'Đã gửi lại 1 mục. Ảnh lỗi và bản xung đột vẫn chờ bạn xử lý.' : 'Ảnh và ghi chú vẫn giữ trên máy, không bị xoá.'} />
+      <Group>
+        {syncQueue.map((q) => (
+          <Row
+            key={q.title}
+            icon={q.tone === 'success' ? CircleCheck : q.tone === 'warning' ? TriangleAlert : CircleAlert}
+            iconTone={q.tone}
+            title={q.title}
+            subtitle={q.sub}
+            subtitleTone={q.tone}
+            trailing={<Tag label={q.state} tone={q.tone} />}
+            chevron={false}
+          />
+        ))}
+      </Group>
+    </ScrollPage>
+  );
+};
