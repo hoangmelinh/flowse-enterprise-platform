@@ -2,8 +2,9 @@ import con from "../config/connect.js";
 
 export const findAllWorkspacesByUserId = async (user_id) => {
     try {
-        const query = `SELECT w.* FROM workspaces w
+        const query = `SELECT w.*, LOWER(r.role_name) AS role_name FROM workspaces w
         JOIN workspace_members wm ON w.workspace_id = wm.workspace_id
+        LEFT JOIN roles r ON r.role_id = wm.role_id
                 WHERE wm.user_id = $1
                     AND w.deleted_at IS NULL
                     AND wm.deleted_at IS NULL`;
