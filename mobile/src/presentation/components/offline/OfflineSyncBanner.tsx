@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors } from '../../../core/theme/colors';
-import { typography, spacing, borderRadius } from '../../../core/theme';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { WifiOff, RefreshCw } from 'lucide-react-native';
+import { radius, space, useColors } from '../../../core/theme';
+import { AppText } from '../ui';
 
 interface OfflineSyncBannerProps {
   isOffline: boolean;
@@ -11,36 +11,31 @@ interface OfflineSyncBannerProps {
   isSyncing?: boolean;
 }
 
+/** I03 / I04 — mất mạng hoặc còn thao tác chờ đồng bộ. */
 export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
   isOffline,
   pendingCount,
   onSyncNow,
   isSyncing = false,
 }) => {
+  const c = useColors();
   if (!isOffline && pendingCount === 0) {
     return null;
   }
 
   return (
-    <View style={[styles.container, isOffline ? styles.offlineBg : styles.pendingBg]}>
-      <View style={styles.leftRow}>
-        <WifiOff size={16} color={colors.offline.bannerText} style={styles.icon} />
-        <Text style={styles.bannerText}>
-          {isOffline
-            ? 'Đang ngoại tuyến. Dữ liệu sẽ lưu cục bộ.'
-            : `${pendingCount} thao tác đang chờ đồng bộ...`}
-        </Text>
-      </View>
-
+    <View accessibilityRole="alert" style={[styles.container, { backgroundColor: c.warningSoft }]}>
+      <WifiOff size={16} color={c.warning} />
+      <AppText variant="label" tone="warning" style={styles.flex}>
+        {isOffline ? 'Đang ngoại tuyến. Thao tác được giữ trên máy.' : `${pendingCount} thao tác đang chờ đồng bộ`}
+      </AppText>
       {!isOffline && pendingCount > 0 && onSyncNow && (
-        <TouchableOpacity
-          style={styles.syncButton}
-          onPress={onSyncNow}
-          disabled={isSyncing}
-        >
-          <RefreshCw size={14} color="#FFFFFF" />
-          <Text style={styles.syncButtonText}>{isSyncing ? 'Đang sync...' : 'Đồng bộ'}</Text>
-        </TouchableOpacity>
+        <Pressable accessibilityRole="button" onPress={onSyncNow} disabled={isSyncing} hitSlop={8} style={styles.sync}>
+          <RefreshCw size={14} color={c.warning} />
+          <AppText variant="label" tone="warning">
+            {isSyncing ? 'Đang gửi…' : 'Đồng bộ'}
+          </AppText>
+        </Pressable>
       )}
     </View>
   );
@@ -48,45 +43,13 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: space.sm,
+    paddingHorizontal: 14,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
   },
-  offlineBg: {
-    backgroundColor: colors.offline.bannerBg,
-  },
-  pendingBg: {
-    backgroundColor: '#92400E',
-  },
-  leftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  icon: {
-    marginRight: spacing.sm,
-  },
-  bannerText: {
-    color: colors.offline.bannerText,
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    flex: 1,
-  },
-  syncButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    marginLeft: spacing.sm,
-    gap: 4,
-  },
-  syncButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.xs,
-    fontWeight: '700',
-  },
+  flex: { flex: 1 },
+  sync: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
 });

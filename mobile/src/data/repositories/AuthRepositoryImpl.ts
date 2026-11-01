@@ -4,14 +4,11 @@ import apiClient from '../api/apiClient';
 import secureStorage from '../local/secureStorage';
 
 export class AuthRepositoryImpl implements IAuthRepository {
-  async login(usernameOrEmail: string, password: string): Promise<{ user: User; token: string }> {
-    const isEmail = usernameOrEmail.includes('@');
-    const payload = isEmail
-      ? { email: usernameOrEmail, password }
-      : { username: usernameOrEmail, password };
-
-    const res = await apiClient.post('/auth/login', payload);
-    const { token, user } = res.data;
+  async login(email: string, password: string): Promise<{ user: User; token: string }> {
+    // Backend: POST /auth/signin { email, password } -> { user: { ..., access_token } }
+    const res = await apiClient.post('/auth/signin', { email, password });
+    const user = res.data.user;
+    const token: string = user.access_token;
 
     await secureStorage.saveToken(token);
 
@@ -32,7 +29,7 @@ export class AuthRepositoryImpl implements IAuthRepository {
 
   async logout(): Promise<void> {
     try {
-      await apiClient.post('/auth/logout');
+      await apiClient.post('/auth/signout');
     } catch (e) {
       // Bỏ qua lỗi server nếu token đã hết hạn
     } finally {
@@ -46,7 +43,7 @@ export class AuthRepositoryImpl implements IAuthRepository {
 
     try {
       const res = await apiClient.get('/users/profile');
-      const u = res.data;
+      const u = res.data.user;
       return {
         id: u.user_id,
         username: u.username,

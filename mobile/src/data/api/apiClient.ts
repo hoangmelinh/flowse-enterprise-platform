@@ -1,11 +1,14 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import config from '../../core/config';
+import { demoAdapter } from './demoAdapter';
 import secureStorage from '../local/secureStorage';
 import { AuthError, ConflictError, NetworkError, PermissionError } from '../../core/errors/AppError';
+import { usePrefs } from '../../presentation/state/prefsStore';
 
 export const apiClient = axios.create({
   baseURL: config.apiBaseUrl,
   timeout: config.apiTimeoutMs,
+  adapter: config.demo ? demoAdapter : undefined,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -37,6 +40,7 @@ apiClient.interceptors.response.use(
 
     if (status === 401) {
       secureStorage.removeToken();
+      if (!error.config?.url?.includes('/auth/')) usePrefs.getState().set({ sessionExpired: true });
       return Promise.reject(new AuthError(msg, status));
     }
 

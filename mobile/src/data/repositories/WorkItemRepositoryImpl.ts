@@ -9,9 +9,9 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
       params.type = filterType;
     }
     const res = await apiClient.get('/tasks/my-tasks', { params });
-    const list = res.data?.tasks || res.data || [];
-
-    return list.map((item: any) => this.mapToWorkItem(item));
+    // API trả về nhóm theo trạng thái: [{ id, name, tasks: [...] }]
+    const groups: any[] = Array.isArray(res.data) ? res.data : [];
+    return groups.flatMap((g) => g.tasks ?? []).map((item: any) => this.mapToWorkItem(item));
   }
 
   async getWorkItemById(id: number): Promise<WorkItem> {
@@ -21,7 +21,8 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
 
   async getAvailableTransitions(workItemId: number): Promise<WorkflowTransition[]> {
     const res = await apiClient.get(`/workflows/tasks/${workItemId}/transitions`);
-    return (res.data || []).map((t: any) => ({
+    // backend trả { success, data: [...] }
+    return (res.data?.data ?? res.data ?? []).map((t: any) => ({
       id: t.transition_id,
       transitionName: t.transition_name,
       fromStateId: t.from_state_id,
@@ -79,6 +80,8 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
       description: item.description,
       priority: item.priority || 'Normal',
       statusId: item.status_id,
+      statusName: item.status_name,
+      dueDate: item.due_date || undefined,
       listId: item.list_id,
       creatorId: item.created_by,
       creatorName: item.creator_name,
