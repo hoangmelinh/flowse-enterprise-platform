@@ -29,6 +29,13 @@ con.connect((err, client, release) => {
     release();
 });
 
+// DB_SCHEMA (chỉ dùng khi test): mọi truy vấn chạy trong schema riêng, không chạm dữ liệu ở public
+const schema = process.env.DB_SCHEMA;
+if (schema) {
+    if (!/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('DB_SCHEMA không hợp lệ');
+    con.on('connect', (client) => client.query(`SET search_path TO ${schema}, extensions`));
+}
+
 con.on('error', (err) => {
     console.error('Cảnh báo ngắt kết nối tạm thời từ PostgreSQL (idle client):', err.message);
 });

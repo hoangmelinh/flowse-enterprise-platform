@@ -154,8 +154,13 @@ import socketService from "./services/socketService.js";
 const server = http.createServer(app);
 socketService.init(server, allowedOrigins);
 
-server.listen(PORT, HOST, () => {
-  console.log(`Server is running on ${HOST}:${PORT} (HTTP + Socket.IO)`);
-  // Khởi động bộ quét giám sát SLA định kỳ
-  SlaMonitorWorker.start(60000);
-});
+// Test import `app` rồi tự mở cổng ngẫu nhiên; không chạy worker SLA
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, HOST, () => {
+    console.log(`Server is running on ${HOST}:${PORT} (HTTP + Socket.IO)`);
+    // Khởi động bộ quét giám sát SLA định kỳ
+    SlaMonitorWorker.start(60000);
+  });
+}
+
+export { app, server };

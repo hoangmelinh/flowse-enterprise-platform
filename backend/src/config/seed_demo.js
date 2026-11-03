@@ -1,14 +1,14 @@
 import pkg from 'pg';
+import 'dotenv/config';
 const { Client } = pkg;
 
 async function seed() {
-  const client = new Client({
-    host: 'localhost',
-    port: 5432,
-    user: 'postgres',
-    password: '123456',
-    database: 'flowse_enterprise'
-  });
+  // Có DATABASE_URL (Supabase) thì dùng, không thì Postgres trên máy như trước
+  const client = new Client(
+    process.env.DATABASE_URL
+      ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+      : { host: 'localhost', port: 5432, user: 'postgres', password: '123456', database: 'flowse_enterprise' }
+  );
   await client.connect();
 
   console.log("Seeding demo enterprise data...");
