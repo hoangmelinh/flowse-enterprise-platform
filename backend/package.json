@@ -6,7 +6,8 @@
     "test": "node --test --test-concurrency=1 --test-global-setup=test/global-setup.js \"test/**/*.test.js\"",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "db:setup": "node src/config/setup_db.js"
+    "db:setup": "node src/config/setup_db.js",
+    "db:migrate": "node src/config/setup_db.js --migrate"
   },
   "type": "module",
   "keywords": [],

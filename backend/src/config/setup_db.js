@@ -48,7 +48,22 @@ export async function applySchema(client) {
   return done;
 }
 
+/** Chạy lại các migration mới (013+) trên database đang dùng. Mỗi file phải chạy lại được (IF EXISTS / IF NOT EXISTS). */
+async function migrate() {
+  const client = newClient();
+  await client.connect();
+  try {
+    for (const f of newMigrations()) {
+      await client.query(fs.readFileSync(path.join(migrationsDir, f), 'utf8'));
+      console.log('✓', f);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
 async function main() {
+  if (process.argv.includes('--migrate')) return migrate();
   const client = newClient();
   await client.connect();
   const { rows } = await client.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'");

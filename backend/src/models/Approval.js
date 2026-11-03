@@ -126,12 +126,8 @@ class Approval {
       const res = await client.query(updateQuery, [status, approverId, decisionNote || null, approvalId]);
       const appRecord = res.rows[0];
 
-      // 1. Xác định incident_id (qua khóa ngoại trực tiếp hoặc fallback qua request_note)
-      let incId = appRecord.incident_id;
-      if (!incId && appRecord.request_note) {
-        const match = appRecord.request_note.match(/sự cố #(\d+)/i);
-        if (match && match[1]) incId = parseInt(match[1], 10);
-      }
+      // 1. Sự cố liên quan chỉ lấy từ khoá ngoại incident_id (không đoán từ ghi chú: "sự cố #N" có thể trỏ sự cố khác)
+      const incId = appRecord.incident_id;
 
       let incidentData = null;
 
