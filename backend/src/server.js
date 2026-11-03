@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import con from "./config/connect.js";
 import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
 import {
   authRoutes,
   userRoutes,
@@ -91,10 +92,30 @@ import path from 'path';
 const localUploads = path.resolve(process.cwd(), 'uploads');
 const parentUploads = path.resolve(process.cwd(), '..', 'uploads');
 if (!fs.existsSync(localUploads)) fs.mkdirSync(localUploads, { recursive: true });
-app.use('/uploads', express.static(localUploads));
+// Tệp tải lên chỉ mở khi đã đăng nhập: header Bearer, hoặc ?token= cho thẻ <img> / <Image> không gửi được header.
+// shortcut: chưa kiểm tra tệp thuộc workspace nào (tên tệp ngẫu nhiên nên khó đoán); token trong URL có thể lọt vào log,
+// đổi sang URL ký có hạn khi chuyển ảnh lên Supabase Storage.
+const requireFileAuth = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1] || req.query.token;
+  try {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    return next();
+  } catch {
+    return res.status(401).json({ message: 'Cần đăng nhập để xem tệp' });
+  }
+};
+// Chỉ ảnh được hiển thị trong trình duyệt; HTML/SVG/PDF tải lên luôn tải xuống, không chạy trên domain backend
+const fileHeaders = {
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (!/\.(webp|png|jpe?g|gif)$/i.test(filePath)) res.setHeader('Content-Disposition', 'attachment');
+  },
+};
+app.use('/uploads', requireFileAuth, express.static(localUploads, fileHeaders));
 if (fs.existsSync(parentUploads)) {
-  app.use('/uploads', express.static(parentUploads));
+  app.use('/uploads', requireFileAuth, express.static(parentUploads, fileHeaders));
 }
+app.use('/uploads', (req, res) => res.status(404).json({ message: 'Không tìm thấy tệp' }));
 
 app.get("/db-health", async (req, res) => {
   try {

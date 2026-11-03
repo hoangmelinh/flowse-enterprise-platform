@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented, Drawer } from "antd";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw, Activity } from "lucide-react";
-import { getIncidents, reportIncident, getDowntimeStats, cleanTestIncidents, type IncidentItem, type DowntimeStats } from "@/api/incidents";
+import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
 import { WorkflowTransitionBar } from "@/components/WorkflowTransitionBar";
@@ -25,7 +25,6 @@ const IncidentHubPage: React.FC = () => {
   const [focusedIncident, setFocusedIncident] = useState<IncidentItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [period, setPeriod] = useState<string>("month");
-  const [cleaningTest, setCleaningTest] = useState(false);
   const [form] = Form.useForm();
 
   const fetchData = async (targetPeriod: string = period) => {
@@ -117,29 +116,6 @@ const IncidentHubPage: React.FC = () => {
       );
     },
   });
-
-  const handleCleanTestData = () => {
-    Modal.confirm({
-      title: "Dọn dẹp sự cố kiểm thử?",
-      content:
-        "Hệ thống sẽ xóa các sự cố mock kiểm thử (Test Gate...) để giải phóng các số liệu Downtime ảo và đưa bảng số liệu về 0 sạch sẽ. Bạn có chắc chắn muốn thực hiện?",
-      okText: "Xác nhận dọn dẹp",
-      okType: "danger",
-      cancelText: "Hủy",
-      onOk: async () => {
-        try {
-          setCleaningTest(true);
-          const res = await cleanTestIncidents();
-          message.success(res.message || "Đã dọn dẹp dữ liệu kiểm thử thành công!");
-          await fetchData(period);
-        } catch (err: any) {
-          message.error("Lỗi khi dọn dẹp: " + (err?.message || ""));
-        } finally {
-          setCleaningTest(false);
-        }
-      },
-    });
-  };
 
   const handleCreateIncident = async (values: any) => {
     try {
@@ -454,19 +430,6 @@ const IncidentHubPage: React.FC = () => {
               { label: "Toàn thời gian", value: "all" },
             ]}
           />
-        </div>
-        <div className="flex items-center gap-2">
-          <Tooltip title="Dọn dẹp các sự cố mock kiểm thử (Test Gate) để giải phóng các giờ dừng máy ảo và đưa số liệu về 0 sạch sẽ">
-            <Button
-              size="small"
-              icon={<RotateCcw size={13} className="text-rose-500" />}
-              loading={cleaningTest}
-              onClick={handleCleanTestData}
-              className="text-xs text-gray-600 dark:text-gray-300 hover:text-rose-600"
-            >
-              Dọn ca test (Reset 0h)
-            </Button>
-          </Tooltip>
         </div>
       </div>
 

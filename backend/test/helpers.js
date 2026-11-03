@@ -44,3 +44,16 @@ export async function api(method, path, { as, token = as && tokenOf(as), body } 
 
 /** Chạy SQL thẳng trên schema test (dựng dữ liệu cho từng ca). */
 export const sql = (text, params) => con.query(text, params);
+
+/** Tạo một việc trong workspace `wsId` (kèm không gian và danh sách riêng); trả task_id. */
+export async function makeTask(wsId, ownerId, type = 'TASK', name = 'Việc test') {
+  const space = (await sql('INSERT INTO spaces (workspace_id, name, created_by) VALUES ($1, $2, $3) RETURNING space_id', [wsId, 'KG test', ownerId])).rows[0].space_id;
+  const list = (await sql('INSERT INTO lists (space_id, name, created_by) VALUES ($1, $2, $3) RETURNING list_id', [space, 'DS test', ownerId])).rows[0].list_id;
+  return (await sql('INSERT INTO tasks (list_id, name, created_by, work_item_type) VALUES ($1, $2, $3, $4) RETURNING task_id', [list, name, ownerId, type])).rows[0].task_id;
+}
+
+/** Tạo sự cố gắn với một việc mới trong workspace `wsId`; trả incident_id. */
+export async function makeIncident(wsId, reporterId) {
+  const task = await makeTask(wsId, reporterId, 'INCIDENT', 'Sự cố test');
+  return (await sql('INSERT INTO incidents (task_id, reported_by, symptom) VALUES ($1, $2, $3) RETURNING incident_id', [task, reporterId, 'Rung'])).rows[0].incident_id;
+}

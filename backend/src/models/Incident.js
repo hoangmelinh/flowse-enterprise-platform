@@ -7,26 +7,28 @@ import Department from "./Department.js";
 
 class Incident {
   static async getAll(user = null) {
-    let whereClause = "";
-    const values = [];
+    // Luôn giới hạn trong workspace user là thành viên (việc → danh sách → không gian → workspace)
+    const values = [user.user_id];
+    let whereClause = `WHERE EXISTS (
+      SELECT 1 FROM lists l JOIN spaces sp ON sp.space_id = l.space_id
+      JOIN workspace_members wm ON wm.workspace_id = sp.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+      WHERE l.list_id = t.list_id
+    )`;
 
-    if (user && user.user_id) {
-      // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
-      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
+    // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
+    const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
 
-      // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
-      if (accessibleDeptIds !== null) {
-        values.push(user.user_id);
-        values.push(accessibleDeptIds);
-        whereClause = `
-          WHERE (
-            inc.reported_by = $1 
-            OR tech.assignee_id = $1 
-            OR a.department_id = ANY($2::int[])
-            OR a.department_id IS NULL
-          )
-        `;
-      }
+    // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
+    if (accessibleDeptIds !== null) {
+      values.push(accessibleDeptIds);
+      whereClause += `
+        AND (
+          inc.reported_by = $1 
+          OR tech.assignee_id = $1 
+          OR a.department_id = ANY($2::int[])
+          OR a.department_id IS NULL
+        )
+      `;
     }
 
     const query = `
@@ -768,52 +770,6 @@ class Incident {
    * Dọn dẹp dữ liệu kiểm thử mock (Các sự cố có tiêu đề 'Test Gate%' hoặc 'Test %')
    * Phục vụ Admin làm sạch giao diện và đưa Downtime về 0 trước khi chạy thật.
    */
-  static async cleanTestData() {
-    const client = await con.connect();
-    try {
-      await client.query("BEGIN");
-
-      const testTasksRes = await client.query(`
-        SELECT t.task_id, inc.incident_id 
-        FROM tasks t
-        LEFT JOIN incidents inc ON t.task_id = inc.task_id
-        WHERE t.name ILIKE 'Test Gate%' OR t.name ILIKE 'Test %'
-      `);
-
-      if (testTasksRes.rows.length === 0) {
-        await client.query("COMMIT");
-        return { cleanedCount: 0 };
-      }
-
-      const taskIds = testTasksRes.rows.map(r => r.task_id).filter(Boolean);
-      const incIds = testTasksRes.rows.map(r => r.incident_id).filter(Boolean);
-
-      if (incIds.length > 0) {
-        await client.query(`DELETE FROM approvals WHERE incident_id = ANY($1::int[])`, [incIds]);
-        await client.query(`DELETE FROM incidents WHERE incident_id = ANY($1::int[])`, [incIds]);
-      }
-
-      if (taskIds.length > 0) {
-        await client.query(`DELETE FROM approvals WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM sla_instances WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM task_assigns WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM time_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM activity_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM comments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM attachments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM incidents WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM tasks WHERE task_id = ANY($1::int[])`, [taskIds]);
-      }
-
-      await client.query("COMMIT");
-      return { cleanedCount: testTasksRes.rows.length };
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
 }
 
 export default Incident;

@@ -52,10 +52,6 @@ export const getDowntimeStats = async (period: string = "month"): Promise<{ succ
   return beApi.get(`/incidents/stats/downtime-mttr?period=${period}`);
 };
 
-export const cleanTestIncidents = async (): Promise<{ success: boolean; message: string; data: { cleanedCount: number } }> => {
-  return beApi.post("/incidents/clean-test-data");
-};
-
 export const getIncidents = async (): Promise<{ success: boolean; data: IncidentItem[] }> => {
   return beApi.get("/incidents");
 };

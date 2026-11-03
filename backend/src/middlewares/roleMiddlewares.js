@@ -59,7 +59,20 @@ import pool from '../config/connect.js';
 import Department from '../models/Department.js';
 import { getWorkspaceRolesForTask } from '../models/Permission.js';
 
-/** task_id của phiếu duyệt / sự cố trên route, dùng với requireTaskManager */
+/** Chỉ thành viên workspace chứa việc mới đi tiếp (xem, thêm ảnh, mở lại...). 404 nếu không có việc. */
+export const requireTaskMember = (getTaskId) => async (req, res, next) => {
+    try {
+        const taskId = await getTaskId(req);
+        if (!taskId) return res.status(404).json({ message: 'Không tìm thấy dữ liệu.' });
+        if ((await getWorkspaceRolesForTask(req.user.user_id, taskId)).length > 0) return next();
+        return res.status(403).json({ message: 'Forbidden: Dữ liệu không thuộc nơi làm việc của bạn.' });
+    } catch (error) {
+        console.error('[requireTaskMember] Error:', error);
+        return res.status(500).json({ message: 'Lỗi server khi kiểm tra quyền truy cập.' });
+    }
+};
+
+/** task_id của phiếu duyệt / sự cố trên route, dùng với requireTaskManager / requireTaskMember */
 export const taskOfApproval = async (req) =>
     (await pool.query('SELECT task_id FROM approvals WHERE approval_id = $1', [req.params.approvalId])).rows[0]?.task_id;
 export const taskOfIncident = async (req) =>
