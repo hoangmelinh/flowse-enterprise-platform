@@ -80,14 +80,23 @@ export const StatRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <View style={s.statRow}>{children}</View>;
 };
 
-/** Dòng nhãn – giá trị trong Group (KV trong Figma). */
-export const KV: React.FC<{ label: string; value: string; tone?: ColorToken }> = ({ label, value, tone = 'ink' }) => {
+/** Dòng nhãn – giá trị trong Group (KV / Prop trong Figma): icon đầu dòng và avatar trước giá trị là tùy chọn. */
+export const KV: React.FC<{ label: string; value: string; tone?: ColorToken; icon?: LucideIcon; person?: boolean }> = ({
+  label,
+  value,
+  tone = 'ink',
+  icon: Icon,
+  person,
+}) => {
   const s = useStyles();
+  const c = useColors();
   return (
     <View style={s.kv}>
+      {Icon && <Icon size={18} color={c.muted} />}
       <AppText tone="muted" variant="body" style={s.flex}>
         {label}
       </AppText>
+      {person && <Avatar name={value} size={22} />}
       <AppText variant="bodyMedium" tone={tone} style={s.kvValue}>
         {value}
       </AppText>
@@ -115,7 +124,7 @@ export const Tag: React.FC<{ label: string; tone?: ColorToken; icon?: LucideIcon
   );
 };
 
-export const Avatar: React.FC<{ name: string; size?: number }> = ({ name, size = 32 }) => {
+export const Avatar: React.FC<{ name: string; size?: number; bg?: ColorToken }> = ({ name, size = 32, bg = 'subtle' }) => {
   const c = useColors();
   const initials = name
     .trim()
@@ -125,7 +134,7 @@ export const Avatar: React.FC<{ name: string; size?: number }> = ({ name, size =
     .join('')
     .toUpperCase();
   return (
-    <View style={[stylesStatic.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.subtle }]}>
+    <View style={[stylesStatic.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: c[bg] }]}>
       <AppText variant="micro" style={{ fontSize: size * 0.36, lineHeight: size * 0.5 }}>
         {initials}
       </AppText>
@@ -147,7 +156,7 @@ export const IconButton: React.FC<{ icon: LucideIcon; label: string; onPress?: (
   );
 };
 
-export const SectionHeader: React.FC<{ title: string; action?: string; onAction?: () => void; count?: number }> = ({
+export const SectionHeader: React.FC<{ title: string; action?: string; onAction?: () => void; count?: number | string }> = ({
   title,
   action,
   onAction,
@@ -250,17 +259,18 @@ export const ScrollPage: React.FC<{
   caption?: string;
   onBack?: () => void;
   right?: React.ReactNode;
+  titleRight?: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   contentStyle?: StyleProp<ViewStyle>;
-}> = ({ title, caption, onBack, right, footer, children, refreshing, onRefresh, contentStyle }) => {
+}> = ({ title, caption, onBack, right, titleRight, footer, children, refreshing, onRefresh, contentStyle }) => {
   const s = useStyles();
   const c = useColors();
   return (
     <Screen>
-      <ScreenHeader title={title} caption={caption} onBack={onBack} right={right} />
+      <ScreenHeader title={title} caption={caption} onBack={onBack} right={right} titleRight={titleRight} />
       <ScrollView
         contentContainerStyle={[s.page, contentStyle]}
         keyboardShouldPersistTaps="handled"

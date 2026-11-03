@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Search, CircleCheck, Circle, TriangleAlert, Package } from 'lucide-react-native';
+import { Search, CircleCheck, CircleCheckBig, Circle, TriangleAlert, Package, Clock, Check } from 'lucide-react-native';
 import { radius, space, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { handover, incidents, inspections, materials, myRequests } from '../../../data/demo/fixtures';
@@ -14,7 +14,6 @@ export const RepairOrderScreen: React.FC<ScreenProps<typeof Routes.REPAIR_ORDER>
   const c = useColors();
   const i = incidents.find((x) => x.id === route.params.incidentId) ?? incidents[0];
   const [done, setDone] = useState<boolean[]>(REPAIR_STEPS.map(() => false));
-  const [note, setNote] = useState('');
   const all = done.every(Boolean);
   return (
     <ScrollPage
@@ -24,9 +23,9 @@ export const RepairOrderScreen: React.FC<ScreenProps<typeof Routes.REPAIR_ORDER>
       footer={
         <BottomBar>
           <Button
-            title={all ? 'Gửi xác minh' : `Còn ${done.filter((d) => !d).length} bước`}
-            disabled={!all || !note.trim()}
-            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã gửi xác minh', body: 'Trưởng ca nhận thông báo để xác minh kết quả sửa.', kind: 'Sửa chữa', code: i.code, anim: 'send' })}
+            title={all ? 'Hoàn tất sửa chữa' : `Còn ${done.filter((d) => !d).length} bước`}
+            disabled={!all}
+            onPress={() => navigation.navigate(Routes.REPAIR_DONE, { incidentId: i.id })}
           />
           <Button title="Đề nghị vật tư" variant="secondary" icon={<Package size={18} color={c.ink} />} onPress={() => navigation.navigate(Routes.MATERIAL_REQUEST)} />
         </BottomBar>
@@ -45,7 +44,113 @@ export const RepairOrderScreen: React.FC<ScreenProps<typeof Routes.REPAIR_ORDER>
           />
         ))}
       </Group>
-      <Field label="Kết quả sửa (bắt buộc)" value={note} onChangeText={setNote} placeholder="Đo rung còn 2.1 mm/s, trong ngưỡng" multiline />
+    </ScrollPage>
+  );
+};
+
+const RESULTS = ['Đạt', 'Cần theo dõi', 'Chưa đạt'];
+
+/** E10 — Hoàn tất sửa chữa: kết quả chạy thử, thời gian dừng máy, ghi chú và ảnh rồi gửi xác minh. */
+export const RepairDoneScreen: React.FC<ScreenProps<typeof Routes.REPAIR_DONE>> = ({ route, navigation }) => {
+  const s = useStyles();
+  const c = useColors();
+  const i = incidents.find((x) => x.id === route.params.incidentId) ?? incidents[0];
+  const [result, setResult] = useState(0);
+  const [downtime, setDowntime] = useState('42 phút');
+  const [note, setNote] = useState('Chạy thử 10 phút tải nặng, không còn rung.');
+  return (
+    <ScrollPage
+      title="Hoàn tất"
+      caption="BT-2610-011"
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          <Button
+            title="Gửi xác minh"
+            disabled={!note.trim()}
+            onPress={() =>
+              navigation.replace(Routes.SUCCESS, {
+                title: 'Đã gửi xác minh',
+                body: 'Người báo và trưởng ca nhận thông báo để xác minh kết quả sửa.',
+                kind: 'Sửa chữa',
+                code: i.code,
+                anim: 'send',
+                rows: [['Kết quả chạy thử', RESULTS[result]], ['Dừng máy', downtime]],
+              })
+            }
+          />
+        </BottomBar>
+      }
+    >
+      <View style={s.block}>
+        <AppText variant="caption" tone="muted">Kết quả chạy thử</AppText>
+        <Segmented items={RESULTS} value={result} onChange={setResult} />
+      </View>
+      <Field label="Thời gian dừng máy" icon={Clock} value={downtime} onChangeText={setDowntime} />
+      <Field label="Ghi chú cho người xác minh" value={note} onChangeText={setNote} multiline />
+      {/* shortcut: 2 ô ảnh mẫu; nối ImagePicker như màn Báo sự cố khi có API tải ảnh */}
+      <View style={s.photos}>
+        {[0, 1].map((k) => (
+          <View key={k} style={s.photo} accessibilityLabel={`Ảnh sau sửa ${k + 1}`}>
+            <Check size={22} color={c.success} />
+          </View>
+        ))}
+      </View>
+      <AppText variant="caption" tone="muted" style={s.small}>Người báo và trưởng ca sẽ xác minh. Phiếu chỉ đóng khi được xác minh đạt.</AppText>
+    </ScrollPage>
+  );
+};
+
+const VERIFY_CHECKS = ['Máy chạy ổn định 10 phút', 'Không còn tiếng kêu lạ', 'Khu vực đã vệ sinh'];
+
+/** E11 — Trưởng ca xác minh kết quả sửa; xác nhận đủ các mục mới đóng được sự cố. */
+export const VerifyRepairScreen: React.FC<ScreenProps<typeof Routes.VERIFY_REPAIR>> = ({ route, navigation }) => {
+  const i = incidents.find((x) => x.id === route.params.incidentId) ?? incidents[0];
+  const [checks, setChecks] = useState([true, true, false]);
+  const all = checks.every(Boolean);
+  return (
+    <ScrollPage
+      title="Xác minh"
+      caption={`${i.code} · Trưởng ca`}
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          <Button
+            title="Xác minh đạt, đóng sự cố"
+            disabled={!all}
+            onPress={() =>
+              navigation.replace(Routes.SUCCESS, {
+                title: `${i.code} đã đóng`,
+                body: 'Tổng thời gian xử lý 1 giờ 12 phút, trong SLA 2 giờ. Có thể yêu cầu mở lại trong 24 giờ nếu sự cố tái diễn.',
+                kind: 'Sự cố',
+                code: i.code,
+                anim: 'close',
+                primary: 'Về danh sách sự cố',
+              })
+            }
+          />
+          <Button title="Cần sửa lại" variant="secondary" onPress={() => navigation.navigate(Routes.COMMENTS, { code: i.code })} />
+        </BottomBar>
+      }
+    >
+      <Group>
+        {VERIFY_CHECKS.map((t, k) => (
+          <Row
+            key={t}
+            icon={checks[k] ? CircleCheckBig : Circle}
+            iconTone={checks[k] ? 'success' : 'muted'}
+            title={t}
+            subtitle={checks[k] ? undefined : 'Chạm để xác nhận'}
+            chevron={false}
+            onPress={() => setChecks((x) => x.map((v, j) => (j === k ? !v : v)))}
+          />
+        ))}
+      </Group>
+      <Group>
+        <KV label="Kỹ thuật" value="Lê Đức Thành" />
+        <KV label="Dừng máy" value="42 phút" />
+        <KV label="Vật tư dùng" value="2 vòng bi, 8 bu lông" />
+      </Group>
     </ScrollPage>
   );
 };
@@ -174,5 +279,9 @@ const useStyles = makeStyles((c: Colors) =>
     col: { flex: 1, alignItems: 'center', gap: 4 },
     bar: { width: '100%', borderTopLeftRadius: 6, borderTopRightRadius: 6, backgroundColor: c.accent },
     low: { backgroundColor: c.warning },
+    block: { gap: space.sm },
+    photos: { flexDirection: 'row', gap: 10 },
+    photo: { width: 76, height: 76, borderRadius: radius.md, backgroundColor: c.successSoft, alignItems: 'center', justifyContent: 'center' },
+    small: { fontSize: 12 },
   })
 );

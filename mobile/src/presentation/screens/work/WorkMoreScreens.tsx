@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
-import { Circle, CircleCheck, Folder, List, Plus, Search, SquareCheckBig, Square } from 'lucide-react-native';
+import { Circle, CircleCheck, ChevronRight, Factory, Folder, List, Package, Plus, Search, SquareCheckBig, Square } from 'lucide-react-native';
+import { useRoleScope } from '../../state/useHomeRole';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { Tone } from '../../../data/demo/fixtures';
 import {
-  AppText, Avatar, BottomBar, Button, Chips, Field, Group, KV, PressableScale, Row, ScrollPage, SectionHeader, Segmented, Stat, StatRow, Tag,
+  AppText, Avatar, BottomBar, Button, Chips, Field, Group, IconButton, KV, PressableScale, Row, ScrollPage, SectionHeader, Segmented, Stat, StatRow, Tag,
+  TaskRow, TaskStatus,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 
@@ -285,23 +287,50 @@ export const WorkFilterSheet: React.FC<ScreenProps<typeof Routes.WORK_FILTER>> =
 };
 
 const TEAM = [
-  { name: 'Phạm Quốc Huy', role: 'Chuyên viên kế hoạch', load: '7 mở · 2 trễ', late: true },
-  { name: 'Nguyễn Minh Anh', role: 'Chuyên viên kế hoạch', load: '5 mở', late: false },
-  { name: 'Trần Thu Hà', role: 'Điều độ', load: '3 mở · 1 trễ', late: true },
-  { name: 'Lê Đức Thành', role: 'Điều độ', load: '3 mở', late: false },
-  { name: 'Võ Văn Khánh', role: 'Thực tập', load: '1 mở', late: false, free: true },
+  { name: 'Phạm Quốc Huy', role: 'Chuyên viên kế hoạch', open: 7, late: 2 },
+  { name: 'Nguyễn Minh Anh', role: 'Chuyên viên kế hoạch', open: 5, late: 0 },
+  { name: 'Trần Thu Hà', role: 'Điều độ', open: 3, late: 1 },
+  { name: 'Lê Đức Thành', role: 'Điều độ', open: 3, late: 0 },
+  { name: 'Võ Văn Khánh', role: 'Thực tập', open: 1, late: 0 },
 ];
+const MAX_LOAD = Math.max(...TEAM.map((m) => m.open));
 
-/** D04 — Nhóm. */
+/** D04 — Nhóm: tải việc từng người (thanh dài theo số việc mở, vàng khi có việc trễ). Tab "Nhóm" của Trưởng phòng. */
 export const TeamScreen: React.FC<ScreenProps<typeof Routes.TEAM>> = ({ navigation }) => {
-  const [f, setF] = useState('Tất cả 6');
-  const list = TEAM.filter((m) => (f.startsWith('Có') ? m.late : f.startsWith('Rảnh') ? m.free : true));
+  const s = useStyles();
+  const c = useColors();
+  const scope = useRoleScope();
+  const late = TEAM.filter((m) => m.late);
+  const free = TEAM.filter((m) => m.open <= 1);
+  const chips = [`Tất cả ${TEAM.length}`, `Có việc quá hạn ${late.length}`, `Rảnh ${free.length}`];
+  const [f, setF] = useState(chips[0]);
+  const list = f === chips[1] ? late : f === chips[2] ? free : TEAM;
   return (
-    <ScrollPage title="Nhóm" caption="Phòng Kế hoạch" onBack={navigation.goBack}>
-      <Chips items={['Tất cả 6', 'Có việc quá hạn 2', 'Rảnh 1']} value={f} onChange={setF} />
+    <ScrollPage
+      title="Nhóm"
+      caption={scope.unit}
+      onBack={navigation.goBack}
+      right={<IconButton icon={Search} label="Tìm người" onPress={() => navigation.navigate(Routes.SEARCH)} />}
+    >
+      <Chips items={chips} value={f} onChange={setF} />
       <Group>
         {list.map((m) => (
-          <Row key={m.name} title={m.name} subtitle={m.role} trailing={<Tag label={m.load} tone={m.late ? 'danger' : 'muted'} />} onPress={() => navigation.navigate(Routes.MEMBER_WORK, { name: m.name })} />
+          <PressableScale key={m.name} accessibilityRole="button" scaleTo={0.99} pressedBackground={c.subtle} style={s.member} onPress={() => navigation.navigate(Routes.MEMBER_WORK, { name: m.name })}>
+            <View style={s.memberTop}>
+              <Avatar name={m.name} size={28} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="bodyMedium">{m.name}</AppText>
+                <AppText variant="caption" tone="muted">{m.role}</AppText>
+              </View>
+              <ChevronRight size={18} color={c.muted} />
+            </View>
+            <View style={s.load}>
+              <View style={s.track}>
+                <View style={[s.fill, { width: `${(m.open / MAX_LOAD) * 100}%`, backgroundColor: m.late ? c.warning : c.accent }]} />
+              </View>
+              <AppText variant="label" tone={m.late ? 'danger' : 'muted'} style={s.small}>{m.late ? `${m.open} mở · ${m.late} trễ` : `${m.open} mở`}</AppText>
+            </View>
+          </PressableScale>
         ))}
       </Group>
     </ScrollPage>
@@ -370,6 +399,7 @@ export const ReassignScreen: React.FC<ScreenProps<typeof Routes.REASSIGN>> = ({ 
 
 /** D07 — Đơn vị trong phạm vi quản lý. */
 export const UnitsScreen: React.FC<ScreenProps<typeof Routes.UNITS>> = ({ navigation }) => {
+  const scope = useRoleScope();
   const units: [string, string, Tone, boolean][] = [
     ['Xưởng đóng gói', '18 việc · 4 quá hạn · 3 sự cố', 'danger', false],
     ['Dây chuyền A1', '6 việc · 1 quá hạn', 'warning', true],
@@ -379,10 +409,16 @@ export const UnitsScreen: React.FC<ScreenProps<typeof Routes.UNITS>> = ({ naviga
     ['Kho thành phẩm', '7 việc · đúng hạn', 'success', false],
   ];
   return (
-    <ScrollPage title="Đơn vị" caption="Nhà máy Bình Dương" onBack={navigation.goBack}>
+    <ScrollPage
+      title={scope.workshop ? 'Phân xưởng' : 'Đơn vị'}
+      caption={scope.workshop ? `${scope.unit} · 3 dây chuyền` : scope.unit}
+      onBack={navigation.goBack}
+      right={<IconButton icon={Search} label="Tìm đơn vị" onPress={() => navigation.navigate(Routes.SEARCH)} />}
+    >
       <Group>
-        {units.map(([n, sub, tone, line]) => (
-          <Row key={n} icon={line ? List : Folder} title={n} subtitle={sub} subtitleTone={tone} onPress={() => navigation.navigate(Routes.LINE_DETAIL)} />
+        {/* Quản đốc chỉ thấy các dây chuyền của xưởng mình; quản lý nhà máy thấy cả nhà máy */}
+        {units.filter(([, , , line]) => !scope.workshop || line).map(([n, sub, tone, line]) => (
+          <Row key={n} icon={line ? List : n.startsWith('Kho') ? Package : Factory} title={n} subtitle={sub} subtitleTone={tone === 'danger' ? 'danger' : 'muted'} onPress={() => navigation.navigate(Routes.LINE_DETAIL)} />
         ))}
       </Group>
       <AppText variant="caption" tone="muted">Chỉ hiện đơn vị trong phạm vi bạn quản lý.</AppText>
@@ -393,12 +429,13 @@ export const UnitsScreen: React.FC<ScreenProps<typeof Routes.UNITS>> = ({ naviga
 /** D08 — Chi tiết dây chuyền: việc, thiết bị, QC, vật tư. */
 export const LineDetailScreen: React.FC<ScreenProps<typeof Routes.LINE_DETAIL>> = ({ navigation }) => {
   const [tab, setTab] = useState(0);
+  const work: [string, TaskStatus, string, string, Tone, boolean, () => void][] = [
+    ['BT-07 rung bất thường', 'blocked', 'Sự cố · Lê Đức Thành', 'Còn 28 phút', 'danger', true, () => navigation.navigate(Routes.INCIDENT_DETAIL, { incidentId: 24 })],
+    ['Kiểm tra cảm biến băng tải', 'progress', 'Nguyễn Hoàng Nam', '10:30', 'warning', false, () => navigation.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: 105 })],
+    ['Kiểm tra khu vực cuối chuyền', 'review', 'Lê Minh Tâm', 'Chờ review', 'muted', false, () => navigation.navigate(Routes.REVIEW)],
+  ];
   const tabs: [string, string, Tone, () => void][][] = [
-    [
-      ['BT-07 rung bất thường', 'Sự cố · Lê Đức Thành · còn 28 phút', 'danger', () => navigation.navigate(Routes.INCIDENT_DETAIL, { incidentId: 24 })],
-      ['Kiểm tra cảm biến băng tải', 'Nguyễn Hoàng Nam', 'muted', () => navigation.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: 105 })],
-      ['Kiểm tra khu vực cuối chuyền', 'Lê Minh Tâm · Chờ review', 'warning', () => navigation.navigate(Routes.REVIEW)],
-    ],
+    [],
     [
       ['BT-07 · Băng tải con lăn 6 m', 'Đang có sự cố', 'danger', () => navigation.navigate(Routes.ASSET_DETAIL, { assetCode: 'BT-07' })],
       ['MD-03 · Máy dán thùng', 'PM hôm nay 15:00', 'warning', () => navigation.navigate(Routes.PM_LIST)],
@@ -415,9 +452,9 @@ export const LineDetailScreen: React.FC<ScreenProps<typeof Routes.LINE_DETAIL>> 
         <Stat value={12} label="Người" />
       </StatRow>
       <Group>
-        {tabs[tab].map(([t, sub, tone, go]) => (
-          <Row key={t} title={t} subtitle={sub} subtitleTone={tone} onPress={go} />
-        ))}
+        {tab === 0
+          ? work.map(([t, st, meta, due, tone, flag, go]) => <TaskRow key={t} title={t} status={st} meta={meta} due={due} dueTone={tone} flag={flag} onPress={go} />)
+          : tabs[tab].map(([t, sub, tone, go]) => <Row key={t} title={t} subtitle={sub} subtitleTone={tone} onPress={go} />)}
       </Group>
     </ScrollPage>
   );
@@ -493,6 +530,12 @@ export const ShiftTransferSheet: React.FC<ScreenProps<typeof Routes.SHIFT_TRANSF
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
     bleed: { marginHorizontal: -space.xl },
+    member: { gap: 10, paddingVertical: 14, paddingHorizontal: space.lg },
+    memberTop: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+    load: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: 40 },
+    track: { flex: 1, height: 6, borderRadius: 3, backgroundColor: c.subtle, overflow: 'hidden' },
+    fill: { height: 6, borderRadius: 3 },
+    small: { fontSize: 12 },
     board: { gap: space.md, paddingHorizontal: space.xl },
     column: { width: 248, gap: space.sm, padding: space.md, borderRadius: radius.lg, backgroundColor: c.subtle },
     card: { gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line },

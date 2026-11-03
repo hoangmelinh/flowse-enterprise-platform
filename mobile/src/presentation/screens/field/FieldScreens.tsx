@@ -1,9 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Image, ScrollView, StyleSheet, Linking } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, CameraOff, Plus, ScanLine, TriangleAlert, Wrench, BookOpen, Circle, CircleCheck } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { Camera, CameraOff, Plus, ScanLine, TriangleAlert, Wrench, BookOpen, Circle, CircleCheck, X, Settings, List, Sparkles, Search, Clock, Check } from 'lucide-react-native';
+import { useRoleScope } from '../../state/useHomeRole';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { asset, incidents, incidentTimeline, people, symptoms } from '../../../data/demo/fixtures';
@@ -21,6 +25,8 @@ export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) =
   const focused = useIsFocused();
   const [perm, requestPerm] = useCameraPermissions();
   const [manual, setManual] = useState('');
+  const [typing, setTyping] = useState(false);
+  const [torch, setTorch] = useState(false);
   const handled = useRef(false);
 
   const open = (code: string) => {
@@ -34,33 +40,84 @@ export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) =
     setTimeout(() => (handled.current = false), 1200);
   };
 
+  // Vạch quét chạy lên xuống trong khung (UI thread)
+  const reduce = useReducedMotion();
+  const y = useSharedValue(0);
+  useEffect(() => {
+    if (reduce || !focused) return;
+    y.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => cancelAnimation(y);
+  }, [y, reduce, focused]);
+  const line = useAnimatedStyle(() => ({ transform: [{ translateY: (y.value - 0.5) * 200 }] }));
+
   return (
-    <Screen>
-      <ScreenHeader title="Quét mã" caption="Đưa mã QR trên thiết bị vào khung" onBack={onBack} />
-      <View style={s.scanBody}>
+    <SafeAreaView edges={onBack ? ['top', 'bottom'] : ['top']} style={s.scanRoot}>
+      {focused && <StatusBar style="light" />}
+      {perm?.granted && focused ? (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          enableTorch={torch}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={(r) => open(r.data)}
+        />
+      ) : null}
+      <View style={s.scanTop}>
+        {onBack ? (
+          <PressableScale accessibilityRole="button" accessibilityLabel="Đóng" onPress={onBack} hitSlop={6} style={s.iconSpace}>
+            <X size={22} color={SCAN.text} />
+          </PressableScale>
+        ) : (
+          <View style={s.iconSpace} />
+        )}
+        <AppText variant="navTitle" style={[s.flex, s.center, { color: SCAN.text }]}>Quét mã thiết bị</AppText>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Quyền camera" onPress={() => nav.navigate(Routes.PERMISSIONS)} hitSlop={6} style={s.iconSpace}>
+          <Settings size={22} color={SCAN.text} />
+        </PressableScale>
+      </View>
+      <View style={s.viewfinder}>
         {!perm ? null : perm.granted ? (
-          <View style={s.camera}>
-            {focused && (
-              <CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={(r) => open(r.data)} />
-            )}
-            <View style={s.frame} pointerEvents="none" />
-          </View>
+          <>
+            <View style={s.frame} pointerEvents="none">
+              <Animated.View style={[s.scanLine, line]} />
+            </View>
+            <AppText style={{ color: SCAN.text }}>Đưa mã QR trên thiết bị vào khung</AppText>
+          </>
         ) : (
           // K08 — camera bị chặn
-          <EmptyState
-            icon={CameraOff}
-            title="Flowse chưa được dùng camera"
-            body="Bật camera trong cài đặt điện thoại, hoặc nhập mã in dưới QR."
-            actionTitle={perm.canAskAgain ? 'Cho phép camera' : 'Mở cài đặt'}
-            onAction={perm.canAskAgain ? requestPerm : Linking.openSettings}
-          />
+          <View style={s.permCard}>
+            <EmptyState
+              icon={CameraOff}
+              title="Flowse chưa được dùng camera"
+              body="Bật camera trong cài đặt điện thoại, hoặc nhập mã in dưới QR."
+              actionTitle={perm.canAskAgain ? 'Cho phép camera' : 'Mở cài đặt'}
+              onAction={perm.canAskAgain ? requestPerm : Linking.openSettings}
+            />
+          </View>
         )}
-        <Field label="Nhập mã thủ công" icon={ScanLine} value={manual} onChangeText={setManual} placeholder="Ví dụ: BT-07" autoCapitalize="characters" onSubmitEditing={() => open(manual)} returnKeyType="go" />
-        <Button title="Mở thiết bị" variant="secondary" disabled={!manual.trim()} onPress={() => open(manual)} icon={<ScanLine size={18} color={c.ink} />} />
       </View>
-    </Screen>
+      {typing ? (
+        <View style={s.manual}>
+          <Field label="Mã in dưới QR" icon={ScanLine} value={manual} onChangeText={setManual} placeholder="Ví dụ: BT-07" autoCapitalize="characters" autoFocus onSubmitEditing={() => open(manual)} returnKeyType="go" />
+          <Button title="Mở thiết bị" disabled={!manual.trim()} onPress={() => open(manual)} />
+        </View>
+      ) : null}
+      <View style={s.scanActions}>
+        <Button title="Nhập mã" variant="secondary" style={[s.flex, s.scanBtn]} icon={<List size={18} color={c.ink} />} onPress={() => setTyping((t) => !t)} />
+        <Button
+          title={torch ? 'Tắt đèn' : 'Đèn'}
+          variant="secondary"
+          style={[s.flex, s.scanBtn]}
+          icon={<Sparkles size={18} color={c.ink} />}
+          disabled={!perm?.granted}
+          onPress={() => setTorch((t) => !t)}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
+
+// Máy quét luôn nền tối như kính ngắm camera, kể cả giao diện sáng
+const SCAN = { bg: '#0E1110', text: '#FFFFFF', frame: 'rgba(255,255,255,0.9)' };
 
 /** E02 — Hồ sơ thiết bị. */
 export const AssetDetailScreen: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>> = ({ route, navigation }) => {
@@ -178,25 +235,48 @@ export const ReportIncidentScreen: React.FC<ScreenProps<typeof Routes.REPORT_INC
 
 /** E06 — Sự cố theo SLA (tab hiện trường). */
 export const IncidentsScreen: React.FC = () => {
+  const s = useStyles();
+  const c = useColors();
   const nav = useNavigation<any>();
-  const [f, setF] = useState('Mở');
-  const list = incidents.filter((i) => (f === 'Chờ xác minh' ? i.state === 'Chờ xác minh' : f === 'Đã đóng' ? false : i.state !== 'Chờ xác minh'));
+  const scope = useRoleScope();
+  // Kỹ thuật chỉ thấy sự cố được giao cho mình; các vai trò khác thấy cả đơn vị
+  // shortcut: lọc theo tên người sửa trong dữ liệu mẫu; đổi sang assignee_id khi nối API
+  const mine = scope.mine ? incidents.filter((i) => i.who.startsWith('Lê Đức Thành')) : incidents;
+  const verify = mine.filter((i) => i.state === 'Chờ xác minh');
+  const chips = [`Mở ${mine.length - verify.length}`, `Chờ xác minh ${verify.length}`, 'Đã đóng'];
+  const [f, setF] = useState(chips[0]);
+  const list = f === chips[1] ? verify : f === chips[2] ? [] : mine.filter((i) => i.state !== 'Chờ xác minh');
   return (
     <Screen>
-      <ScreenHeader title="Sự cố" caption="Dây chuyền A2 · Trưởng ca" right={<IconButton icon={ScanLine} label="Quét mã" onPress={() => nav.navigate(Routes.SCAN)} />} />
-      <ScrollView contentContainerStyle={{ gap: space.lg, paddingHorizontal: space.xl, paddingBottom: 100 }}>
-        <Chips items={['Mở', 'Chờ xác minh', 'Đã đóng']} value={f} onChange={setF} />
+      <ScreenHeader
+        title={scope.mine ? 'Sự cố của tôi' : 'Sự cố'}
+        caption={`${scope.unit} · ${scope.title}`}
+        right={
+          <View style={{ flexDirection: 'row' }}>
+            <IconButton icon={Search} label="Tìm sự cố" onPress={() => nav.navigate(Routes.SEARCH)} />
+            <IconButton icon={Plus} label="Báo sự cố" onPress={() => nav.navigate(Routes.REPORT_INCIDENT)} />
+          </View>
+        }
+      />
+      <ScrollView contentContainerStyle={{ gap: space.lg, paddingHorizontal: space.xl, paddingBottom: 40 }}>
+        <Chips items={chips} value={f} onChange={setF} />
         {list.length ? (
           <Group>
             {list.map((i) => (
-              <Row key={i.id} title={i.title} subtitle={`${i.code} · ${i.who}`} trailing={<Tag label={i.sla} tone={i.tone} />} chevron={false} onPress={() => nav.navigate(Routes.INCIDENT_DETAIL, { incidentId: i.id })} />
+              <PressableScale key={i.id} accessibilityRole="button" scaleTo={0.99} pressedBackground={c.subtle} style={s.incident} onPress={() => nav.navigate(Routes.INCIDENT_DETAIL, { incidentId: i.id })}>
+                <View style={s.incidentTop}>
+                  <AppText variant="caption" tone="muted" style={{ flex: 1 }}>{`${i.code} · ${i.asset}`}</AppText>
+                  <Tag label={i.sla} tone={i.tone} icon={i.tone === 'success' ? Check : Clock} />
+                </View>
+                <AppText variant="bodyMedium">{i.title}</AppText>
+                <AppText variant="caption" tone="muted">{i.who}</AppText>
+              </PressableScale>
             ))}
           </Group>
         ) : (
-          <EmptyState icon={CircleCheck} title="Không có sự cố" body="Mọi thiết bị đang chạy ổn định." />
+          <EmptyState icon={CircleCheck} title="Không có sự cố" body={scope.mine ? 'Chưa có sự cố nào giao cho bạn.' : 'Mọi thiết bị đang chạy ổn định.'} />
         )}
       </ScrollView>
-      <Fab label="Báo sự cố" onPress={() => nav.navigate(Routes.REPORT_INCIDENT)} />
     </Screen>
   );
 };
@@ -213,19 +293,7 @@ export const IncidentDetailScreen: React.FC<ScreenProps<typeof Routes.INCIDENT_D
       footer={
         <BottomBar>
           {i.state === 'Chờ xác minh' ? (
-            <Button
-              title="Xác minh và đóng sự cố"
-              onPress={() =>
-                navigation.replace(Routes.SUCCESS, {
-                  title: `${i.code} đã đóng`,
-                  body: 'Tổng thời gian xử lý 1 giờ 12 phút, trong SLA 2 giờ. Có thể yêu cầu mở lại trong 24 giờ nếu sự cố tái diễn.',
-                  kind: 'Sự cố',
-                  code: i.code,
-                  anim: 'close',
-                  primary: 'Về danh sách sự cố',
-                })
-              }
-            />
+            <Button title="Xác minh kết quả" onPress={() => navigation.navigate(Routes.VERIFY_REPAIR, { incidentId: i.id })} />
           ) : (
             <Button title="Mở phiếu sửa chữa" onPress={() => navigation.navigate(Routes.REPAIR_ORDER, { incidentId: i.id })} />
           )}
@@ -315,9 +383,20 @@ export const IncidentTriageSheet: React.FC<ScreenProps<typeof Routes.INCIDENT_TR
 
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
-    scanBody: { flex: 1, gap: space.lg, paddingHorizontal: space.xl, paddingBottom: space.xl },
-    camera: { flex: 1, minHeight: 280, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-    frame: { width: 220, height: 220, borderRadius: radius.xl, borderWidth: 3, borderColor: c.accent },
+    scanRoot: { flex: 1, backgroundColor: SCAN.bg },
+    incident: { gap: 4, paddingVertical: 14, paddingHorizontal: space.lg },
+    incidentTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+    scanTop: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.md, height: 44 },
+    iconSpace: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    flex: { flex: 1 },
+    center: { textAlign: 'center' },
+    viewfinder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl },
+    frame: { width: 248, height: 248, borderRadius: 28, borderWidth: 3, borderColor: SCAN.frame, alignItems: 'center', justifyContent: 'center' },
+    scanLine: { width: 200, height: 2, borderRadius: 1, backgroundColor: c.accent },
+    permCard: { alignSelf: 'stretch', marginHorizontal: space.xl, borderRadius: radius.xl, backgroundColor: c.bg },
+    manual: { gap: space.sm, marginHorizontal: space.xl, marginBottom: space.md, padding: space.lg, borderRadius: radius.xl, backgroundColor: c.bg },
+    scanActions: { flexDirection: 'row', gap: space.md, paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.md },
+    scanBtn: { backgroundColor: c.subtle, borderWidth: 0 },
     assetCard: { flexDirection: 'row', gap: space.md, alignItems: 'center', padding: space.lg, borderRadius: radius.xl, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line },
     assetIcon: { width: 64, height: 64, borderRadius: radius.lg, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
     photos: { flexDirection: 'row', gap: space.md },

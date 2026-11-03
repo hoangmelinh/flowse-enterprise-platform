@@ -8,10 +8,13 @@ import {
   AppText, Banner, BottomBar, Bubble, Button, Chips, Composer, Field, Group, IconButton, KV, Row, Screen, ScreenHeader, ScrollPage, Segmented, Stat, StatRow, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import * as Clipboard from 'expo-clipboard';
 import { AILaunch, AILogo } from './AILaunch';
 
 const ICONS = [FileText, LayoutGrid, TriangleAlert, Plus];
-type Card = 'summary' | 'proposal' | 'applied' | 'missing' | 'denied' | 'offline';
+// shortcut: bản nháp mẫu theo Figma L02, Ngắn hơn / Trang trọng hơn trả lại cùng bản; nối POST /ai/chat để soạn thật
+const DRAFT = 'Kính gửi anh Tuấn,\nĐơn PO-2410 sẽ giao ngày 30/10 thay vì 28/10 do lô vải về muộn. Chúng tôi ưu tiên dây chuyền A2 và cập nhật lại trước 17:00 hôm nay.';
+type Card = 'draft' | 'summary' | 'proposal' | 'applied' | 'missing' | 'denied' | 'offline';
 type Msg = { id: number; mine: boolean; text: string; card?: Card; streaming?: boolean };
 
 /**
@@ -44,6 +47,7 @@ const StreamBubble: React.FC<{ text: string; onDone: () => void; onGrow: () => v
 const workCard = (q: string): Card =>
   /tóm tắt|quá hạn|tiến độ/i.test(q) ? 'summary' : /nhắc/i.test(q) ? 'missing' : /hồ thị lan|a1/i.test(q) ? 'denied' : /cập nhật/i.test(q) ? 'offline' : 'proposal';
 const cardText: Record<Card, string> = {
+  draft: 'Bản nháp cho bạn:',
   summary: 'Phòng Kế hoạch có 18 việc mở, 3 quá hạn. Chậm nhất là việc của Phạm Quốc Huy.',
   proposal: 'Mình đã soạn công việc. Bạn xem lại trước khi áp dụng.',
   applied: 'Đã tạo VP-2610-052 và báo cho Lê Đức Thành lúc 10:14.',
@@ -72,7 +76,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
   }, [route.params?.applied]);
 
   const run = (q: string, work: boolean) => {
-    if (!work) return push({ mine: true, text: q }, { mine: false, text: 'Mình đã soạn bản nháp cho bạn. Bạn xem lại nội dung, sửa chỗ cần thiết rồi gửi nhé. Nếu muốn giọng trang trọng hơn hoặc ngắn gọn hơn, cứ nhắn mình.', streaming: true });
+    if (!work) return push({ mine: true, text: q }, { mine: false, text: cardText.draft, card: 'draft', streaming: true });
     const card = workCard(q);
     push({ mine: true, text: q }, { mine: false, text: cardText[card], card, streaming: true });
   };
@@ -116,7 +120,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
                         onPress={() => {
                           const work = g.sub.startsWith('Work');
                           setMode(work ? 1 : 0);
-                          run(g.title, work);
+                          run(g.q, work);
                         }}
                       />
                     ))}
@@ -131,22 +135,23 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
           renderItem={({ item }) => (
             <View style={{ gap: space.sm }}>
               {item.streaming ? <StreamBubble text={item.text} onDone={() => finish(item.id)} onGrow={toEnd} /> : <Bubble text={item.text} mine={item.mine} />}
-              {item.card && !item.streaming ? <AICard card={item.card} onChange={(c) => replaceCard(item.id, c)} navigation={navigation} /> : null}
+              {item.card && !item.streaming ? <AICard card={item.card} onChange={(c) => replaceCard(item.id, c)} onAsk={(q) => run(q, false)} navigation={navigation} /> : null}
             </View>
           )}
         />
-        <Composer placeholder={mode === 0 ? 'Hỏi hoặc nhờ soạn nội dung' : 'Giao việc như nhắn tin'} onSend={ask} attach={false} />
+        <Composer placeholder={msgs.length ? 'Hỏi tiếp' : mode === 0 ? 'Hỏi hoặc giao việc' : 'Giao việc như nhắn tin'} onSend={ask} attach={false} />
       </KeyboardAvoidingView>
       {launching ? <AILaunch onDone={launched} /> : null}
     </Screen>
   );
 };
 
-/** Thẻ kết quả Work: L03 tóm tắt, L04 đề xuất, L06 đã áp dụng, L07 thiếu thông tin, L08 mất mạng, L09 thiếu quyền. */
-const AICard: React.FC<{ card: Card; onChange: (c?: Card) => void; navigation: ScreenProps<typeof Routes.FLOWSE_AI>['navigation'] }> = ({ card, onChange, navigation }) => {
+/** Thẻ kết quả: L02 bản nháp (Chat); Work: L03 tóm tắt, L04 đề xuất, L06 đã áp dụng, L07 thiếu thông tin, L08 mất mạng, L09 thiếu quyền. */
+const AICard: React.FC<{ card: Card; onChange: (c?: Card) => void; onAsk: (q: string) => void; navigation: ScreenProps<typeof Routes.FLOWSE_AI>['navigation'] }> = ({ card, onChange, onAsk, navigation }) => {
   const s = useStyles();
   const c = useColors();
   const [undo, setUndo] = useState(5);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (card !== 'applied' || undo <= 0) return;
     const t = setTimeout(() => setUndo((v) => v - 1), 1000);
@@ -154,6 +159,17 @@ const AICard: React.FC<{ card: Card; onChange: (c?: Card) => void; navigation: S
   }, [card, undo]);
 
   switch (card) {
+    case 'draft':
+      return (
+        <View style={s.card}>
+          <AppText>{DRAFT}</AppText>
+          <View style={s.chipRow}>
+            <Button title={copied ? 'Đã chép' : 'Sao chép'} size="sm" variant="secondary" onPress={() => Clipboard.setStringAsync(DRAFT).then(() => setCopied(true))} />
+            <Button title="Ngắn hơn" size="sm" variant="secondary" onPress={() => onAsk('Viết ngắn hơn.')} />
+            <Button title="Trang trọng hơn" size="sm" variant="secondary" onPress={() => onAsk('Viết trang trọng hơn.')} />
+          </View>
+        </View>
+      );
     case 'summary':
       return (
         <View style={s.card}>
@@ -313,6 +329,7 @@ const useStyles = makeStyles((c: Colors) =>
     note: { padding: space.md, borderRadius: radius.md, backgroundColor: c.accentSoft },
     card: { gap: space.sm, padding: space.md, borderRadius: radius.lg, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line },
     actions: { flexDirection: 'row', gap: space.sm },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
     offlineHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   })
 );

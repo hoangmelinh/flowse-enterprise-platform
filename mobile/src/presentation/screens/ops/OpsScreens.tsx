@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Package, CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react-native';
+import { Package, CircleAlert, CircleCheck, CircleCheckBig, CircleDashed, Clock, TriangleAlert } from 'lucide-react-native';
 import { Routes } from '../../../core/constants/routes';
 import { handover, materials, syncQueue } from '../../../data/demo/fixtures';
 import { AppText, Banner, BottomBar, Button, Field, Group, Row, ScrollPage, SectionHeader, Tag } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 import { FigmaAnim } from '../../components/anim/FigmaAnim';
 
-/** H02 — Theo dõi vật tư. */
+/** Vật tư của tôi: danh sách phiếu đề nghị (mở H02 / H05). */
 export const MaterialsScreen: React.FC<ScreenProps<typeof Routes.MATERIALS>> = ({ navigation }) => (
   <ScrollPage
     title="Vật tư"
@@ -20,12 +20,55 @@ export const MaterialsScreen: React.FC<ScreenProps<typeof Routes.MATERIALS>> = (
   >
     <Group>
       {materials.map((m) => (
-        <Row key={m.id} icon={Package} title={m.title} subtitle={`${m.code} · ${m.sub}`} subtitleTone={m.tone} onPress={() => navigation.navigate(Routes.MATERIAL_DETAIL, { materialId: m.id })} />
+        <Row key={m.id} icon={Package} title={m.title} subtitle={`${m.code} · ${m.sub}`} subtitleTone={m.tone} onPress={() => (m.id === 12 ? navigation.navigate(Routes.MATERIAL_MINE) : navigation.navigate(Routes.MATERIAL_DETAIL, { materialId: m.id }))} />
       ))}
     </Group>
     <AppText variant="caption" tone="muted">Kho cấp trước phần đang có; phần thiếu tự chuyển Mua hàng.</AppText>
   </ScrollPage>
 );
+
+const MINE_STEPS: [string, string, 'done' | 'now' | 'next'][] = [
+  ['Đã duyệt', 'Trần Quốc Dũng · 09:12', 'done'],
+  ['Kho cấp 2/4', 'Lê Văn Phúc · 10:05', 'done'],
+  ['Chờ mua 2 cái', 'MH-2610-009 · dự kiến 29/10', 'now'],
+  ['Nhận đủ', 'Bạn xác nhận', 'next'],
+];
+
+/** H02 — Phiếu vật tư của tôi: tiến trình duyệt → kho cấp → mua → nhận đủ; người đề nghị xác nhận phần đã nhận. */
+export const MyMaterialScreen: React.FC<ScreenProps<typeof Routes.MATERIAL_MINE>> = ({ navigation }) => {
+  return (
+    <ScrollPage
+      title="Vật tư"
+      caption="VT-2610-012 · của tôi"
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          <Button
+            title="Xác nhận đã nhận 2"
+            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã xác nhận nhận 2 cái', body: 'Phiếu mở tới khi Mua hàng giao đủ 2 cái còn lại.', kind: 'Vật tư', code: 'VT-2610-012', anim: 'issue' })}
+          />
+          <Button title="Trao đổi với kho" variant="secondary" onPress={() => navigation.navigate(Routes.COMMENTS, { code: 'VT-2610-012' })} />
+        </BottomBar>
+      }
+    >
+      <AppText variant="heading" style={{ fontSize: 22, lineHeight: 28 }}>Cảm biến quang E3Z-D61 × 4</AppText>
+      <Group>
+        {MINE_STEPS.map(([t, sub, st]) => (
+          <Row
+            key={t}
+            icon={st === 'done' ? CircleCheckBig : st === 'now' ? Clock : CircleDashed}
+            iconTone={st === 'done' ? 'success' : st === 'now' ? 'accent' : 'muted'}
+            title={t}
+            titleTone={st === 'next' ? 'muted' : 'ink'}
+            subtitle={sub}
+            chevron={false}
+          />
+        ))}
+      </Group>
+      <AppText variant="caption" tone="muted" style={{ fontSize: 12 }}>Phiếu chỉ đóng khi bạn xác nhận đã nhận đủ.</AppText>
+    </ScrollPage>
+  );
+};
 
 /** I01 — Bàn giao ca. */
 export const HandoverScreen: React.FC<ScreenProps<typeof Routes.HANDOVER>> = ({ navigation }) => {

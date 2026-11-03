@@ -4,12 +4,17 @@ import { useNavigation } from '@react-navigation/native';
 import { StyleSheet } from 'react-native';
 import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { House, SquareCheckBig, ScanLine, FileText, Inbox, TriangleAlert, CircleUser, LucideIcon } from 'lucide-react-native';
+import {
+  House, SquareCheckBig, ScanQrCode, FileText, Inbox, TriangleAlert, CircleUser, LayoutGrid, Users, ClipboardCheck, Wrench, Factory,
+  Building, Package, ShoppingCart, LucideIcon,
+} from 'lucide-react-native';
 import { Routes } from '../../core/constants/routes';
+import { approvals } from '../../data/demo/fixtures';
 import { text, useColors } from '../../core/theme';
 import { RootStackParamList, MainTabParamList } from './types';
 import { useAuthStore } from '../state/authStore';
-import { usePrefs } from '../state/prefsStore';
+import { HomeRole, usePrefs } from '../state/prefsStore';
+import { useHomeRole } from '../state/useHomeRole';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ContextSelectScreen } from '../screens/auth/ContextSelectScreen';
@@ -26,9 +31,9 @@ import {
   InspectionsScreen, InspectionRunnerScreen, InspectionResultScreen, RequestsScreen, RequestTypesScreen, RequestFormScreen,
   RequestDetailScreen, ApprovalsScreen, ApprovalDecisionScreen, RejectReasonSheet,
 } from '../screens/requests/RequestScreens';
-import { MaterialsScreen, HandoverScreen, SyncQueueScreen } from '../screens/ops/OpsScreens';
-import { RepairOrderScreen, HandoverReceiveScreen, MaterialIssueScreen, ProductionScreen, SearchScreen } from '../screens/more/MoreScreens';
-import { InboxScreen, ChatScreen, NotificationSettingsScreen } from '../screens/inbox/InboxScreens';
+import { MaterialsScreen, MyMaterialScreen, HandoverScreen, SyncQueueScreen } from '../screens/ops/OpsScreens';
+import { RepairOrderScreen, RepairDoneScreen, VerifyRepairScreen, HandoverReceiveScreen, MaterialIssueScreen, ProductionScreen, SearchScreen } from '../screens/more/MoreScreens';
+import { InboxScreen, ChatScreen, NotificationSettingsScreen, QuietHoursScreen } from '../screens/inbox/InboxScreens';
 import { AppearanceScreen, NewMessageSheet, ChannelMembersSheet } from '../screens/inbox/InboxMoreScreens';
 import {
   ForgotPasswordScreen, CheckEmailScreen, NewPasswordScreen, AccountLockedScreen, SessionExpiredScreen, PermissionsScreen,
@@ -55,26 +60,53 @@ const tabIcon =
   (Icon: LucideIcon) =>
   ({ color }: { color: string }) => <Icon size={24} color={color} />;
 
-// Thanh tab theo vai trò (sheet 05): văn phòng vs hiện trường
-const OFFICE_TABS = [
-  { name: Routes.HOME, title: 'Hôm nay', icon: House, component: HomeScreen },
-  { name: Routes.WORK_ITEMS, title: 'Công việc', icon: SquareCheckBig, component: WorkItemsScreen },
-  { name: Routes.REQUESTS, title: 'Yêu cầu', icon: FileText, component: RequestsScreen },
-  { name: Routes.INBOX, title: 'Hộp thư', icon: Inbox, component: InboxScreen },
-  { name: Routes.PROFILE, title: 'Tôi', icon: CircleUser, component: ProfileScreen },
-] as const;
-const FIELD_TABS = [
-  { name: Routes.HOME, title: 'Hôm nay', icon: House, component: HomeScreen },
-  { name: Routes.QR_SCANNER, title: 'Quét QR', icon: ScanLine, component: QRScannerScreen },
-  { name: Routes.INCIDENTS, title: 'Sự cố', icon: TriangleAlert, component: IncidentsScreen },
-  { name: Routes.INBOX, title: 'Hộp thư', icon: Inbox, component: InboxScreen },
-  { name: Routes.PROFILE, title: 'Tôi', icon: CircleUser, component: ProfileScreen },
-] as const;
+// Màn sẵn có đặt làm tab thì không có nút quay lại
+const asTab = (C: React.ComponentType<any>) => {
+  const Tabbed = (p: any) => <C {...p} navigation={{ ...p.navigation, goBack: undefined }} />;
+  return Tabbed;
+};
+const TeamTab = asTab(TeamScreen);
+const ApprovalsTab = asTab(ApprovalsScreen);
+const LineTab = asTab(LineDetailScreen);
+const UnitsTab = asTab(UnitsScreen);
+const Noop = () => null;
+
+type TabDef = { name: keyof MainTabParamList; title: string; icon: LucideIcon; component: React.ComponentType<any>; badge?: number; open?: string };
+const home = (title: string, icon: LucideIcon): TabDef => ({ name: Routes.HOME, title, icon, component: HomeScreen });
+const overview = home('Tổng quan', LayoutGrid);
+const today = home('Hôm nay', House);
+const work: TabDef = { name: Routes.WORK_ITEMS, title: 'Công việc', icon: SquareCheckBig, component: WorkItemsScreen };
+const me: TabDef = { name: Routes.PROFILE, title: 'Tôi', icon: CircleUser, component: ProfileScreen };
+const scan: TabDef = { name: Routes.QR_SCANNER, title: 'Quét', icon: ScanQrCode, component: QRScannerScreen };
+const incidents: TabDef = { name: Routes.INCIDENTS, title: 'Sự cố', icon: TriangleAlert, component: IncidentsScreen };
+// shortcut: số chưa đọc của Hộp thư lấy theo Figma; đổi sang số thật khi nối API thông báo
+const inbox = (badge?: number): TabDef => ({ name: Routes.INBOX, title: 'Hộp thư', icon: Inbox, component: InboxScreen, badge });
+const approvalsTab: TabDef = { name: Routes.TAB_APPROVALS, title: 'Duyệt', icon: ClipboardCheck, component: ApprovalsTab, badge: approvals.length };
+// "Báo sự cố" mở form chồng lên (form dùng replace của stack), không phải tab nội dung
+const report: TabDef = { name: Routes.TAB_REPORT, title: 'Báo sự cố', icon: TriangleAlert, component: Noop, open: Routes.REPORT_INCIDENT };
+const fieldTabs = [today, scan, report, inbox(), me];
+
+/** Thanh tab theo vai trò, đúng thứ tự và badge trong Figma B01–B12. */
+const ROLE_TABS: Record<HomeRole, TabDef[]> = {
+  VP: [today, work, { name: Routes.REQUESTS, title: 'Yêu cầu', icon: FileText, component: RequestsScreen }, inbox(4), me],
+  TP: [overview, { name: Routes.TAB_TEAM, title: 'Nhóm', icon: Users, component: TeamTab }, work, approvalsTab, me],
+  CN: fieldTabs,
+  CN_OFF: fieldTabs,
+  TC: [today, work, incidents, inbox(), me],
+  KT: [home('Việc sửa', Wrench), scan, incidents, inbox(2), me],
+  QC: [home('Kiểm tra', ClipboardCheck), scan, work, inbox(), me],
+  QLDC: [overview, { name: Routes.TAB_LINE, title: 'Dây chuyền', icon: Factory, component: LineTab }, work, incidents, me],
+  QLPX: [overview, { name: Routes.TAB_UNITS, title: 'Phân xưởng', icon: Factory, component: UnitsTab }, work, approvalsTab, me],
+  QLN: [overview, { name: Routes.TAB_UNITS, title: 'Đơn vị', icon: Building, component: UnitsTab }, work, approvalsTab, me],
+  KHO: [home('Vật tư', Package), work, inbox(3), me],
+  MH: [home('Mua hàng', ShoppingCart), work, inbox(), me],
+  QT: [home('Tôi', CircleUser), inbox()],
+};
 
 const MainTabs: React.FC = () => {
   const c = useColors();
-  const field = useAuthStore((s) => s.capabilities.canExecuteRepair && !s.capabilities.canAssignWork);
-  const tabs = field ? FIELD_TABS : OFFICE_TABS;
+  const role = useHomeRole();
+  const tabs = ROLE_TABS[role];
   const nav = useNavigation<any>();
   // A10: lần đầu vào app thì hỏi quyền một lần
   useEffect(() => {
@@ -86,6 +118,8 @@ const MainTabs: React.FC = () => {
   }, [nav]);
   return (
     <Tab.Navigator
+      // Đổi vai trò thì dựng lại thanh tab từ tab đầu
+      key={role}
       screenOptions={{
         headerShown: false,
         // Chuyển tab: nội dung trượt nhẹ + mờ (chạy native), không nháy trắng
@@ -93,12 +127,28 @@ const MainTabs: React.FC = () => {
         tabBarActiveTintColor: c.ink,
         tabBarInactiveTintColor: c.muted,
         tabBarLabelStyle: text.tab,
+        tabBarBadgeStyle: { backgroundColor: c.danger, color: c.onAccent, fontFamily: text.micro.fontFamily, fontSize: 10, lineHeight: 14, minWidth: 17, height: 14, borderRadius: 8 },
         tabBarStyle: { backgroundColor: c.bg, borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth, elevation: 0 },
         sceneStyle: { backgroundColor: c.bg },
       }}
     >
       {tabs.map((t) => (
-        <Tab.Screen key={t.name} name={t.name} component={t.component} options={{ title: t.title, tabBarIcon: tabIcon(t.icon) }} />
+        <Tab.Screen
+          key={t.name}
+          name={t.name}
+          component={t.component}
+          options={{ title: t.title, tabBarIcon: tabIcon(t.icon), tabBarBadge: t.badge }}
+          listeners={
+            t.open
+              ? {
+                  tabPress: (e) => {
+                    e.preventDefault();
+                    nav.navigate(t.open);
+                  },
+                }
+              : undefined
+          }
+        />
       ))}
     </Tab.Navigator>
   );
@@ -169,12 +219,16 @@ export const AppNavigator: React.FC = () => {
           <RootStack.Screen name={Routes.APPROVALS} component={ApprovalsScreen} />
           <RootStack.Screen name={Routes.APPROVAL_DECISION} component={ApprovalDecisionScreen} />
           <RootStack.Screen name={Routes.MATERIALS} component={MaterialsScreen} />
+          <RootStack.Screen name={Routes.MATERIAL_MINE} component={MyMaterialScreen} />
           <RootStack.Screen name={Routes.HANDOVER} component={HandoverScreen} />
           <RootStack.Screen name={Routes.SYNC_QUEUE} component={SyncQueueScreen} />
           <RootStack.Screen name={Routes.CHAT} component={ChatScreen} />
           <RootStack.Screen name={Routes.NOTIFICATION_SETTINGS} component={NotificationSettingsScreen} />
+          <RootStack.Screen name={Routes.QUIET_HOURS} component={QuietHoursScreen} />
           <RootStack.Screen name={Routes.FLOWSE_AI} component={FlowseAIScreen} />
           <RootStack.Screen name={Routes.REPAIR_ORDER} component={RepairOrderScreen} />
+          <RootStack.Screen name={Routes.REPAIR_DONE} component={RepairDoneScreen} />
+          <RootStack.Screen name={Routes.VERIFY_REPAIR} component={VerifyRepairScreen} />
           <RootStack.Screen name={Routes.HANDOVER_RECEIVE} component={HandoverReceiveScreen} />
           <RootStack.Screen name={Routes.MATERIAL_ISSUE} component={MaterialIssueScreen} />
           <RootStack.Screen name={Routes.PRODUCTION} component={ProductionScreen} />

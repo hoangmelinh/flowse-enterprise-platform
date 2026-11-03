@@ -1,10 +1,11 @@
 export { AppText } from './AppText';
 export { Button } from './Button';
 export { Field } from './Field';
-export { Group, Row } from './Group';
+export { Group, Row, TaskRow } from './Group';
+export type { TaskStatus } from './Group';
 export { ScreenHeader } from './ScreenHeader';
 export { Banner, EmptyState } from './Feedback';
-export { FlowseMark, FlowseWordmark, GoogleLogo, AISparkle, AIButton } from './Brand';
+export { FlowseMark, FlowseWordmark, GoogleLogo, AISparkle, AIButton, SpaceMark } from './Brand';
 export { Screen } from './Screen';
 export { PressableScale } from './PressableScale';
 export {
