@@ -37,3 +37,7 @@ Thumbs.db
 
 # graphify knowledge graph output (local only)
 graphify-out/
+
+# Skill cho AI agent (cài bằng npx skills), không commit
+.agents/
+skills-lock.json
