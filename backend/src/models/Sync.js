@@ -24,12 +24,18 @@ class Sync {
       );
       if (claim.rows.length === 0) {
         const existing = (await con.query(`SELECT * FROM offline_sync_logs WHERE idempotency_key = $1`, [idempotency_key])).rows[0];
-        // Khoá của người khác: không trả lại payload của họ
-        results.push(
-          existing?.user_id === userId
-            ? { idempotency_key, status: "ALREADY_APPLIED", result: existing }
-            : { idempotency_key, status: "REJECTED", error: "idempotency_key đã được dùng" }
-        );
+        if (existing?.user_id !== userId) {
+          // Khoá của người khác: không trả lại payload của họ
+          results.push({ idempotency_key, status: "REJECTED", error: "idempotency_key đã được dùng" });
+        } else if (existing.status === "PROCESSING") {
+          // Đang chạy ở request khác: client giữ bản nháp và gửi lại sau. Kẹt quá 5 phút (server dừng giữa chừng) thì nhả khoá
+          if (Date.now() - new Date(existing.applied_at).getTime() > 5 * 60 * 1000) {
+            await con.query(`DELETE FROM offline_sync_logs WHERE sync_id = $1 AND status = 'PROCESSING'`, [existing.sync_id]);
+          }
+          results.push({ idempotency_key, status: "IN_PROGRESS" });
+        } else {
+          results.push({ idempotency_key, status: "ALREADY_APPLIED", result: existing });
+        }
         continue;
       }
       const syncId = claim.rows[0].sync_id;

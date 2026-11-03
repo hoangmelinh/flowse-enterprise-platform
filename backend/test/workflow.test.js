@@ -48,3 +48,10 @@ test('đường dẫn ảnh không được trỏ ra ngoài thư mục uploads',
   const r = await AIVisionService.analyzeEvidence({ imageUrl: '/uploads/../package.json' });
   assert.equal(r.status, 'WARNING');
 });
+
+test('người công ty khác không chuyển trạng thái được (kể cả bước cho phép member)', async () => {
+  const { task } = await incidentAt('ASSIGNED');
+  const res = await api('POST', `/workflows/tasks/${task}/transition`, { as: U.managerB, body: { toStateId: state.IN_PROGRESS } });
+  assert.equal(res.status, 403, JSON.stringify(res.body));
+  assert.equal((await sql('SELECT current_state_id FROM tasks WHERE task_id = $1', [task])).rows[0].current_state_id, state.ASSIGNED);
+});

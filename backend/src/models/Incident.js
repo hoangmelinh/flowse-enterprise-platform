@@ -6,7 +6,7 @@ import socketService from "../services/socketService.js";
 import Department from "./Department.js";
 
 class Incident {
-  static async getAll(user = null) {
+  static async getAll(user) {
     // Luôn giới hạn trong workspace user là thành viên (việc → danh sách → không gian → workspace)
     const values = [user.user_id];
     let whereClause = `WHERE EXISTS (

@@ -60,16 +60,10 @@ class SocketService {
       }
     });
 
-    // 2. Kết nối: vào phòng cá nhân + mọi workspace mình là thành viên
+    // 2. Kết nối: vào phòng cá nhân, gắn handler, rồi vào mọi workspace mình là thành viên
     this.io.on("connection", async (socket) => {
       const userId = socket.user.user_id;
       socket.join(`user_${userId}`);
-      try {
-        const ws = await pool.query("SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL", [userId]);
-        ws.rows.forEach((r) => socket.join(`workspace_${r.workspace_id}`));
-      } catch (err) {
-        console.error("[Socket.IO] Không lấy được workspace của user:", err.message);
-      }
 
       // Xin vào phòng (hội thoại vừa mở...): chỉ khi canJoin cho phép
       socket.on("join_room", async (roomName) => {
@@ -92,6 +86,14 @@ class SocketService {
           console.warn("[Socket.IO] Token refresh không hợp lệ");
         }
       });
+
+      // Gắn handler xong mới tra workspace, để join_room gửi ngay lúc kết nối không bị mất
+      try {
+        const ws = await pool.query("SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL", [userId]);
+        ws.rows.forEach((r) => socket.join(`workspace_${r.workspace_id}`));
+      } catch (err) {
+        console.error("[Socket.IO] Không lấy được workspace của user:", err.message);
+      }
     });
 
     console.log("[Socket.IO] Realtime Server đã khởi tạo sẵn sàng!");

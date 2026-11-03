@@ -133,10 +133,7 @@ class WorkflowEngine {
       }
     }
 
-    if (roles.size === 0) {
-      roles.add("member");
-    }
-
+    // Không tự gán "member": người ngoài workspace phải không có vai trò nào (thành viên đã có "member" từ bước 1)
     return Array.from(roles);
   }
 

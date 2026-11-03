@@ -19,7 +19,9 @@ test('hai lần gửi song song cùng khoá: chỉ chuyển trạng thái một 
   const action = { idempotency_key: `k-${task}`, action_type: 'WORKFLOW_TRANSITION', payload: { task_id: task, to_state_id: state.IN_PROGRESS } };
   const [a, b] = await Promise.all([1, 2].map(() => api('POST', '/sync/batch', { as: U.managerA, body: { actions: [action] } })));
   const statuses = [a, b].map((r) => (r.body.data ?? r.body.results ?? r.body)[0].status).sort();
-  assert.deepEqual(statuses, ['ALREADY_APPLIED', 'APPLIED'], JSON.stringify([a.body, b.body]));
+  // Request thứ hai tới khi request đầu đang chạy (IN_PROGRESS) hoặc đã xong (ALREADY_APPLIED); không bao giờ áp dụng lần nữa
+  assert.equal(statuses.filter((x) => x === 'APPLIED').length, 1, JSON.stringify([a.body, b.body]));
+  assert.ok(['ALREADY_APPLIED', 'IN_PROGRESS'].includes(statuses.find((x) => x !== 'APPLIED')), JSON.stringify(statuses));
   const logs = (await sql("SELECT count(*)::int n FROM activity_logs WHERE task_id = $1 AND action = 'WORKFLOW_TRANSITION'", [task])).rows[0].n;
   assert.equal(logs, 1);
 });
@@ -41,4 +43,15 @@ test('ghi chú nhắc "sự cố #N" không tác động sự cố N khi duyệt
   const after = (await sql('SELECT t.current_state_id FROM incidents i JOIN tasks t ON t.task_id = i.task_id WHERE i.incident_id = $1', [victim])).rows[0];
   assert.deepEqual(after, before);
   assert.equal(res.body.data?.incident ?? null, null);
+});
+
+test('khoá đang xử lý: báo IN_PROGRESS; khoá kẹt quá 5 phút được nhả cho lần gửi sau', async () => {
+  const task = await makeTask(WS.A.id, U.memberA.id);
+  const action = (key) => ({ idempotency_key: key, action_type: 'WORKFLOW_TRANSITION', payload: { task_id: task } });
+  await sql("INSERT INTO offline_sync_logs (user_id, idempotency_key, action_type, payload, base_version, server_version, status) VALUES ($1, 'dang-chay', 'X', '{}', 1, 1, 'PROCESSING')", [U.managerA.id]);
+  await sql("INSERT INTO offline_sync_logs (user_id, idempotency_key, action_type, payload, base_version, server_version, status, applied_at) VALUES ($1, 'ket', 'X', '{}', 1, 1, 'PROCESSING', now() - interval '10 minutes')", [U.managerA.id]);
+  const res = await api('POST', '/sync/batch', { as: U.managerA, body: { actions: [action('dang-chay'), action('ket')] } });
+  assert.deepEqual(res.body.data.map((r) => r.status), ['IN_PROGRESS', 'IN_PROGRESS'], JSON.stringify(res.body));
+  assert.equal((await sql("SELECT count(*)::int n FROM offline_sync_logs WHERE idempotency_key = 'ket'")).rows[0].n, 0);
+  assert.equal((await sql("SELECT count(*)::int n FROM offline_sync_logs WHERE idempotency_key = 'dang-chay'")).rows[0].n, 1);
 });
