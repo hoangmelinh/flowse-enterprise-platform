@@ -92,34 +92,20 @@ class AIVisionService {
         };
       }
 
-      // Xử lý đường dẫn file cục bộ trong thư mục uploads
-      let relativePath = imageUrl.startsWith("/") ? imageUrl.slice(1) : imageUrl;
-      if (relativePath.startsWith("uploads/")) {
-        // ok
-      } else if (relativePath.includes("/uploads/")) {
-        relativePath = relativePath.slice(relativePath.indexOf("uploads/"));
-      }
+      // Chỉ đọc tệp nằm thẳng trong thư mục uploads: lấy tên tệp, bỏ mọi thư mục và "../" trong đường dẫn
+      const uploadsDir = path.resolve(process.cwd(), "uploads");
+      const fileName = path.basename(imageUrl.split("?")[0]);
+      const filePath = path.join(uploadsDir, fileName);
+      const insideUploads = !imageUrl.includes("..") && path.dirname(filePath) === uploadsDir;
 
-      const filePath = path.resolve(process.cwd(), relativePath);
-
-      // Nếu không tìm thấy file trên đĩa (ví dụ URL bên ngoài hoặc mock)
-      if (!fs.existsSync(filePath)) {
-        const isSpamNamed = /spam|fake|meme|blank|black|dark/i.test(imageUrl);
-        if (isSpamNamed) {
-          return {
-            isValid: false,
-            status: "WARNING",
-            score: 25,
-            tags: ["Nghi vấn nội dung", "Cần duyệt"],
-            feedback: "⚠️ Tệp hình ảnh có dấu hiệu không rõ ràng hoặc không liên quan đến máy móc. Ảnh được gắn cờ để Quản đốc thẩm định.",
-          };
-        }
+      // Không có ảnh trên máy chủ (URL ngoài, tệp giả, tệp đã xoá): không tự cho đạt, chuyển quản đốc xem
+      if (!insideUploads || !fs.existsSync(filePath)) {
         return {
-          isValid: true,
-          status: "VERIFIED",
-          score: 85,
-          tags: ["Ảnh bằng chứng", assetName ? `Thiết bị: ${assetName}` : "Thiết bị nhà xưởng"],
-          feedback: "✅ Hình ảnh bằng chứng đã được ghi nhận vào hồ sơ nghiệm thu.",
+          isValid: false,
+          status: "WARNING",
+          score: null,
+          tags: ["Không tìm thấy ảnh", "Cần duyệt"],
+          feedback: "⚠️ Không tìm thấy ảnh bằng chứng trên máy chủ. Quản đốc cần xem lại trước khi đóng sự cố.",
         };
       }
 
@@ -209,13 +195,14 @@ class AIVisionService {
         feedback: `✅ AI Verified (Độ tin cậy: ${baseScore}%): Nhận diện cấu trúc bề mặt kim loại và hiện trường sửa chữa hợp lệ.`,
       };
     } catch (err) {
-      console.warn("[AIVisionService] Phân tích ảnh gặp lỗi, chuyển sang chế độ chấp thuận an toàn:", err.message);
+      // Lỗi phân tích thì không tự cho đạt: gắn cờ để quản đốc xem
+      console.warn("[AIVisionService] Phân tích ảnh gặp lỗi, chuyển quản đốc xem:", err.message);
       return {
-        isValid: true,
-        status: "VERIFIED",
-        score: 80,
-        tags: ["Bằng chứng hiện trường"],
-        feedback: "✅ Hình ảnh bằng chứng đã được ghi nhận thành công.",
+        isValid: false,
+        status: "WARNING",
+        score: null,
+        tags: ["Chưa phân tích được", "Cần duyệt"],
+        feedback: "⚠️ Chưa phân tích được ảnh bằng chứng. Quản đốc cần xem lại trước khi đóng sự cố.",
       };
     }
   }

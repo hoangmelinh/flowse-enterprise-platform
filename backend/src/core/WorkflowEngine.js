@@ -4,6 +4,7 @@ import AIVisionService from "../services/aiVisionService.js";
 import Asset from "../models/Asset.js";
 import socketService from "../services/socketService.js";
 import { getWorkspaceRolesForTask } from "../models/Permission.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -204,9 +205,10 @@ class WorkflowEngine {
       );
 
       if (taskRes.rows.length === 0) {
-        throw new Error("Task not found");
+        throw new AppError("Task not found", 404, "NOT_FOUND");
       }
       const task = taskRes.rows[0];
+      let evidenceToCheck = null;
 
       // 2. Kiểm tra transition hợp lệ
       const transRes = await client.query(
@@ -220,8 +222,10 @@ class WorkflowEngine {
       );
 
       if (transRes.rows.length === 0) {
-        throw new Error(
-          `Không thể chuyển từ trạng thái '${task.current_state_name || "N/A"}' sang trạng thái đích đã chọn.`
+        throw new AppError(
+          `Không thể chuyển từ trạng thái '${task.current_state_name || "N/A"}' sang trạng thái đích đã chọn.`,
+          409,
+          "INVALID_TRANSITION"
         );
       }
       const transition = transRes.rows[0];
@@ -237,17 +241,20 @@ class WorkflowEngine {
           transition.allowed_roles.some((r) => rolesArray.includes(r.toLowerCase())));
 
       if (!isAllowed) {
-        throw new Error(
-          `Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'. Vai trò yêu cầu: ${transition.allowed_roles.join(", ")}.`
+        throw new AppError(
+          `Bạn không có quyền thực hiện bước chuyển '${transition.transition_name}'. Vai trò yêu cầu: ${transition.allowed_roles.join(", ")}.`,
+          403,
+          "FORBIDDEN"
         );
       }
 
       // 3b. Kiểm tra required_fields (nếu có yêu cầu)
       if (transition.required_fields && transition.required_fields.length > 0) {
         for (const field of transition.required_fields) {
-          const val = metadata?.[field] || (field === "evidence_url" && metadata?.evidence_urls) || note;
-          if (!val || (Array.isArray(val) && val.length === 0)) {
-            throw new Error(`Bước chuyển này bắt buộc phải cung cấp thông tin [${field}].`);
+          // Mỗi trường phải có giá trị riêng; ghi chú chỉ thoả trường "note"
+          const val = field === "note" ? note : field === "evidence_url" ? metadata?.evidence_urls : metadata?.[field];
+          if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
+            throw new AppError(`Bước chuyển này bắt buộc phải cung cấp thông tin [${field}].`, 400, "MISSING_FIELD", { field });
           }
         }
       }
@@ -337,40 +344,19 @@ class WorkflowEngine {
 
       // 6c. Lưu trữ bằng chứng nghiệm thu và kết quả AI Copilot (Giai đoạn 3)
       if (incId && (transition.to_state_code === "RESOLVED" || transition.to_state_code === "CLOSED" || transition.to_state_code === "WAITING_VERIFY" || transition.is_terminal)) {
-        if (metadata && metadata.evidence_urls && Array.isArray(metadata.evidence_urls) && metadata.evidence_urls.length > 0) {
-          let aiStatus = metadata.ai_evidence_status;
-          let aiFeedback = metadata.ai_evidence_feedback;
-          let aiScore = metadata.ai_evidence_score;
-
-          // Nếu chưa có kết quả AI từ client, tự động chạy phân tích qua AIVisionService
-          if (!aiStatus) {
-            try {
-              const aiEval = await AIVisionService.analyzeEvidence({
-                imageUrl: metadata.evidence_urls[0],
-                incidentTitle: task.name || task.title || "",
-                assetName: incInfo ? incInfo.asset_name : "",
-                symptom: incInfo ? incInfo.symptom : "",
-              });
-              aiStatus = aiEval.status;
-              aiFeedback = aiEval.feedback;
-              aiScore = aiEval.score;
-            } catch (evalErr) {
-              console.warn("[WorkflowEngine] AI Vision fallback:", evalErr.message);
-              aiStatus = "VERIFIED";
-              aiFeedback = "Đã ghi nhận ảnh bằng chứng nghiệm thu.";
-              aiScore = 80;
-            }
-          }
-
+        if (metadata && Array.isArray(metadata.evidence_urls) && metadata.evidence_urls.length > 0) {
+          // Chỉ lưu ảnh; kết quả AI do server tự chấm sau khi commit (không tin ai_evidence_* client gửi lên,
+          // không giữ khóa dòng trong lúc chờ AI)
           await client.query(
             `UPDATE incidents
              SET resolved_evidence_urls = $2,
-                 ai_evidence_status = $3,
-                 ai_evidence_feedback = $4,
-                 ai_evidence_score = $5
+                 ai_evidence_status = 'NOT_EVALUATED',
+                 ai_evidence_feedback = NULL,
+                 ai_evidence_score = NULL
              WHERE incident_id = $1`,
-            [incId, metadata.evidence_urls, aiStatus || "VERIFIED", aiFeedback || null, aiScore || 0]
+            [incId, metadata.evidence_urls]
           );
+          evidenceToCheck = metadata.evidence_urls[0];
         }
       }
 
@@ -416,6 +402,24 @@ class WorkflowEngine {
       );
 
       await client.query("COMMIT");
+
+      // Chấm ảnh nghiệm thu ngoài transaction. Service không ném lỗi; lỗi lưu kết quả chỉ ghi log
+      if (evidenceToCheck) {
+        try {
+          const ai = await AIVisionService.analyzeEvidence({
+            imageUrl: evidenceToCheck,
+            incidentTitle: task.name || "",
+            assetName: incInfo?.asset_name || "",
+            symptom: incInfo?.symptom || "",
+          });
+          await con.query(
+            `UPDATE incidents SET ai_evidence_status = $2, ai_evidence_feedback = $3, ai_evidence_score = $4 WHERE incident_id = $1`,
+            [incId, ai.status, ai.feedback, ai.score]
+          );
+        } catch (err) {
+          console.error("[WorkflowEngine] Lưu kết quả AI ảnh nghiệm thu lỗi:", err.message);
+        }
+      }
 
       // Tự động tính toán lại và lưu cố định Health Score thiết bị (Giai đoạn 1 Enterprise)
       if (incInfo && incInfo.asset_id) {
