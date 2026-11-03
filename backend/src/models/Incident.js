@@ -2,6 +2,8 @@ import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
 import Asset from "./Asset.js";
 import socketService from "../services/socketService.js";
+import { resolveListForUser } from "./Permission.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
 
 import Department from "./Department.js";
 
@@ -121,14 +123,19 @@ class Incident {
       await client.query("BEGIN");
 
       // Tìm list_id mặc định nếu không truyền
-      let targetListId = list_id;
+      // Danh sách phải thuộc công ty của người báo (list_id từ web, mobile hay sync đều kiểm ở đây)
+      let targetListId = await resolveListForUser(reported_by, list_id ?? null, client);
+      if (list_id && !targetListId) {
+        throw new AppError("Danh sách không thuộc nơi làm việc của bạn", 403, "FORBIDDEN");
+      }
       if (!targetListId) {
-        const listRes = await client.query(`SELECT list_id FROM lists WHERE deleted_at IS NULL ORDER BY list_id ASC LIMIT 1`);
-        targetListId = listRes.rows[0]?.list_id;
-        if (!targetListId) {
-          // Tự động khởi tạo Space & List mặc định cho Vận Hành Hiện Trường nếu chưa có
-          const wsRes = await client.query(`SELECT workspace_id FROM workspaces WHERE deleted_at IS NULL ORDER BY workspace_id ASC LIMIT 1`);
-          const workspaceId = wsRes.rows[0]?.workspace_id || 1;
+          // Chưa có danh sách nào: tạo không gian Vận hành trong workspace của chính người báo
+          const wsRes = await client.query(
+            `SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL ORDER BY workspace_id LIMIT 1`,
+            [reported_by]
+          );
+          const workspaceId = wsRes.rows[0]?.workspace_id;
+          if (!workspaceId) throw new AppError("Bạn chưa thuộc nơi làm việc nào", 403, "FORBIDDEN");
 
           const spRes = await client.query(
             `INSERT INTO spaces (workspace_id, name, description, color, created_by)
@@ -154,7 +161,6 @@ class Incident {
             [spaceId, reported_by || null]
           );
           targetListId = newListRes.rows[0].list_id;
-        }
       }
 
       // Lấy workflow INCIDENT_FLOW và Initial State (REPORTED)

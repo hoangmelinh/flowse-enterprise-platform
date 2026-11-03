@@ -54,7 +54,7 @@ Bảo mật trước, vì nối dữ liệu thật mà phân quyền còn hở l
 - [x] **Điểm dừng 1:** test xanh (22/22, 2026-11-03), chờ người dùng xem lại
 
 ### Giai đoạn 2: Nối mobile với API đã có (việc 7–12)
-- [ ] Việc 7: Sửa 3 chỗ lệch đường dẫn mobile ↔ backend
+- [x] Việc 7: Sửa 3 chỗ lệch đường dẫn mobile ↔ backend
 - [ ] Việc 8: Vai trò công việc (home_role) trong /users/contexts
 - [ ] Việc 9: Đăng nhập sai và khóa tài khoản (A03, A07, A08)
 - [ ] Việc 10: Quên mật khẩu (A04–A06)
@@ -90,7 +90,8 @@ Xong Giai đoạn 1 và việc 8 rồi thì có thể làm song song: G (13–15
 ## Phát hiện thêm khi làm Giai đoạn 1 (chưa sửa)
 
 - `departments` và `assets` không có cột `workspace_id`: phòng ban, thiết bị dùng chung mọi công ty; admin của bất kỳ công ty nào đều tạo/sửa được. Gộp vào Việc 8.
-- `POST /incidents` và sync `REPORT_INCIDENT` nhận `list_id` từ client mà không kiểm tra list thuộc workspace của người báo. Gộp vào Việc 7.
+- ~~`list_id` khi tạo việc/sự cố không kiểm tra~~ — đã sửa ở Việc 7 (`resolveListForUser`).
+- Sync chưa chặn dùng lại cùng `idempotency_key` với nội dung khác (nên lưu hash payload và trả 422). Gộp vào Việc 11 hoặc làm riêng.
 - Backend trả lỗi đăng nhập "Sai email hoac password" (không dấu), mobile đang tìm chữ "mật khẩu" để tô đỏ ô. Gộp vào Việc 9.
 - Test chạy trên schema `flowse_test` của chính project Supabase (không cần project thứ hai); `npm test` mất khoảng 1 phút vì máy chủ ở Ireland.
 
