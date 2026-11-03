@@ -4,11 +4,16 @@
  */
 export type Tone = 'danger' | 'warning' | 'success' | 'progress' | 'muted' | 'accent';
 
+// C01 / C12: không gian thường và dự án (không gian có nhãn Dự án)
 export const spaces = [
-  { id: 1, name: 'Kế hoạch sản xuất', sub: '18 việc mở · 12 thành viên', color: '#0E7C74', project: false },
-  { id: 2, name: 'Dự án ERP giai đoạn 2', sub: 'Phòng Kế hoạch · hạn 15/12 · 62%', color: '#C98512', project: true },
-  { id: 3, name: 'Mở rộng dây chuyền A3', sub: 'Nhà máy Bình Dương · 40%', color: '#2F5FD0', project: true },
-  { id: 4, name: 'Cải tiến liên tục', sub: '9 việc mở', color: '#C9473B', project: false },
+  { id: 1, name: 'Kế hoạch sản xuất', sub: '2 thư mục · 3 danh sách · 12 người', open: 18, project: false, pinned: true, mine: true },
+  { id: 5, name: 'Kinh doanh', sub: '1 thư mục · 2 danh sách · 8 người', open: 7, project: false, pinned: true, mine: false },
+  { id: 6, name: 'Nhân sự & hành chính', sub: '3 danh sách · 6 người', open: 4, project: false, pinned: false, mine: false },
+  { id: 4, name: 'Cải tiến liên tục', sub: '2 danh sách · 5 người', open: 9, project: false, pinned: false, mine: true },
+  { id: 2, name: 'Dự án ERP giai đoạn 2', sub: 'Phòng Kế hoạch · hạn 15/12 · 62%', open: 24, project: true, state: 'run' },
+  { id: 3, name: 'Mở rộng dây chuyền A3', sub: 'Nhà máy Bình Dương · hạn 30/11 · 40%', open: 31, project: true, state: 'run' },
+  { id: 7, name: 'Chuẩn hoá ISO 9001', sub: 'QA/QC · hạn 20/01 · 18%', open: 12, project: true, state: 'run' },
+  { id: 8, name: 'Đơn hàng AP-1126', sub: 'Kinh doanh · hạn 05/11 · 85%', open: 8, project: true, state: 'soon' },
 ];
 
 export const spaceTree = [
@@ -56,18 +61,22 @@ export const incidentTimeline = [
 
 export const symptoms = ['Rung, kêu lạ', 'Dừng máy', 'Rò rỉ', 'Nguy cơ an toàn', 'Khác'];
 
+// F01: kiểm tra được giao hôm nay (chip: Hôm nay / Chưa làm / Đã gửi)
 export const inspections = [
-  { id: 18, code: 'QC-2610-018', title: 'Kiểm tra lô vải 24', sub: 'QC đầu vào · 6 tiêu chí', due: 'Hạn 10:30', tone: 'warning' as Tone },
-  { id: 20, code: 'QC-2610-020', title: 'An toàn khu đóng gói', sub: 'Định kỳ tuần · 8 tiêu chí', due: 'Hôm nay', tone: 'muted' as Tone },
+  { id: 20, code: 'QC-2610-020', title: 'Khu vực đóng gói ca sáng', sub: '6 tiêu chí · A2', due: '13:30', status: 'todo' as const },
+  { id: 18, code: 'QC-2610-018', title: 'Lô vải 25 · QC đầu vào', sub: '4/10 tiêu chí', due: '11:00', dueTone: 'warning' as Tone, status: 'progress' as const },
+  { id: 4, code: 'QC-2610-004', title: 'An toàn đầu ca A2', sub: 'Chưa đạt · NCR-2610-004', status: 'blocked' as const, sent: true },
+  { id: 17, code: 'QC-2610-017', title: 'Lô vải 24 · QC đầu vào', sub: '12/12 đạt', due: '08:40', status: 'done' as const, sent: true },
 ];
 
-export const checklist = [
-  'Số lượng khớp phiếu nhập',
-  'Màu đúng mẫu duyệt',
-  'Không lỗi dệt quá 2 điểm/m',
-  'Độ ẩm dưới 8%',
-  'Nhãn lô đầy đủ',
-  'Bình chữa cháy số 3 còn hạn',
+// F02: tiêu chí khu vực đóng gói; `fail` là ghi chú mẫu hiện khi chọn Không đạt
+export const checklist: { title: string; fail?: string }[] = [
+  { title: 'Lối thoát hiểm thông thoáng' },
+  { title: 'Bình chữa cháy còn hạn', fail: 'Bình số 3 hết hạn 09/2026. Đã chụp 1 ảnh.' },
+  { title: 'Dây điện không vắt ngang lối đi' },
+  { title: 'Biển báo an toàn đầy đủ' },
+  { title: 'Tủ điện đóng kín, có khóa' },
+  { title: 'Khu vực sạch, không dầu tràn' },
 ];
 
 export const requestTypes = [
@@ -77,6 +86,8 @@ export const requestTypes = [
   { key: 'transfer', name: 'Điều động nhân sự', sub: 'Nhân sự · 2 bước' },
   { key: 'advance', name: 'Thanh toán, tạm ứng', sub: 'Tài chính · 3 bước' },
   { key: 'admin', name: 'Hành chính, IT', sub: 'Văn phòng · không cần duyệt' },
+  // P2: chưa mở ở bản này, hiện để người dùng biết sắp có
+  { key: 'contract', name: 'Thẩm định hợp đồng', sub: 'Pháp chế · P2', soon: true },
 ];
 
 /** Trường form theo loại yêu cầu (G03, G03b–e) */
@@ -93,6 +104,7 @@ export const myRequests = [
   { id: 39, code: 'YC-2610-039', title: 'Cấp laptop cho nhân sự mới', sub: 'IT · Chờ bạn xác nhận đã nhận', tone: 'warning' as Tone },
   { id: 44, code: 'YC-2610-044', title: 'Tạm ứng công tác Đồng Nai', sub: 'Tài chính · Đang duyệt bước 2/3', tone: 'progress' as Tone },
   { id: 12, code: 'NP-2610-012', title: 'Nghỉ phép 03–04/11', sub: 'Nhân sự · Trả lại: cần người thay', tone: 'danger' as Tone },
+  { id: 50, code: 'YC-2610-050', title: 'In 200 tem nhãn AP-1126', sub: 'Hành chính · Đang xử lý', tone: 'muted' as Tone },
 ];
 
 export const requestSteps = [
@@ -114,6 +126,7 @@ export const approvalLines = [
 ];
 
 export const materials = [
+  { id: 12, code: 'VT-2610-012', title: 'Cảm biến quang E3Z-D61 × 4', sub: 'Kho cấp 2/4 · chờ mua 2', tone: 'warning' as Tone },
   { id: 9, code: 'VT-2610-009', title: 'Vòng bi 6204-2RS cho BT-07', sub: 'Kho cấp 2/4 · chờ mua 2', tone: 'warning' as Tone },
   { id: 7, code: 'VT-2610-007', title: 'Dây curoa máy M-07', sub: 'Đã nhận đủ', tone: 'success' as Tone },
 ];
@@ -153,9 +166,10 @@ export const chatMessages = [
   { mine: true, text: 'Ok, chiều anh qua xem BT-07.', meta: '10:24 · Đã xem' },
 ];
 
+// `q`: câu hỏi gửi đi khi chạm gợi ý (L02, L03, L04)
 export const aiSuggestions = [
-  { title: 'Soạn email báo trễ đơn hàng', sub: 'Chat · soạn nội dung' },
-  { title: 'Tóm tắt tiến độ hôm nay', sub: 'Work · 12 việc đang làm' },
-  { title: 'Việc quá hạn của phòng', sub: 'Work · 3 việc cần xử lý' },
-  { title: 'Tạo và giao công việc', sub: 'Work · gõ như nhắn tin' },
+  { title: 'Soạn email báo trễ đơn hàng', sub: 'Chat · soạn nội dung', q: 'Soạn email báo khách đơn PO-2410 trễ 2 ngày do thiếu vải.' },
+  { title: 'Tóm tắt tiến độ hôm nay', sub: 'Work · 12 việc đang làm', q: 'Tóm tắt tiến độ phòng hôm nay' },
+  { title: 'Việc quá hạn của phòng', sub: 'Work · 3 việc cần xử lý', q: 'Việc quá hạn của phòng' },
+  { title: 'Tạo và giao công việc', sub: 'Work · gõ như nhắn tin', q: 'Giao Đức Thành kiểm tra lô vải 24 trước 15h mai, ưu tiên cao.' },
 ];

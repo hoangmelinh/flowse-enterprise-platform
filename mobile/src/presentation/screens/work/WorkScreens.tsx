@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, FlatList, ScrollView, ActivityIndicator, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, SectionList, ScrollView, ActivityIndicator, Alert, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import {
   Circle,
-  CircleAlert,
   CircleCheck,
   Layers,
-  MessageSquare,
   UserPlus,
   Folder,
   List,
@@ -16,44 +14,65 @@ import {
   SquareCheckBig,
   WifiOff,
   Search,
-  ListChecks,
-  SlidersHorizontal,
+  ListFilter,
+  Ellipsis,
+  Dot,
+  Clock,
+  CircleUser,
+  Users,
 } from 'lucide-react-native';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
-import { dueBucket } from '../../../core/utils/dueDate';
+import { dueBucket, dueText, fmtDue, overdueDays } from '../../../core/utils/dueDate';
 import { WorkItem } from '../../../domain/entities/workitem';
 import { WorkItemRepositoryImpl } from '../../../data/repositories/WorkItemRepositoryImpl';
 import { comments, people, spaces, spaceTree } from '../../../data/demo/fixtures';
 import {
   AppText, Avatar, Banner, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KV, Row,
-  Screen, ScreenHeader, ScrollPage, Segmented, SectionHeader, Stat, StatRow, Tag,
+  Screen, ScreenHeader, ScrollPage, Segmented, SectionHeader, Stat, StatRow, Tag, TaskRow, TaskStatus, SpaceMark,
 } from '../../components/ui';
+import { useAuthStore } from '../../state/authStore';
 import { WorkflowTransitionBar } from '../../components/workflow/WorkflowTransitionBar';
 import { ScreenProps } from '../../navigation/types';
 
 const repo = new WorkItemRepositoryImpl();
 export const useMyWork = () => useQuery({ queryKey: ['my-work'], queryFn: () => repo.getMyWorkItems() });
 
-const dueInfo = (w: WorkItem) => {
+/** Cách một việc hiện trong dòng việc (Figma Task): vòng trạng thái, chữ hạn có màu, cờ ưu tiên. */
+export const taskView = (w: WorkItem) => {
   const b = dueBucket(w.dueDate);
-  if (b === 'overdue') return { label: 'Quá hạn', tone: 'danger' as const, icon: CircleAlert };
-  if (b === 'today') return { label: 'Hôm nay', tone: 'warning' as const, icon: Circle };
-  return { label: w.statusName || 'Đang mở', tone: 'muted' as const, icon: Circle };
+  const status: TaskStatus = w.currentState?.isTerminal ? 'done' : w.statusName === 'Chờ review' ? 'review' : w.statusName === 'Đang làm' ? 'progress' : 'todo';
+  return {
+    status,
+    due: dueText(w.dueDate),
+    dueTone: b === 'overdue' ? ('danger' as const) : b === 'today' ? ('warning' as const) : ('muted' as const),
+    flag: w.priority === 'High' || w.priority === 'Urgent',
+    // shortcut: Figma hiện tên danh sách; API việc của tôi chưa trả tên danh sách nên tạm hiện trạng thái
+    meta: w.statusName,
+  };
 };
+
+const BUCKETS: [ReturnType<typeof dueBucket>, string][] = [
+  ['overdue', 'Quá hạn'],
+  ['today', 'Hôm nay'],
+  ['later', 'Sắp tới'],
+  ['none', 'Chưa đặt hạn'],
+];
 
 /** D01 — Công việc của tôi (tab). Dùng chung cache ['my-work'] với Trang chủ nên chuyển tab không tải lại. */
 export const WorkItemsScreen: React.FC = () => {
   const s = useStyles();
   const nav = useNavigation<any>();
-  const [filter, setFilter] = useState('Tất cả');
+  const [seg, setSeg] = useState(0);
   const { data = [], isLoading, isError, refetch, isRefetching } = useMyWork();
-  const list = useMemo(() => {
-    if (filter === 'Quá hạn') return data.filter((w) => dueBucket(w.dueDate) === 'overdue');
-    if (filter === 'Hôm nay') return data.filter((w) => dueBucket(w.dueDate) === 'today');
-    if (filter === 'Chờ review') return data.filter((w) => w.statusName === 'Chờ review');
-    return data;
-  }, [data, filter]);
+  // shortcut: chỉ có API "việc tôi làm"; Tôi giao / Theo dõi trống cho tới khi backend có
+  const sections = useMemo(
+    () =>
+      seg === 0
+        ? BUCKETS.map(([b, title]) => ({ title, data: data.filter((w) => dueBucket(w.dueDate) === b) })).filter((x) => x.data.length)
+        : [],
+    [data, seg]
+  );
 
   return (
     <Screen>
@@ -62,46 +81,58 @@ export const WorkItemsScreen: React.FC = () => {
         caption={`${data.length} việc của tôi`}
         right={
           <View style={s.headerIcons}>
-            <IconButton icon={SlidersHorizontal} label="Lọc" onPress={() => nav.navigate(Routes.WORK_FILTER)} />
-            <IconButton icon={Layers} label="Không gian" onPress={() => nav.navigate(Routes.SPACES)} />
+            <IconButton icon={Search} label="Tìm kiếm" onPress={() => nav.navigate(Routes.SEARCH)} />
+            <IconButton icon={ListFilter} label="Lọc" onPress={() => nav.navigate(Routes.WORK_FILTER)} />
           </View>
         }
       />
       <View style={s.filters}>
-        <Chips items={['Tất cả', 'Quá hạn', 'Hôm nay', 'Chờ review']} value={filter} onChange={setFilter} />
+        <Segmented items={[`Tôi làm ${data.length}`, 'Tôi giao', 'Theo dõi']} value={seg} onChange={setSeg} />
       </View>
       {isLoading ? (
         <ActivityIndicator style={s.loading} />
       ) : isError ? (
         <EmptyState icon={WifiOff} title="Không tải được công việc" body="Kiểm tra kết nối mạng rồi thử lại." actionTitle="Thử lại" onAction={refetch} />
       ) : (
-        <FlatList
-          data={list}
+        <SectionList
+          sections={sections}
           keyExtractor={(w) => String(w.id)}
           contentContainerStyle={s.list}
           onRefresh={refetch}
           refreshing={isRefetching}
-          ListEmptyComponent={<EmptyState icon={SquareCheckBig} title="Không có việc phù hợp" body={`Không có việc nào khớp bộ lọc "${filter}". Thử bỏ một bộ lọc.`} actionTitle="Xóa tất cả bộ lọc" onAction={() => setFilter('Tất cả')} />}
-          renderItem={({ item, index }) => {
-            const d = dueInfo(item);
-            return (
-              <View style={[s.cell, index === 0 && s.first, index === list.length - 1 && s.last]}>
-                <Row
-                  icon={d.icon}
-                  iconTone={d.tone}
-                  title={item.title}
-                  subtitle={d.label}
-                  subtitleTone={d.tone}
-                  onPress={() => nav.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: item.id })}
-                />
-              </View>
-            );
-          }}
+          stickySectionHeadersEnabled={false}
+          ListEmptyComponent={<EmptyState icon={SquareCheckBig} title={seg === 0 ? 'Chưa có việc nào' : seg === 1 ? 'Bạn chưa giao việc nào' : 'Bạn chưa theo dõi việc nào'} body="Việc sẽ hiện ở đây khi có." />}
+          renderSectionHeader={({ section }) => (
+            <View style={s.sectionHead}>
+              <SectionHeader title={section.title} count={section.data.length} />
+            </View>
+          )}
+          renderItem={({ item, index, section }) => (
+            <View style={[s.cell, index === 0 && s.first, index === section.data.length - 1 && s.last]}>
+              <TaskRow title={item.title} {...taskView(item)} onPress={() => nav.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: item.id })} />
+            </View>
+          )}
         />
       )}
       <Fab label="Tạo công việc" onPress={() => nav.navigate(Routes.CREATE_WORK_ITEM)} />
     </Screen>
   );
+};
+
+// shortcut: người review, việc con và hoạt động lấy từ Figma C06; nối API khi backend trả các trường này
+const DETAIL_DEMO = {
+  list: 'Kế hoạch SX / AP-1126',
+  reviewer: 'Trần Quốc Dũng',
+  subDone: 3,
+  subTotal: 5,
+  subtasks: [
+    ['Đối chiếu tồn kho vải', 'done', 'Nguyễn Minh Anh'],
+    ['Báo giá phụ liệu từ 2 NCC', 'progress', 'Phạm Quốc Huy'],
+  ] as [string, TaskStatus, string][],
+  activity: [
+    ['Phạm Quốc Huy đính kèm bao-gia-ncc.pdf', 'Hôm nay 09:12'],
+    ['Trần Quốc Dũng đổi hạn 28/10 → 29/10', 'Hôm qua 16:40'],
+  ],
 };
 
 /** C06 — Chi tiết công việc + chuyển trạng thái. */
@@ -118,13 +149,25 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
     },
   });
   const w = item.data;
-  const d = w ? dueInfo(w) : undefined;
+  const v = w ? taskView(w) : undefined;
+  const user = useAuthStore((st) => st.user);
+  const c = useColors();
+  const s = useStyles();
+  const more = () =>
+    w &&
+    Alert.alert(w.title, undefined, [
+      { text: 'Trao đổi', onPress: () => navigation.navigate(Routes.COMMENTS, { code: `VP-${w.id}` }) },
+      { text: 'Giao / chuyển việc', onPress: () => navigation.navigate(Routes.ASSIGN_SHEET, { title: w.title }) },
+      ...(w.statusName === 'Chờ review' ? [{ text: 'Review kết quả', onPress: () => navigation.navigate(Routes.REVIEW) }] : []),
+      { text: 'Đóng', style: 'cancel' as const },
+    ]);
 
   return (
     <ScrollPage
-      title={w?.title ? 'Chi tiết công việc' : 'Đang tải…'}
-      caption={w ? `VP-${String(w.id).padStart(4, '0')}` : undefined}
+      title={w ? `VP-${String(w.id).padStart(4, '0')}` : 'Đang tải…'}
+      caption={DETAIL_DEMO.list}
       onBack={navigation.goBack}
+      right={<IconButton icon={Ellipsis} label="Thêm thao tác" onPress={more} />}
       footer={
         transitions.data?.length ? (
           <BottomBar>
@@ -135,23 +178,46 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
     >
       {w ? (
         <>
-          <View style={{ gap: space.sm }}>
-            <Tag label={w.statusName || 'Đang mở'} tone="progress" />
-            <AppText variant="title" style={{ fontSize: 24, lineHeight: 30 }}>
-              {w.title}
-            </AppText>
+          <AppText variant="title" style={s.detailTitle}>
+            {w.title}
+          </AppText>
+          <View style={s.tags}>
+            <Tag label={w.statusName || 'Đang mở'} tone={v!.status === 'review' ? 'warning' : v!.status === 'done' ? 'success' : 'progress'} icon={Dot} />
+            {v!.flag ? <Tag label="Ưu tiên cao" tone="danger" icon={Flag} /> : null}
+            {overdueDays(w.dueDate) ? <Tag label={`Quá hạn ${overdueDays(w.dueDate)} ngày`} tone="danger" icon={Clock} /> : null}
           </View>
           <Group>
-            <KV label="Hạn" value={w.dueDate ? new Date(w.dueDate).toLocaleDateString('vi-VN') : 'Chưa đặt'} tone={d?.tone === 'muted' ? 'ink' : d?.tone} />
-            <KV label="Trạng thái" value={w.statusName || 'Đang mở'} />
-            <KV label="Ưu tiên" value={w.priority === 'High' || w.priority === 'Urgent' ? 'Cao' : 'Bình thường'} />
+            <KV icon={CircleUser} label="Người làm" value={w.assigneeName ?? user?.name ?? 'Chưa giao'} person={!!(w.assigneeName ?? user?.name)} />
+            <KV icon={Users} label="Người review" value={DETAIL_DEMO.reviewer} person />
+            <KV icon={Calendar} label="Hạn" value={w.dueDate ? fmtDue(w.dueDate) : 'Chưa đặt'} tone={v!.dueTone === 'danger' ? 'danger' : 'ink'} />
+            <KV icon={Folder} label="Vị trí" value={DETAIL_DEMO.list} />
           </Group>
+          <Pressable accessibilityRole="button" onPress={() => navigation.navigate(Routes.SUBTASKS)} style={s.subHead}>
+            <SectionHeader title="Việc con" count={`${DETAIL_DEMO.subDone}/${DETAIL_DEMO.subTotal}`} />
+            <View style={s.track}>
+              <View style={[s.fill, { width: `${(DETAIL_DEMO.subDone / DETAIL_DEMO.subTotal) * 100}%` }]} />
+            </View>
+          </Pressable>
           <Group>
-            <Row icon={MessageSquare} title="Trao đổi" subtitle="3 bình luận · 1 tệp" onPress={() => navigation.navigate(Routes.COMMENTS, { code: `VP-${w.id}` })} />
-            <Row icon={UserPlus} title="Giao / chuyển việc" subtitle="Chọn người trong không gian" onPress={() => navigation.navigate(Routes.ASSIGN_SHEET, { title: w.title })} />
-            <Row icon={ListChecks} title="Việc con & checklist" subtitle="3/5 việc con · 4/6 mục" onPress={() => navigation.navigate(Routes.SUBTASKS)} />
-            {w.statusName === 'Chờ review' ? <Row icon={CircleCheck} iconTone="warning" title="Review kết quả" subtitle="Bạn là người review" onPress={() => navigation.navigate(Routes.REVIEW)} /> : null}
+            {DETAIL_DEMO.subtasks.map(([t, st, who]) => (
+              <TaskRow key={t} title={t} status={st} who={<Avatar name={who} size={24} />} onPress={() => navigation.navigate(Routes.SUBTASKS)} />
+            ))}
           </Group>
+          <SectionHeader title="Hoạt động" />
+          <View>
+            {DETAIL_DEMO.activity.map(([t, at], i) => (
+              <View key={t} style={s.event}>
+                <View style={s.rail}>
+                  <View style={[s.dot, { backgroundColor: i === 0 ? c.accent : c.line }]} />
+                  {i < DETAIL_DEMO.activity.length - 1 ? <View style={s.railLine} /> : null}
+                </View>
+                <View style={s.eventText}>
+                  <AppText style={s.eventBody}>{t}</AppText>
+                  <AppText variant="caption" tone="muted" style={s.small}>{at}</AppText>
+                </View>
+              </View>
+            ))}
+          </View>
           {move.isSuccess ? <AppText variant="caption" tone="success">Đã cập nhật trạng thái.</AppText> : null}
         </>
       ) : (
@@ -275,19 +341,43 @@ export const CommentsScreen: React.FC<ScreenProps<typeof Routes.COMMENTS>> = ({ 
 };
 
 /** C01 / C12 — Không gian và Dự án. */
-export const SpacesScreen: React.FC<ScreenProps<typeof Routes.SPACES>> = ({ navigation }) => {
-  const [tab, setTab] = useState(0);
-  const list = spaces.filter((x) => (tab === 1 ? x.project : true));
+export const SpacesScreen: React.FC<ScreenProps<typeof Routes.SPACES>> = ({ route, navigation }) => {
+  const s = useStyles();
+  const projects = !!route.params?.projectsOnly;
+  const chips = projects ? ['Đang chạy', 'Sắp hạn', 'Đã xong'] : ['Tất cả', 'Đã ghim', 'Của tôi'];
+  const [f, setF] = useState(chips[0]);
+  const list = spaces.filter((x) =>
+    projects
+      ? x.project && (f === 'Sắp hạn' ? x.state === 'soon' : f !== 'Đã xong')
+      : !x.project && (f === 'Đã ghim' ? x.pinned : f === 'Của tôi' ? x.mine : true)
+  );
   return (
-    <ScrollPage title={tab === 1 ? 'Dự án' : 'Không gian'} caption="Công ty An Phát" onBack={navigation.goBack}>
-      <Segmented items={['Không gian', 'Dự án']} value={tab} onChange={setTab} />
-      <Group>
-        {list.map((x) => (
-          <Row key={x.id} icon={Layers} iconTone="accent" title={x.name} subtitle={x.sub} onPress={() => (x.project ? navigation.navigate(Routes.PROJECT_DETAIL, { name: x.name }) : navigation.navigate(Routes.SPACE_DETAIL, { spaceId: x.id, name: x.name }))} />
-        ))}
-      </Group>
-      <AppText variant="caption" tone="muted">
-        Chỉ hiện không gian bạn là thành viên. Dự án là không gian có nhãn Dự án.
+    <ScrollPage
+      title={projects ? 'Dự án' : 'Không gian'}
+      caption={projects ? 'Không gian · nhãn Dự án' : 'Công ty An Phát · Văn phòng'}
+      onBack={navigation.goBack}
+      // shortcut: Figma có nút + tạo không gian/dự án; chưa có màn tạo nên chỉ để tìm kiếm
+      right={<IconButton icon={Search} label="Tìm kiếm" onPress={() => navigation.navigate(Routes.SEARCH)} />}
+    >
+      <Chips items={chips} value={f} onChange={setF} />
+      {list.length ? (
+        <Group>
+          {list.map((x, i) => (
+            <Row
+              key={x.id}
+              leading={<SpaceMark index={i} />}
+              title={x.name}
+              subtitle={x.sub}
+              trailing={<AppText tone="muted" style={s.count}>{x.open}</AppText>}
+              onPress={() => (x.project ? navigation.navigate(Routes.PROJECT_DETAIL, { name: x.name }) : navigation.navigate(Routes.SPACE_DETAIL, { spaceId: x.id, name: x.name }))}
+            />
+          ))}
+        </Group>
+      ) : (
+        <EmptyState icon={Layers} title={projects ? 'Chưa có dự án đã xong' : 'Không có không gian phù hợp'} body="Thử chọn bộ lọc khác." />
+      )}
+      <AppText variant="caption" tone="muted" style={s.small}>
+        {projects ? 'Dự án là không gian có nhãn Dự án: có hạn, tiến độ và thành viên.' : 'Chỉ hiện không gian bạn là thành viên.'}
       </AppText>
     </ScrollPage>
   );
@@ -318,7 +408,21 @@ export const SpaceDetailScreen: React.FC<ScreenProps<typeof Routes.SPACE_DETAIL>
 
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
-    filters: { paddingLeft: space.xl, paddingBottom: space.md },
+    filters: { paddingHorizontal: space.xl, paddingBottom: space.md },
+    sectionHead: { paddingTop: space.lg, paddingBottom: space.md },
+    detailTitle: { fontSize: 24, lineHeight: 30 },
+    tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+    subHead: { gap: space.md },
+    track: { height: 6, borderRadius: 3, backgroundColor: c.subtle, overflow: 'hidden' },
+    fill: { height: 6, borderRadius: 3, backgroundColor: c.accent },
+    event: { flexDirection: 'row', gap: space.md },
+    rail: { width: 10, alignItems: 'center', paddingTop: 5 },
+    dot: { width: 10, height: 10, borderRadius: 5 },
+    railLine: { flex: 1, width: 2, marginTop: 4, backgroundColor: c.line },
+    eventText: { flex: 1, gap: 2, paddingBottom: space.lg },
+    eventBody: { fontSize: 14, lineHeight: 20 },
+    small: { fontSize: 12 },
+    count: { fontSize: 14 },
     headerIcons: { flexDirection: 'row' },
     loading: { marginTop: 40 },
     list: { paddingHorizontal: space.xl, paddingBottom: 100 },

@@ -29,6 +29,18 @@ export const FlowseMark: React.FC<{ size?: number }> = ({ size = 56 }) => (
   </Svg>
 );
 
+/** Một khối màu đầu dòng Không gian / Dự án (C01, C12); màu xoay vòng theo thứ tự. */
+export const SpaceMark: React.FC<{ index: number }> = ({ index }) => {
+  const [top, left, right] = BLOCKS[index % BLOCKS.length];
+  return (
+    <Svg width={28} height={32} viewBox="16 0 24 27">
+      <Polygon points="16,7 28,14 28,27 16,20" fill={left} />
+      <Polygon points="28,14 40,7 40,20 28,27" fill={right} />
+      <Polygon points="28,0 40,7 28,14 16,7" fill={top} />
+    </Svg>
+  );
+};
+
 export const FlowseWordmark: React.FC = () => (
   <View style={styles.row}>
     <FlowseMark />

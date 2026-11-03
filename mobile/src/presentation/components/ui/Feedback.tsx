@@ -9,8 +9,8 @@ type BannerTone = 'danger' | 'warning' | 'accent';
 const bannerIcon: Record<BannerTone, LucideIcon> = { danger: CircleAlert, warning: TriangleAlert, accent: Info };
 const softBg = { danger: 'dangerSoft', warning: 'warningSoft', accent: 'accentSoft' } as const;
 
-/** Dải thông báo trong màn (lỗi đăng nhập A03, mất mạng I03...). */
-export const Banner: React.FC<{ tone?: BannerTone; text: string }> = ({ tone = 'accent', text }) => {
+/** Dải thông báo trong màn (lỗi đăng nhập A03, mất mạng I03...). `plain`: hộp ghi chú không icon (B11, B12). */
+export const Banner: React.FC<{ tone?: BannerTone; text: string; plain?: boolean }> = ({ tone = 'accent', text, plain }) => {
   const c = useColors();
   const Icon = bannerIcon[tone];
   return (
@@ -18,8 +18,8 @@ export const Banner: React.FC<{ tone?: BannerTone; text: string }> = ({ tone = '
       accessibilityRole="alert"
       style={[styles.banner, { backgroundColor: c[softBg[tone]] }]}
     >
-      <Icon size={18} color={c[tone]} />
-      <AppText variant="caption" tone={tone} style={styles.flex}>
+      {!plain && <Icon size={18} color={c[tone]} />}
+      <AppText variant="label" tone={tone} style={styles.flex}>
         {text}
       </AppText>
     </View>

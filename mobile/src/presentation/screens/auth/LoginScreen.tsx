@@ -54,7 +54,6 @@ export const LoginScreen: React.FC = () => {
             icon={AtSign}
             value={email}
             onChangeText={setEmail}
-            invalid={!!error}
             placeholder="ten@congty.vn"
             autoCapitalize="none"
             autoComplete="email"
@@ -67,7 +66,9 @@ export const LoginScreen: React.FC = () => {
             icon={Lock}
             value={password}
             onChangeText={setPassword}
-            invalid={!!error}
+            // Chỉ lỗi sai mật khẩu mới tô đỏ ô; lỗi mạng chỉ hiện ở banner
+            invalid={!!error?.includes('mật khẩu')}
+            hint="Mật khẩu chưa đúng. Kiểm tra Caps Lock."
             secureTextEntry={!showPassword}
             autoComplete="current-password"
             textContentType="password"

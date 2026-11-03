@@ -118,7 +118,34 @@ export const ChatScreen: React.FC<ScreenProps<typeof Routes.CHAT>> = ({ route, n
 };
 
 /** J11 — Cài đặt thông báo. */
+/** J03 — Thông báo: loại thông báo nào báo ngay; giờ yên lặng ở J11. */
 export const NotificationSettingsScreen: React.FC<ScreenProps<typeof Routes.NOTIFICATION_SETTINGS>> = ({ navigation }) => {
+  const c = useColors();
+  const [on, setOn] = useState({ task: true, mention: true, approval: true, digest: false });
+  const toggle = (k: keyof typeof on) => (
+    <Switch value={on[k]} onValueChange={(v) => setOn((x) => ({ ...x, [k]: v }))} trackColor={{ true: c.accent, false: c.line }} thumbColor={c.surface} />
+  );
+  return (
+    <ScrollPage title="Thông báo" caption="Tôi" onBack={navigation.goBack}>
+      {/* shortcut: chưa có expo-notifications nên chưa đọc được quyền thông báo thật; luôn gợi ý mở cài đặt */}
+      <Banner tone="warning" text="Thông báo đẩy đang tắt trên điện thoại. Bạn có thể bỏ lỡ sự cố và phê duyệt gấp." />
+      <Button title="Mở cài đặt điện thoại" variant="secondary" onPress={Linking.openSettings} />
+      <Group>
+        <Row title="Việc giao cho tôi" subtitle="Ngay lập tức" trailing={toggle('task')} chevron={false} />
+        <Row title="@ Nhắc tên" subtitle="Ngay lập tức" trailing={toggle('mention')} chevron={false} />
+        <Row title="Phê duyệt" subtitle="Ngay lập tức" trailing={toggle('approval')} chevron={false} />
+        <Row title="Tóm tắt cuối ngày" subtitle="17:30" trailing={toggle('digest')} chevron={false} />
+      </Group>
+      <Group>
+        <Row title="Giờ yên lặng" subtitle="22:00–06:00" onPress={() => navigation.navigate(Routes.QUIET_HOURS)} />
+      </Group>
+      <AppText variant="caption" tone="muted">Cảnh báo an toàn luôn bật theo quy định công ty.</AppText>
+    </ScrollPage>
+  );
+};
+
+/** J11 — Giờ yên lặng và ngoại lệ luôn báo. */
+export const QuietHoursScreen: React.FC<ScreenProps<typeof Routes.QUIET_HOURS>> = ({ navigation }) => {
   const c = useColors();
   const [quiet, setQuiet] = useState(1);
   const [on, setOn] = useState({ task: true, incident: true, message: false });
@@ -126,14 +153,10 @@ export const NotificationSettingsScreen: React.FC<ScreenProps<typeof Routes.NOTI
     <Switch value={on[k]} onValueChange={(v) => setOn((x) => ({ ...x, [k]: v }))} trackColor={{ true: c.accent, false: c.line }} thumbColor={c.surface} />
   );
   return (
-    <ScrollPage title="Thông báo" caption="Tôi" onBack={navigation.goBack}>
-      {/* J03: shortcut: chưa có expo-notifications nên chưa đọc được quyền thông báo thật; luôn gợi ý mở cài đặt */}
-      <Banner tone="warning" text="Nếu thông báo đẩy đang tắt trên điện thoại, bạn có thể bỏ lỡ sự cố và phê duyệt gấp." />
-      <Button title="Mở cài đặt điện thoại" variant="secondary" size="sm" onPress={Linking.openSettings} />
-      <AppText variant="label" tone="muted">Giờ yên lặng</AppText>
+    <ScrollPage title="Giờ yên lặng" caption="Thông báo" onBack={navigation.goBack}>
       <Segmented items={['Tắt', '22:00–06:00', 'Ngoài ca']} value={quiet} onChange={setQuiet} />
       <Group>
-        <Row title="Việc được giao và @nhắc tên" subtitle="Luôn báo, kể cả giờ yên lặng" trailing={toggle('task')} chevron={false} />
+        <Row title="Việc được giao và @nhắc tên" subtitle="Luôn báo, kể cả trong giờ yên lặng" trailing={toggle('task')} chevron={false} />
         <Row title="Sự cố trong phạm vi" subtitle="Rung mạnh khi SLA còn 15 phút" trailing={toggle('incident')} chevron={false} />
         <Row title="Tin nhắn" subtitle="Chỉ tin trực tiếp và @nhắc tên" trailing={toggle('message')} chevron={false} />
       </Group>

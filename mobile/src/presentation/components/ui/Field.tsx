@@ -9,9 +9,11 @@ interface FieldProps extends TextInputProps {
   icon?: LucideIcon;
   right?: React.ReactNode;
   invalid?: boolean;
+  /** Chữ đỏ dưới ô khi invalid (A03) */
+  hint?: string;
 }
 
-export const Field: React.FC<FieldProps> = ({ label, icon: Icon, right, invalid = false, ...input }) => {
+export const Field: React.FC<FieldProps> = ({ label, icon: Icon, right, invalid = false, hint, ...input }) => {
   const styles = useStyles();
   const c = useColors();
   const [focused, setFocused] = useState(false);
@@ -40,6 +42,11 @@ export const Field: React.FC<FieldProps> = ({ label, icon: Icon, right, invalid 
         />
         {right}
       </View>
+      {invalid && hint ? (
+        <AppText variant="caption" tone="danger" style={styles.hint}>
+          {hint}
+        </AppText>
+      ) : null}
     </View>
   );
 };
@@ -47,6 +54,7 @@ export const Field: React.FC<FieldProps> = ({ label, icon: Icon, right, invalid 
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
     field: { gap: 6 },
+    hint: { fontSize: 12 },
     box: {
       height: 48,
       flexDirection: 'row',

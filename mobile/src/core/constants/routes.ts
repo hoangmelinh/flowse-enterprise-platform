@@ -42,6 +42,10 @@ export const Routes = {
   FLOWSE_AI: 'FlowseAI',
   SUCCESS: 'Success',
   REPAIR_ORDER: 'RepairOrder',
+  REPAIR_DONE: 'RepairDone',
+  QUIET_HOURS: 'QuietHours',
+  MATERIAL_MINE: 'MaterialMine',
+  VERIFY_REPAIR: 'VerifyRepair',
   HANDOVER_RECEIVE: 'HandoverReceive',
   MATERIAL_ISSUE: 'MaterialIssue',
   PRODUCTION: 'Production',
@@ -68,6 +72,12 @@ export const Routes = {
   UNITS: 'Units',
   LINE_DETAIL: 'LineDetail',
   FIELD_WORK: 'FieldWork',
+  // Tab riêng theo vai trò (B02–B12)
+  TAB_TEAM: 'TabTeam',
+  TAB_APPROVALS: 'TabApprovals',
+  TAB_REPORT: 'TabReport',
+  TAB_LINE: 'TabLine',
+  TAB_UNITS: 'TabUnits',
   SHIFT_TRANSFER: 'ShiftTransfer',
   // E · F · Hiện trường và chất lượng
   PM_LIST: 'PmList',

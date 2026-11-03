@@ -12,6 +12,11 @@ export type MainTabParamList = {
   [Routes.QR_SCANNER]: undefined;
   [Routes.INCIDENTS]: undefined;
   [Routes.PROFILE]: undefined;
+  [Routes.TAB_TEAM]: undefined;
+  [Routes.TAB_APPROVALS]: undefined;
+  [Routes.TAB_REPORT]: undefined;
+  [Routes.TAB_LINE]: undefined;
+  [Routes.TAB_UNITS]: undefined;
 };
 
 /** Màn hoàn tất dùng chung: phiếu bay vào khay rồi hiện dấu tích */
@@ -58,6 +63,10 @@ export type RootStackParamList = {
   [Routes.FLOWSE_AI]: { applied?: boolean } | undefined;
   [Routes.SUCCESS]: SuccessParams;
   [Routes.REPAIR_ORDER]: { incidentId: number };
+  [Routes.REPAIR_DONE]: { incidentId: number };
+  [Routes.QUIET_HOURS]: undefined;
+  [Routes.MATERIAL_MINE]: undefined;
+  [Routes.VERIFY_REPAIR]: { incidentId: number };
   [Routes.HANDOVER_RECEIVE]: undefined;
   [Routes.MATERIAL_ISSUE]: undefined;
   [Routes.PRODUCTION]: undefined;

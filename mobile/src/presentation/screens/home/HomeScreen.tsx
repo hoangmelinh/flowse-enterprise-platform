@@ -1,30 +1,22 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, RefreshControl, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Circle, CircleAlert, SquareCheckBig, WifiOff, Stamp, FileText, Search } from 'lucide-react-native';
+import { SquareCheckBig, WifiOff, Stamp, FileText, Search } from 'lucide-react-native';
 import { approvals, myRequests } from '../../../data/demo/fixtures';
-import { useMyWork } from '../work/WorkScreens';
+import { taskView, useMyWork } from '../work/WorkScreens';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { dueBucket } from '../../../core/utils/dueDate';
 import { WorkItem } from '../../../domain/entities/workitem';
 import { useAuthStore } from '../../state/authStore';
-import { usePrefs } from '../../state/prefsStore';
+import { useHomeRole } from '../../state/useHomeRole';
 import { RoleHome } from './RoleHomes';
-import { AIButton, AppText, Group, Row, EmptyState, FlowseMark, ScreenHeader, Screen, SectionHeader, IconButton } from '../../components/ui';
+import { AIButton, AppText, Avatar, Fab, Group, Row, EmptyState, FlowseMark, ScreenHeader, Screen, SectionHeader, IconButton, TaskRow } from '../../components/ui';
 
-
-const dueLabel = (item: WorkItem) => {
-  const bucket = dueBucket(item.dueDate);
-  if (bucket === 'overdue') return { text: 'Quá hạn', tone: 'danger' as const };
-  if (bucket === 'today') return { text: 'Hôm nay', tone: 'warning' as const };
-  return { text: item.statusName || 'Đang mở', tone: 'muted' as const };
-};
 
 /** Trang chủ: B01 cho văn phòng, B02–B12 theo vai trò (chọn thử ở Tôi → Trang chủ theo vai trò). */
 export const HomeScreen: React.FC = () => {
-  const field = useAuthStore((s) => s.capabilities.canExecuteRepair && !s.capabilities.canAssignWork);
-  const role = usePrefs((s) => s.homeRole) ?? (field ? 'KT' : 'VP');
+  const role = useHomeRole();
   return role === 'VP' ? <OfficeHome /> : <RoleHome role={role} />;
 };
 
@@ -100,22 +92,15 @@ const OfficeHome: React.FC = () => {
           <EmptyState icon={SquareCheckBig} title="Chưa có công việc" body="Việc được giao cho bạn sẽ hiện ở đây." />
         ) : (
           <Group>
-            {top.map((item) => {
-              const due = dueLabel(item);
-              return (
-                <Row
-                  key={item.id}
-                  icon={due.tone === 'danger' ? CircleAlert : Circle}
-                  iconTone={due.tone === 'danger' ? 'danger' : 'muted'}
-                  title={item.title}
-                  subtitle={due.text}
-                  subtitleTone={due.tone}
-                  onPress={() =>
-                    navigation.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: item.id, title: item.title })
-                  }
-                />
-              );
-            })}
+            {top.map((item) => (
+              <TaskRow
+                key={item.id}
+                title={item.title}
+                {...taskView(item)}
+                who={<Avatar name={item.assigneeName ?? user?.name ?? ''} size={24} />}
+                onPress={() => navigation.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: item.id, title: item.title })}
+              />
+            ))}
           </Group>
         )}
 
@@ -132,6 +117,7 @@ const OfficeHome: React.FC = () => {
           ))}
         </Group>
       </ScrollView>
+      <Fab label="Tạo nhanh" onPress={() => navigation.navigate(Routes.CREATE_WORK_ITEM)} />
     </Screen>
   );
 };
@@ -140,7 +126,7 @@ const rank = (w: WorkItem) => ({ overdue: 0, today: 1, later: 2, none: 3 })[dueB
 
 const useStyles = makeStyles((c: Colors) =>
   StyleSheet.create({
-    content: { gap: space.xl, paddingTop: space.xs, paddingHorizontal: space.xl, paddingBottom: space.xxl },
+    content: { gap: space.xl, paddingTop: space.xs, paddingHorizontal: space.xl, paddingBottom: 96 },
     flex: { flex: 1, gap: space.xs },
     today: {
       flexDirection: 'row',
