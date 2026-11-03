@@ -7,6 +7,24 @@ import pool from '../config/connect.js';
 // ============================================================
 
 /**
+ * Vai trò (chữ thường) của user trong workspace chứa việc `taskId` (task → list → space → workspace).
+ * Rỗng nếu user không là thành viên workspace đó. `db` cho phép chạy trong transaction đang mở.
+ */
+export const getWorkspaceRolesForTask = async (userId, taskId, db = pool) => {
+    const result = await db.query(
+        `SELECT LOWER(r.role_name) AS role_name
+         FROM tasks t
+         JOIN lists l ON l.list_id = t.list_id
+         JOIN spaces s ON s.space_id = l.space_id
+         JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+         JOIN roles r ON r.role_id = wm.role_id
+         WHERE t.task_id = $2`,
+        [userId, taskId]
+    );
+    return result.rows.map((r) => r.role_name);
+};
+
+/**
  * Tìm space_id dựa vào task_id
  */
 export const getSpaceIdByTaskId = async (taskId) => {

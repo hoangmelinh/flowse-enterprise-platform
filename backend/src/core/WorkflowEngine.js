@@ -3,6 +3,7 @@ import NotificationService from "../services/notificationService.js";
 import AIVisionService from "../services/aiVisionService.js";
 import Asset from "../models/Asset.js";
 import socketService from "../services/socketService.js";
+import { getWorkspaceRolesForTask } from "../models/Permission.js";
 
 /**
  * Universal Workflow Engine for Flowse Enterprise Platform (Flowse 2.0)
@@ -72,14 +73,8 @@ class WorkflowEngine {
     const roles = new Set();
 
     // 1. Quyền theo Workspace
-    const wsRoleRes = await con.query(
-      `SELECT LOWER(r.role_name) as role_name 
-       FROM workspace_members wm 
-       JOIN roles r ON wm.role_id = r.role_id 
-       WHERE wm.user_id = $1 AND wm.deleted_at IS NULL`,
-      [userId]
-    );
-    wsRoleRes.rows.forEach((r) => roles.add(r.role_name));
+    // Chỉ vai trò trong workspace chứa việc, không lấy vai trò ở công ty khác
+    (await getWorkspaceRolesForTask(userId, taskId)).forEach((r) => roles.add(r));
 
     // 2. Quyền ngữ cảnh được giao việc (Assignee / Technician)
     const assignRes = await con.query(
