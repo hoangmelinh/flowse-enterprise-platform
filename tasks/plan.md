@@ -43,15 +43,15 @@ Mục tiêu: tắt chế độ demo mà mọi màn A–L vẫn chạy được t
 Bảo mật trước, vì nối dữ liệu thật mà phân quyền còn hở là lộ dữ liệu công ty khác. Tiếp theo là nối những gì đã có (rẻ nhất, mở được nhiều màn). Sau đó mới đến nghiệp vụ mới, chia theo lát dọc: mỗi việc gồm migration + API + test + nối màn mobile, và xong việc nào là dùng được ngay.
 
 ### Giai đoạn 0: Nền móng (việc 1)
-- [ ] Việc 1: Bộ test backend chạy được
+- [x] Việc 1: Bộ test backend chạy được
 
 ### Giai đoạn 1: Vá bảo mật và mất dữ liệu (việc 2–6)
-- [ ] Việc 2: Giới hạn quyền admin/manager trong workspace
-- [ ] Việc 3: Socket chỉ cho vào phòng của chính mình
-- [ ] Việc 4: Khóa xoá sự cố, bỏ clean-test-data, bảo vệ /uploads
-- [ ] Việc 5: WorkflowEngine không tự xác minh khi AI lỗi
-- [ ] Việc 6: Bỏ đoán sự cố bằng regex, chống gửi trùng khi sync
-- [ ] **Điểm dừng 1:** test xanh, xem lại cùng người dùng
+- [x] Việc 2: Giới hạn quyền admin/manager trong workspace
+- [x] Việc 3: Socket chỉ cho vào phòng của chính mình
+- [x] Việc 4: Khóa xoá sự cố, bỏ clean-test-data, bảo vệ /uploads
+- [x] Việc 5: WorkflowEngine không tự xác minh khi AI lỗi
+- [x] Việc 6: Bỏ đoán sự cố bằng regex, chống gửi trùng khi sync
+- [x] **Điểm dừng 1:** test xanh (22/22, 2026-11-03), chờ người dùng xem lại
 
 ### Giai đoạn 2: Nối mobile với API đã có (việc 7–12)
 - [ ] Việc 7: Sửa 3 chỗ lệch đường dẫn mobile ↔ backend
@@ -86,6 +86,13 @@ Bảo mật trước, vì nối dữ liệu thật mà phân quyền còn hở l
 ## Có thể làm song song
 
 Xong Giai đoạn 1 và việc 8 rồi thì có thể làm song song: G (13–15), H (16–17), I (18, 20), F (19), D (21). Các nhóm này đụng bảng khác nhau. Migration vẫn phải đánh số tuần tự, nên chốt số migration trước khi chia việc.
+
+## Phát hiện thêm khi làm Giai đoạn 1 (chưa sửa)
+
+- `departments` và `assets` không có cột `workspace_id`: phòng ban, thiết bị dùng chung mọi công ty; admin của bất kỳ công ty nào đều tạo/sửa được. Gộp vào Việc 8.
+- `POST /incidents` và sync `REPORT_INCIDENT` nhận `list_id` từ client mà không kiểm tra list thuộc workspace của người báo. Gộp vào Việc 7.
+- Backend trả lỗi đăng nhập "Sai email hoac password" (không dấu), mobile đang tìm chữ "mật khẩu" để tô đỏ ô. Gộp vào Việc 9.
+- Test chạy trên schema `flowse_test` của chính project Supabase (không cần project thứ hai); `npm test` mất khoảng 1 phút vì máy chủ ở Ireland.
 
 ## Rủi ro
 

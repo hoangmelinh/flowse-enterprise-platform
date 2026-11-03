@@ -80,8 +80,8 @@ Mọi việc phải qua chuẩn chung: test mới xanh, test cũ không đỏ, k
 **Cỡ:** M
 
 ## Điểm dừng 1 (sau việc 1–6)
-- [ ] `npm test` xanh hết
-- [ ] Cập nhật memory `backend-audit-findings` (đánh dấu đã sửa)
+- [x] `npm test` xanh hết (22/22)
+- [x] Cập nhật memory `backend-audit-findings` (đánh dấu đã sửa)
 - [ ] Xem lại cùng người dùng trước khi nối mobile
 
 ---
