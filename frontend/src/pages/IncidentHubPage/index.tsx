@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented, Drawer } from "antd";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, RotateCcw, Activity } from "lucide-react";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, Activity } from "lucide-react";
 import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";

@@ -10,7 +10,7 @@ import {
     getFirstWorkspaceForUser,
 } from "../models/AI.js";
 import { createSpaces } from "../models/Spaces.js";
-import { createTaskForList } from "../models/Task.js";
+import { createTaskForList, findAllTasksByUserId } from "../models/Task.js";
 import Incident from "../models/Incident.js";
 import Asset from "../models/Asset.js";
 import dotenv from "dotenv";
@@ -141,6 +141,16 @@ const tools = [
   },
 ];
 
+// gpt-oss truyền null cho tham số không bắt buộc; schema chỉ cho "string" thì Groq từ chối cả lệnh gọi (400 tool_use_failed)
+for (const { function: fn } of tools) {
+    const required = new Set(fn.parameters?.required || []);
+    for (const [key, prop] of Object.entries(fn.parameters?.properties || {})) {
+        if (required.has(key) || Array.isArray(prop.type)) continue;
+        prop.type = [prop.type, "null"];
+        if (prop.enum) prop.enum = [...prop.enum, null];
+    }
+}
+
 // ═══════════════════════════════════════════════
 // LOCAL AI FALLBACK ENGINE (FAULT TOLERANT)
 // ═══════════════════════════════════════════════
@@ -235,7 +245,7 @@ const handleLocalAIChat = async (message, safeHistory, userId, res) => {
         alert += `| # | Tên công việc | Trạng thái | Ưu tiên | Quá hạn |\n|---|---|---|---|---|\n`;
         overdue.slice(0, 10).forEach((t, i) => {
             const dueDate = new Date(t.due_date);
-            const daysOverdue = Math.ceil((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+            const daysOverdue = Math.max(1, Math.round((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
             alert += `| ${i + 1} | ${t.name} | ${t.status || 'N/A'} | ${t.priority || 'Normal'} | ${daysOverdue} ngày |\n`;
         });
         return res.status(200).json({
@@ -294,11 +304,32 @@ export const chatWithAI = async (req, res) => {
         const realSpaces = await getAccessibleSpacesForUser(userId);
         const realSpaceNames = realSpaces.map(r => r.name).join(", ");
 
+        // Ngữ cảnh thật cho AI: giờ Việt Nam và tối đa 15 việc đang mở của người hỏi (để không bịa việc)
+        const tz = { timeZone: "Asia/Ho_Chi_Minh" };
+        const nowVN = new Date().toLocaleString("vi-VN", { ...tz, weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        const due = (d) => (d ? new Date(d).toLocaleString("vi-VN", { ...tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "chưa đặt hạn");
+        // Server tự tính quá hạn bao lâu / đến hạn hôm nay, model chỉ chép lại (model tự tính hay sai)
+        const dayVN = (d) => new Date(d).toLocaleDateString("en-CA", tz);
+        const lateness = (d) => {
+            if (!d) return "";
+            const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000);
+            if (mins > 0) return mins < 60 ? ` (QUÁ HẠN ${mins} phút)` : mins < 1440 ? ` (QUÁ HẠN ${Math.round(mins / 60)} giờ)` : ` (QUÁ HẠN ${Math.round(mins / 1440)} ngày)`;
+            return dayVN(d) === dayVN(Date.now()) ? " (đến hạn hôm nay)" : "";
+        };
+        const myOpenTasks = (await findAllTasksByUserId(userId))
+            .filter((t) => !t.is_done_state && !t.completed_at)
+            .slice(0, 15)
+            .map((t) => `- ${t.name} · ${t.status_name || "chưa có trạng thái"} · hạn ${due(t.due_date)}${lateness(t.due_date)} · ưu tiên ${t.priority_name || t.priority || "Normal"}`)
+            .join("\n");
+
         const messages = [
             {
                 role: "system",
-                content: `Bạn là FlowiseAI, một trợ lý ảo AI thông minh, đa năng và chuyên nghiệp. Bạn có khả năng trả lời BẤT KỲ câu hỏi nào về mọi lĩnh vực giống như ChatGPT, đồng thời được tích hợp sâu vào hệ thống Quản lý Vận hành & Sự cố Flowse Enterprise.
+                content: `Bạn là Flowse AI, một trợ lý ảo AI thông minh, đa năng và chuyên nghiệp. Bạn có khả năng trả lời BẤT KỲ câu hỏi nào về mọi lĩnh vực giống như ChatGPT, đồng thời được tích hợp sâu vào hệ thống Quản lý Vận hành & Sự cố Flowse Enterprise.
+                Bây giờ là ${nowVN}. Người đang hỏi: ${req.user.name || "người dùng"}.
                 Danh sách các Spaces hiện tại: [${realSpaceNames || "Hiện chưa có Space nào"}].
+                Việc đang mở của người hỏi (chỉ dùng dữ liệu này khi nói về việc của họ, không bịa thêm việc):
+                ${myOpenTasks || "Không có việc nào đang mở."}
                 
                 QUY TẮC BẢO MẬT & ACTION CARD (HUMAN-IN-THE-LOOP):
                 1. Khi người dùng muốn báo cáo sự cố hoặc hư hỏng thiết bị, hãy GỌI TOOL draft_incident để tạo Thẻ Hành Động (Action Card) xem trước. TUYỆT ĐỐI không tự động ghi dữ liệu.
@@ -587,7 +618,7 @@ export const chatWithAI = async (req, res) => {
                 alert += `|---|---------|-----------|---------|----------|\n`;
                 overdue.forEach((t, i) => {
                     const dueDate = new Date(t.due_date);
-                    const daysOverdue = Math.ceil((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const daysOverdue = Math.max(1, Math.round((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
                     alert += `| ${i + 1} | ${t.name} | ${t.status || 'N/A'} | ${t.priority || 'Normal'} | ${daysOverdue} ngày |\n`;
                 });
                 alert += `\n🔥 Nên ưu tiên xử lý những task này ngay!`;

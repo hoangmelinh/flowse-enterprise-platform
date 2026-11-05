@@ -9,6 +9,10 @@ import {
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 import * as Clipboard from 'expo-clipboard';
+import config from '../../../core/config';
+import { AiRepositoryImpl } from '../../../data/repositories/AiRepositoryImpl';
+
+const aiRepo = new AiRepositoryImpl();
 import { AILaunch, AILogo } from './AILaunch';
 
 const ICONS = [FileText, LayoutGrid, TriangleAlert, Plus];
@@ -75,7 +79,22 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
     // chỉ chạy khi quay về từ L05 với cờ applied
   }, [route.params?.applied]);
 
-  const run = (q: string, work: boolean) => {
+  const [thinking, setThinking] = useState(false);
+  const run = async (q: string, work: boolean) => {
+    if (!work && !config.demo) {
+      // Có backend: Chat hỏi AI thật (đã biết việc đang mở của người dùng); chữ vẫn hiện dần như đang gõ
+      push({ mine: true, text: q });
+      setThinking(true);
+      try {
+        const history = msgs.filter((m) => !m.card).map((m) => ({ role: m.mine ? ('user' as const) : ('assistant' as const), content: m.text }));
+        push({ mine: false, text: await aiRepo.chat(q, history), streaming: true });
+      } catch {
+        push({ mine: false, text: 'Flowse AI chưa trả lời được. Kiểm tra kết nối rồi hỏi lại nhé.' });
+      } finally {
+        setThinking(false);
+      }
+      return;
+    }
     if (!work) return push({ mine: true, text: q }, { mine: false, text: cardText.draft, card: 'draft', streaming: true });
     const card = workCard(q);
     push({ mine: true, text: q }, { mine: false, text: cardText[card], card, streaming: true });
@@ -132,6 +151,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
               ) : null}
             </View>
           }
+          ListFooterComponent={thinking ? <Bubble text="•••" mine={false} /> : undefined}
           renderItem={({ item }) => (
             <View style={{ gap: space.sm }}>
               {item.streaming ? <StreamBubble text={item.text} onDone={() => finish(item.id)} onGrow={toEnd} /> : <Bubble text={item.text} mine={item.mine} />}
