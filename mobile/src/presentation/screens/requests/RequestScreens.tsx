@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Circle, CircleCheck, CircleCheckBig, Clock, ClipboardCheck, FileText, CircleX, Check, X, Search } from 'lucide-react-native';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
+import config from '../../../core/config';
 import {
   approvalLines, approvals, checklist, inspections, myRequests, requestForms, requestSteps, requestTypes,
 } from '../../../data/demo/fixtures';
@@ -15,6 +16,7 @@ import { ScreenProps } from '../../navigation/types';
 import { FigmaAnim } from '../../components/anim/FigmaAnim';
 import { useAuthStore } from '../../state/authStore';
 import { useRoleScope } from '../../state/useHomeRole';
+import { LiveApprovalsScreen, LiveApprovalDecisionScreen, LiveRejectReasonSheet } from './LiveApprovalScreens';
 
 /* ───────── F · Kiểm tra chất lượng ───────── */
 
@@ -320,7 +322,10 @@ export const RequestDetailScreen: React.FC<ScreenProps<typeof Routes.REQUEST_DET
 };
 
 /** G07 — Cần tôi duyệt. */
-export const ApprovalsScreen: React.FC<ScreenProps<typeof Routes.APPROVALS>> = ({ navigation }) => {
+export const ApprovalsScreen: React.FC<ScreenProps<typeof Routes.APPROVALS>> = (props) =>
+  config.demo ? <DemoApprovalsScreen {...props} /> : <LiveApprovalsScreen {...props} />;
+
+const DemoApprovalsScreen: React.FC<ScreenProps<typeof Routes.APPROVALS>> = ({ navigation }) => {
   const chips = [`Chờ tôi ${approvals.length}`, 'Đã duyệt', 'Đã từ chối'];
   const [f, setF] = useState(chips[0]);
   const user = useAuthStore((st) => st.user);
@@ -351,7 +356,10 @@ export const ApprovalsScreen: React.FC<ScreenProps<typeof Routes.APPROVALS>> = (
 };
 
 /** G08 — Quyết định phê duyệt. */
-export const ApprovalDecisionScreen: React.FC<ScreenProps<typeof Routes.APPROVAL_DECISION>> = ({ route, navigation }) => {
+export const ApprovalDecisionScreen: React.FC<ScreenProps<typeof Routes.APPROVAL_DECISION>> = (props) =>
+  config.demo ? <DemoApprovalDecisionScreen {...props} /> : <LiveApprovalDecisionScreen {...props} />;
+
+const DemoApprovalDecisionScreen: React.FC<ScreenProps<typeof Routes.APPROVAL_DECISION>> = ({ route, navigation }) => {
   const s = useStyles();
   const a = approvals.find((x) => x.id === route.params.approvalId) ?? approvals[0];
   return (
@@ -388,7 +396,10 @@ export const ApprovalDecisionScreen: React.FC<ScreenProps<typeof Routes.APPROVAL
 };
 
 /** G09 — Từ chối cần lý do (form sheet). */
-export const RejectReasonSheet: React.FC<ScreenProps<typeof Routes.REJECT_REASON>> = ({ navigation }) => {
+export const RejectReasonSheet: React.FC<ScreenProps<typeof Routes.REJECT_REASON>> = (props) =>
+  config.demo ? <DemoRejectReasonSheet {...props} /> : <LiveRejectReasonSheet {...props} />;
+
+const DemoRejectReasonSheet: React.FC<ScreenProps<typeof Routes.REJECT_REASON>> = ({ navigation }) => {
   const s = useStyles();
   const [reason, setReason] = useState('');
   const [tried, setTried] = useState(false);

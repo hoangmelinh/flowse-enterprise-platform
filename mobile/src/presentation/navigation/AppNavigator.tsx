@@ -18,6 +18,7 @@ import { useAuthStore } from '../state/authStore';
 import { HomeRole, usePrefs } from '../state/prefsStore';
 import { useHomeRole } from '../state/useHomeRole';
 import { useNotifications } from '../state/useNotifications';
+import { useApprovals } from '../state/useApprovals';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ContextSelectScreen } from '../screens/auth/ContextSelectScreen';
@@ -113,9 +114,11 @@ const MainTabs: React.FC = () => {
   const tabs = ROLE_TABS[role];
   const nav = useNavigation<any>();
   const { unreadCount } = useNotifications();
+  const { data: pendingApprovals = [] } = useApprovals();
   const queryClient = useQueryClient();
   useEffect(() => () => {
     queryClient.removeQueries({ queryKey: ['notifications'] });
+    queryClient.removeQueries({ queryKey: ['pending-approvals'] });
   }, [queryClient]);
   // A10: lần đầu vào app thì hỏi quyền một lần
   useEffect(() => {
@@ -146,7 +149,9 @@ const MainTabs: React.FC = () => {
           key={t.name}
           name={t.name}
           component={t.component}
-          options={{ title: t.title, tabBarIcon: tabIcon(t.icon), tabBarBadge: !config.demo && t.name === Routes.INBOX ? unreadCount || undefined : t.badge }}
+          options={{ title: t.title, tabBarIcon: tabIcon(t.icon), tabBarBadge: config.demo ? t.badge
+            : t.name === Routes.INBOX ? unreadCount || undefined
+            : t.name === Routes.TAB_APPROVALS ? pendingApprovals.length || undefined : t.badge }}
           listeners={
             t.open
               ? {
