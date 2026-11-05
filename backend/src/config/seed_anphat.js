@@ -109,10 +109,12 @@ async function main() {
       // Chạy lại seed hôm sau: dời hạn theo ngày mới để màn "Hôm nay" vẫn đúng
       await con.query(`UPDATE tasks SET due_date = $2, status_id = $3 WHERE task_id = $1`, [t.task_id, due, await statusId(spaceId, status)]);
     }
+    // Việc ở trạng thái Hoàn thành có thời điểm xong; việc khác thì chưa xong
+    await con.query(`UPDATE tasks SET completed_at = CASE WHEN $2 THEN COALESCE(completed_at, now()) ELSE NULL END WHERE task_id = $1`, [t.task_id, status === 'Hoàn thành']);
     if (to) await con.query(`INSERT INTO task_assigns (task_id, user_id, assigned_by) VALUES ($1, $2, $3) ON CONFLICT (task_id, user_id) DO UPDATE SET deleted_at = NULL`, [t.task_id, to, by]);
     return t.task_id;
   };
-  await task(lOrder, sPlan, 'Chốt kế hoạch vật tư tháng 11', { by: id.dungtq, to: id.minhanh, status: 'Đang làm', due: at(-1, 17), priority: 'High', dept: dPlan });
+  const tChot = await task(lOrder, sPlan, 'Chốt kế hoạch vật tư tháng 11', { by: id.dungtq, to: id.minhanh, status: 'Đang làm', due: at(-1, 17), priority: 'High', dept: dPlan });
   await task(lOrder, sPlan, 'Rà soát hồ sơ nghiệm thu AP-1126', { by: id.dungtq, to: id.minhanh, due: at(0, 16, 30), dept: dPlan });
   await task(lOrder, sPlan, 'Cập nhật lịch giao lô 1', { by: id.minhanh, to: id.minhanh, due: at(0, 17), dept: dPlan });
   await task(lOrder, sPlan, 'Báo cáo tiến độ đơn PO-2410', { by: id.dungtq, to: id.minhanh, status: 'Chờ review', due: at(2, 17), dept: dPlan });
@@ -153,6 +155,75 @@ async function main() {
   await request('VT-2610-009 · Vật tư sửa băng tải BT-07', id.namnh, 'Vòng bi 6204-2RS × 2, bu lông M10×35 × 8, cảm biến E3Z-D61 × 1 · 4.860.000 ₫ · cần trước 12:00', incBt07);
   await request('YC-2610-044 · Tạm ứng công tác Đồng Nai', id.minhanh, '3.500.000 ₫ · công tác Đồng Nai 01–02/11 · chuyển khoản');
   await request('NP-2610-013 · Nghỉ phép 05/11', id.hatt, '1 ngày phép năm · người thay: Phạm Quốc Huy');
+
+  // Các không gian khác của văn phòng (C01) và việc của cả nhóm (D04: tải việc theo người)
+  const sSales = await space('Kinh doanh', 'Báo giá, đơn hàng và chăm sóc khách');
+  const lSales = await list(sSales, 'Đơn hàng PO-2410');
+  const sHr = await space('Nhân sự & hành chính', 'Tuyển dụng, hồ sơ và tài sản văn phòng');
+  const lHr = await list(sHr, 'Tài sản & cấp phát');
+  const sKaizen = await space('Cải tiến liên tục', 'Đề xuất cải tiến Kaizen của nhà máy');
+  const lKaizen = await list(sKaizen, 'Kaizen quý 4');
+  await task(lOrder, sPlan, 'Đối chiếu tồn kho vải', { by: id.minhanh, to: id.minhanh, status: 'Hoàn thành', due: at(-2, 17), dept: dPlan });
+  await task(lOrder, sPlan, 'Lập lịch ca tuần 45', { by: id.dungtq, to: id.hatt, status: 'Đang làm', due: at(1, 12), dept: dPlan });
+  await task(lOrder, sPlan, 'Kiểm tra phụ liệu lô 25', { by: id.dungtq, to: id.hatt, due: at(-1, 15), dept: dPlan });
+  await task(lOrder, sPlan, 'Cập nhật định mức chỉ may lô 2', { by: id.minhanh, to: id.thanhld, due: at(3, 17), dept: dPlan });
+  await task(lSales, sSales, 'Gửi báo giá đơn AP-1131', { by: id.dungtq, to: id.minhanh, due: at(3, 10), dept: dPlan });
+  await task(lSales, sSales, 'Xác nhận lịch giao PO-2410 với khách', { by: id.minhanh, to: id.huypq, status: 'Chờ review', due: at(1, 9), dept: dPlan });
+  await task(lHr, sHr, 'Cấp laptop cho nhân sự mới', { by: id.minhanh, to: id.minhanh, status: 'Chờ review', due: at(0, 18), dept: dPlan });
+  await task(lKaizen, sKaizen, 'Giảm thời gian chuyển đổi khuôn máy dán thùng', { by: id.huypq, to: id.huypq, due: at(7, 17) });
+  await task(lIncident, sOps, 'Bảo trì định kỳ máy dán thùng MD-03', { by: id.dungtq, to: id.thanhld, due: at(0, 15) });
+  await task(lIncident, sOps, 'Kiểm tra khu vực cuối chuyền', { by: id.dungtq, to: id.tamlm, status: 'Chờ review', due: at(0, 11), dept: dLineA2 });
+  await task(lIncident, sOps, 'Vệ sinh khu vực cuối chuyền', { by: id.dungtq, to: id.khanhvv, status: 'Đang làm', due: at(0, 13, 30), dept: dLineA2 });
+
+  // Trao đổi trong việc (C10), chỉ thêm khi việc chưa có bình luận
+  if (!(await one(`SELECT 1 FROM comments WHERE task_id = $1 LIMIT 1`, [tChot]))) {
+    const say = (userId, content, minsAgo) =>
+      con.query(`INSERT INTO comments (task_id, user_id, content, created_at) VALUES ($1, $2, $3, now() - make_interval(mins => $4))`, [tChot, userId, content, minsAgo]);
+    await say(id.huypq, 'Báo giá NCC thứ hai em gửi qua mail rồi, chênh 4% so với An Phát.', 180);
+    await say(id.dungtq, '@Minh Anh chọn An Phát, giao đúng hạn quan trọng hơn giá.', 95);
+    await say(id.minhanh, 'Dạ em chốt An Phát, chiều nay gửi kế hoạch vật tư cho anh duyệt.', 40);
+  }
+
+  // Hội thoại (J05–J07): chat riêng Minh Anh – Dũng và kênh bảo trì
+  const conversation = async (type, name, members, messages) => {
+    const found = name
+      ? await one(`SELECT conversation_id FROM conversations WHERE workspace_id = $1 AND name = $2`, [wsId, name])
+      : await one(
+          `SELECT c.conversation_id FROM conversations c WHERE c.workspace_id = $1 AND c.type = 'DIRECT'
+             AND (SELECT array_agg(user_id ORDER BY user_id) FROM conversation_members m WHERE m.conversation_id = c.conversation_id) = $2::int[]`,
+          [wsId, [...members].sort((a, b) => a - b)]
+        );
+    if (found) return;
+    const c = await one(`INSERT INTO conversations (workspace_id, type, name, created_by) VALUES ($1, $2, $3, $4) RETURNING conversation_id`, [wsId, type, name, members[0]]);
+    for (const u of members) await con.query(`INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [c.conversation_id, u]);
+    for (const [sender, content, minsAgo] of messages) {
+      await con.query(`INSERT INTO messages (conversation_id, sender_id, content, created_at) VALUES ($1, $2, $3, now() - make_interval(mins => $4))`, [c.conversation_id, sender, content, minsAgo]);
+    }
+  };
+  await conversation('DIRECT', null, [id.minhanh, id.dungtq], [
+    [id.dungtq, 'Em gửi ảnh BT-07 sau khi siết lại cụm con lăn giúp anh nhé.', 70],
+    [id.minhanh, 'Dạ em vừa nhận từ anh Thành, rung giảm rõ rồi ạ.', 62],
+    [id.dungtq, 'Rung giảm chưa em?', 58],
+    [id.minhanh, 'Ok, chiều anh qua xem BT-07.', 55],
+  ]);
+  await conversation('CHANNEL', 'bảo-trì-a2', [id.dungtq, id.thanhld, id.namnh, id.minhanh, id.huypq], [
+    [id.namnh, 'Đã thay xong con lăn số 3, chạy thử 70% tải 15 phút, chưa thấy rung lại.', 120],
+    [id.thanhld, 'Ok anh, 10:30 em đo và gửi số liệu lên kênh.', 110],
+    [id.dungtq, 'Chọn An Phát cho vòng bi, giao đúng hạn quan trọng hơn.', 90],
+  ]);
+
+  // Thông báo của Minh Anh (J01); dedup_key để chạy lại không nhân đôi
+  const notify = (key, actor, type, content, minsAgo) =>
+    con.query(
+      `INSERT INTO notifications (user_id, actor_id, entity_type, type, content, is_read, created_at, dedup_key)
+       SELECT $1::int, $2::int, 'TASK', $3::varchar, $4::text, false, now() - make_interval(mins => $5::int), $6::varchar
+       WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE user_id = $1::int AND dedup_key = $6::varchar)`,
+      [id.minhanh, actor, type, content, minsAgo, key]
+    );
+  await notify('seed-ap-mention', id.dungtq, 'MENTION', 'Trần Quốc Dũng nhắc bạn: "@Minh Anh chọn An Phát" · Chốt kế hoạch vật tư tháng 11', 95);
+  await notify('seed-ap-assign', id.huypq, 'TASK_ASSIGNED', 'Việc mới: Báo giá phụ liệu từ 2 NCC · Phạm Quốc Huy giao · hạn hôm nay', 150);
+  await notify('seed-ap-laptop', id.dungtq, 'REQUEST_UPDATED', 'Laptop đã sẵn sàng bàn giao · xác nhận khi nhận', 200);
+  await notify('seed-ap-advance', id.dungtq, 'APPROVAL', 'Tạm ứng công tác Đồng Nai được duyệt bước 1 · YC-2610-044', 26 * 60);
 
   console.log(`✓ An Phát: workspace ${wsId}, ${PEOPLE.length} người, mật khẩu chung "${DEMO_PASSWORD}"`);
   await con.end();
