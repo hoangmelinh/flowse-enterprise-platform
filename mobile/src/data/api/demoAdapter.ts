@@ -60,6 +60,8 @@ const patterns: [string, RegExp, (m: RegExpMatchArray, body: any) => unknown][] 
 
 const routes: Partial<Record<string, () => unknown>> = {
   'POST /auth/signin': () => ({ message: 'Dang nhap thanh cong', user: { ...user, access_token: 'demo-token' } }),
+  // Đăng nhập Google ở chế độ xem thử: không gọi Google, trả về tài khoản mẫu
+  'POST /auth/google': () => ({ message: 'Dang nhap Google thanh cong', user: { ...user, access_token: 'demo-token' } }),
   'POST /auth/signout': () => ({ message: 'ok' }),
   'GET /users/profile': () => ({ success: true, user }),
   'GET /workspaces': () => [{ workspace_id: 1, name: 'Nhà máy Bình Dương', slug: 'binh-duong', role_name: 'manager' }],

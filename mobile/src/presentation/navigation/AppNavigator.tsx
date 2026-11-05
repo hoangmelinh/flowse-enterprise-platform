@@ -39,6 +39,7 @@ import {
   ForgotPasswordScreen, CheckEmailScreen, NewPasswordScreen, AccountLockedScreen, SessionExpiredScreen, PermissionsScreen,
 } from '../screens/auth/AccountScreens';
 import { RolePickerScreen } from '../screens/home/RoleHomes';
+import { GoogleSignInScreen } from '../screens/auth/GoogleSignInScreen';
 import {
   ListViewScreen, SubtasksScreen, ReviewScreen, ProjectDetailScreen, PickProjectSheet, WorkFilterSheet, TeamScreen, MemberWorkScreen,
   ReassignScreen, UnitsScreen, LineDetailScreen, FieldWorkScreen, ShiftTransferSheet,
@@ -193,6 +194,7 @@ export const AppNavigator: React.FC = () => {
         <>
           <RootStack.Screen name={Routes.LOGIN} component={LoginScreen} options={{ animation: 'fade' }} />
           <RootStack.Screen name={Routes.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
+          <RootStack.Screen name={Routes.GOOGLE_SIGNIN} component={GoogleSignInScreen} />
           <RootStack.Screen name={Routes.CHECK_EMAIL} component={CheckEmailScreen} />
           <RootStack.Screen name={Routes.NEW_PASSWORD} component={NewPasswordScreen} />
           <RootStack.Screen name={Routes.ACCOUNT_LOCKED} component={AccountLockedScreen} />

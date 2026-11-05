@@ -17,6 +17,7 @@ interface AuthState {
 
   // Actions
   login: (usernameOrEmail: string, password: string) => Promise<boolean>;
+  loginWithGoogle: (idToken: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   switchWorkspace: (workspace: Workspace) => Promise<void>;
@@ -43,6 +44,35 @@ const computeCapabilities = (role: string): UserCapabilities => {
   };
 };
 
+/** Đăng nhập chung cho mật khẩu và Google: lưu phiên, tải nơi làm việc, tính quyền. */
+async function signIn(set: (p: Partial<AuthState>) => void, call: () => Promise<{ user: User; token: string }>): Promise<boolean> {
+  set({ isLoading: true, error: null });
+  try {
+    const { user, token } = await call();
+    const workspaces = await authRepo.getUserWorkspaces();
+    const currentWorkspace = workspaces[0] || null;
+
+    const effectiveRole = currentWorkspace?.role || user.role || 'member';
+    const capabilities = computeCapabilities(effectiveRole);
+
+    set({
+      user,
+      token,
+      workspaces,
+      currentWorkspace,
+      capabilities,
+      isLoading: false,
+    });
+    return true;
+  } catch (err: any) {
+    set({
+      error: err.message || 'Đăng nhập không thành công',
+      isLoading: false,
+    });
+    return false;
+  }
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
@@ -53,33 +83,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   error: null,
 
-  login: async (usernameOrEmail, password) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { user, token } = await authRepo.login(usernameOrEmail, password);
-      const workspaces = await authRepo.getUserWorkspaces();
-      const currentWorkspace = workspaces[0] || null;
-
-      const effectiveRole = currentWorkspace?.role || user.role || 'member';
-      const capabilities = computeCapabilities(effectiveRole);
-
-      set({
-        user,
-        token,
-        workspaces,
-        currentWorkspace,
-        capabilities,
-        isLoading: false,
-      });
-      return true;
-    } catch (err: any) {
-      set({
-        error: err.message || 'Đăng nhập không thành công',
-        isLoading: false,
-      });
-      return false;
-    }
-  },
+  login: (usernameOrEmail, password) => signIn(set, () => authRepo.login(usernameOrEmail, password)),
+  loginWithGoogle: (idToken) => signIn(set, () => authRepo.loginWithGoogle(idToken)),
 
   logout: async () => {
     set({ isLoading: true });

@@ -180,9 +180,11 @@ export const googleSignIn = async (req, res) => {
 
     const googleClient = new OAuth2Client(googleClientId);
 
+    // Token từ app điện thoại mang Client ID iOS/Android của nó; nhận các ID đó qua GOOGLE_MOBILE_CLIENT_IDS (cách nhau dấu phẩy)
+    const audiences = [googleClientId, ...(process.env.GOOGLE_MOBILE_CLIENT_IDS || "").split(",")].map((id) => id.trim()).filter(Boolean);
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: googleClientId,
+      audience: audiences,
     });
     const payload = ticket.getPayload();
     if (!payload?.email) {
