@@ -284,3 +284,9 @@ export const workspaceMapForAi = async (userId) => {
     );
     return rows;
 };
+
+/** Thành viên có thể giao việc trong một không gian người hỏi xem được (công cụ list_members của AI). */
+export const membersForAi = async (userId, spaceName) => {
+    const space = await findSpace(userId, spaceName || fail("Thiếu tên không gian."));
+    return (await findAssignableMembersForSpace(space.space_id)).map((m) => ({ name: m.name || m.username }));
+};

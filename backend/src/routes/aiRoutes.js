@@ -7,7 +7,7 @@ import {
     draftAction,
     summarizeIncident
 } from "../controllers/aiController.js";
-import { applyAiAction, cancelAiAction, listAiActions } from "../controllers/aiWorkController.js";
+import { applyAiAction, cancelAiAction, listAiActions, workWithAI } from "../controllers/aiWorkController.js";
 import { aiChatLimiter } from "../middlewares/rateLimitMiddleware.js";
 
 const router = express.Router();
@@ -20,6 +20,7 @@ router.post("/summarize-incident", aiChatLimiter, summarizeIncident);
 router.post("/generate-description", aiChatLimiter, generateDescription);
 router.post("/suggest-priority", aiChatLimiter, suggestPriority);
 // Chế độ Work: AI đề xuất, người dùng áp dụng/huỷ; danh sách là Lịch sử thao tác (L10)
+router.post("/work", aiChatLimiter, workWithAI);
 router.get("/actions", listAiActions);
 router.post("/actions/:id/apply", applyAiAction);
 router.post("/actions/:id/cancel", cancelAiAction);

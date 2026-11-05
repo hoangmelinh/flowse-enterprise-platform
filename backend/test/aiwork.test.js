@@ -4,11 +4,12 @@ import assert from 'node:assert/strict';
 import { start, stop, api, sql, makeTask } from './helpers.js';
 import { U, WS } from './fixtures.js';
 
-let propose; // proposeAction, nạp sau start() để dùng đúng schema test
+let propose, runWork; // nạp sau start() để dùng đúng schema test
 let spaceA, listA2, statusDone, taskB;
 before(async () => {
   await start();
   ({ proposeAction: propose } = await import('../src/models/AiAction.js'));
+  ({ runWork } = await import('../src/controllers/aiWorkController.js'));
   spaceA = (await sql("INSERT INTO spaces (workspace_id, name, created_by) VALUES ($1, 'Kế hoạch AI', $2) RETURNING space_id", [WS.A.id, U.adminA.id])).rows[0].space_id;
   await sql("INSERT INTO lists (space_id, name, position) VALUES ($1, 'Việc tuần này', 0)", [spaceA]);
   listA2 = (await sql("INSERT INTO lists (space_id, name, position) VALUES ($1, 'Đơn hàng PO-1', 1) RETURNING list_id", [spaceA])).rows[0].list_id;
@@ -96,4 +97,43 @@ test('sửa trạng thái + giao thêm người; huỷ thì không áp dụng đ
 
 test('tên người khớp nhiều kết quả thì hỏi lại, không đoán', async () => {
   await assert.rejects(propose(U.managerA.id, 'CREATE_TASK', { title: 'X', space_name: 'Kế hoạch AI', assignee_names: ['a'] }), /khớp nhiều/);
+});
+
+// AI giả: mỗi bước là một hàm nhận request (đọc được kết quả công cụ trước đó) và trả message của model
+const fakeAI = (...steps) => {
+  const seen = [];
+  return { seen, chat: { completions: { create: async (req) => (seen.push(structuredClone(req)), { choices: [{ message: steps.shift()(req) }] }) } } };
+};
+const toolCall = (name, args) => ({ role: 'assistant', content: '', tool_calls: [{ id: `c_${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
+const lastTool = (req) => JSON.parse(req.messages.at(-1).content);
+
+test('Work: AI tìm việc thật rồi đề xuất xoá đúng việc đó; chưa xoá cho tới khi người dùng áp dụng', async () => {
+  const id = await newTask('Việc AI tìm thấy');
+  await makeTask(WS.B.id, U.adminB.id, 'TASK', 'Việc AI tìm thấy (công ty B)');
+  const ai = fakeAI(
+    () => toolCall('search_tasks', { query: 'AI tìm thấy', space_name: null }),
+    (req) => {
+      const found = lastTool(req);
+      assert.deepEqual(found.map((t) => t.task_id), [id], 'chỉ thấy việc của công ty mình');
+      return toolCall('propose_delete_task', { task_id: found[0].task_id });
+    }
+  );
+  const out = await runWork(ai, { user_id: U.managerA.id, name: 'Manager A' }, 'Xoá việc AI tìm thấy', []);
+  assert.equal(out.action.action_type, 'DELETE_TASK');
+  assert.equal(out.action.status, 'PENDING');
+  assert.match(ai.seen[0].messages[0].content, /Kế hoạch AI/, 'AI biết các không gian của người hỏi');
+  assert.equal((await sql('SELECT deleted_at FROM tasks WHERE task_id = $1', [id])).rows[0].deleted_at, null);
+});
+
+test('Work: thiếu quyền thì AI nhận lỗi và giải thích, không có đề xuất nào được lưu', async () => {
+  const id = await newTask('Việc member muốn xoá');
+  const before = (await sql('SELECT COUNT(*)::int n FROM ai_actions')).rows[0].n;
+  const ai = fakeAI(
+    () => toolCall('propose_delete_task', { task_id: id }),
+    (req) => ({ role: 'assistant', content: `Không xoá được: ${lastTool(req).error}` })
+  );
+  const out = await runWork(ai, { user_id: U.memberA.id, name: 'Member A' }, 'xoá giúp tôi', []);
+  assert.equal(out.action, null);
+  assert.match(out.response, /không có quyền xoá/);
+  assert.equal((await sql('SELECT COUNT(*)::int n FROM ai_actions')).rows[0].n, before);
 });
