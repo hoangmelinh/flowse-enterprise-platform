@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, ScrollView, TextInput, StyleSheet, StyleProp, ViewStyle, LayoutChangeEvent, RefreshControl } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming, withDelay, withRepeat, withSequence, useReducedMotion, Easing } from 'react-native-reanimated';
 import { Plus, Send, Paperclip, LucideIcon } from 'lucide-react-native';
 import { radius, space, text, Colors, ColorToken, makeStyles, useColors } from '../../../core/theme';
 import { AppText } from './AppText';
@@ -218,6 +218,29 @@ export const Bubble: React.FC<{ text: string; mine?: boolean; meta?: string; met
   );
 };
 
+const Dot: React.FC<{ delay: number }> = ({ delay }) => {
+  const s = useStyles();
+  const reduce = useReducedMotion();
+  const v = useSharedValue(0);
+  useEffect(() => {
+    if (!reduce) v.value = withDelay(delay, withRepeat(withSequence(withTiming(1, { duration: 320 }), withTiming(0, { duration: 320 }), withTiming(0, { duration: 300 })), -1));
+  }, [reduce]);
+  const st = useAnimatedStyle(() => ({ opacity: 0.35 + v.value * 0.65, transform: [{ translateY: -3 * v.value }] }));
+  return <Animated.View style={[s.dot, st]} />;
+};
+
+/** Bong bóng "đang suy nghĩ": ba chấm nhấp nhô lần lượt (Flowse AI, chat). */
+export const TypingBubble: React.FC = () => {
+  const s = useStyles();
+  return (
+    <View style={s.bubbleWrap} accessibilityLabel="Đang soạn trả lời">
+      <View style={[s.bubble, s.theirs, s.dots]}>
+        {[0, 160, 320].map((d) => <Dot key={d} delay={d} />)}
+      </View>
+    </View>
+  );
+};
+
 /** Ô soạn tin (chat, trao đổi, Flowse AI). */
 export const Composer: React.FC<{ placeholder: string; onSend: (msg: string) => void; attach?: boolean; disabled?: boolean }> = ({
   placeholder,
@@ -310,6 +333,8 @@ const useStyles = makeStyles((c: Colors) =>
     bubble: { maxWidth: '82%', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18 },
     mine: { backgroundColor: c.ink, borderBottomRightRadius: 6 },
     theirs: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderTopLeftRadius: 6 },
+    dots: { flexDirection: 'row', gap: 5, paddingVertical: 15 },
+    dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.muted },
     composer: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: 10, paddingBottom: 10, paddingHorizontal: space.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line, backgroundColor: c.bg },
     input: { ...text.body, flex: 1, height: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: c.subtle, color: c.ink },
     send: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' },

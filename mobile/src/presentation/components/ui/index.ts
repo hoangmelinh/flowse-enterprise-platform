@@ -21,6 +21,7 @@ export {
   BottomBar,
   Fab,
   Bubble,
+  TypingBubble,
   Composer,
   ScrollPage,
 } from './Kit';

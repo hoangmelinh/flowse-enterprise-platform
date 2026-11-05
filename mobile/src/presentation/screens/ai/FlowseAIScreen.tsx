@@ -5,7 +5,7 @@ import { radius, space, Colors, makeStyles, useColors } from '../../../core/them
 import { Routes } from '../../../core/constants/routes';
 import { aiSuggestions } from '../../../data/demo/fixtures';
 import {
-  AppText, Banner, BottomBar, Bubble, Button, Chips, Composer, Field, Group, IconButton, KV, Row, Screen, ScreenHeader, ScrollPage, Segmented, Stat, StatRow, Tag,
+  AppText, Banner, BottomBar, Bubble, TypingBubble, Button, Chips, Composer, Field, Group, IconButton, KV, Row, Screen, ScreenHeader, ScrollPage, Segmented, Stat, StatRow, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 import * as Clipboard from 'expo-clipboard';
@@ -44,7 +44,7 @@ const StreamBubble: React.FC<{ text: string; onDone: () => void; onGrow: () => v
     // chỉ chạy một lần cho mỗi tin
   }, []);
   useEffect(onGrow, [n]);
-  return <Bubble text={n ? `${text.slice(0, n)}${n < text.length ? ' ▍' : ''}` : '•••'} mine={false} />;
+  return n ? <Bubble text={`${text.slice(0, n)}${n < text.length ? ' ▍' : ''}`} mine={false} /> : <TypingBubble />;
 };
 
 // shortcut: trả lời mẫu theo Figma L02–L09; nối POST /ai/chat (backend đã có aiRoutes) khi bật AI trên mobile
@@ -151,7 +151,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
               ) : null}
             </View>
           }
-          ListFooterComponent={thinking ? <Bubble text="•••" mine={false} /> : undefined}
+          ListFooterComponent={thinking ? <TypingBubble /> : undefined}
           renderItem={({ item }) => (
             <View style={{ gap: space.sm }}>
               {item.streaming ? <StreamBubble text={item.text} onDone={() => finish(item.id)} onGrow={toEnd} /> : <Bubble text={item.text} mine={item.mine} />}
