@@ -7,7 +7,7 @@
    cd backend
    node src/config/seed_anphat.js
    ```
-   Thấy dòng `✓ An Phát: workspace 1, 11 người` là xong. Chạy lại bao nhiêu lần cũng được.
+   Thấy dòng `✓ An Phát: workspace 1, 11 người` là xong. Chạy lại bao nhiêu lần cũng được; ai lỡ đổi mật khẩu thì thêm `--reset-passwords` để đưa về `Flowse@2026`.
 2. Bật backend: `cd backend && npm run dev` (cổng 5001). Kiểm tra: mở `http://localhost:5001/db-health` thấy `"database":"connected"`.
 3. Bật web: `cd frontend && npm run dev`, mở `http://localhost:5173`.
 4. Bật app mobile: chọn **Cách A** hoặc **Cách B** bên dưới.

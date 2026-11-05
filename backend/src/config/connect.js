@@ -31,10 +31,13 @@ con.connect((err, client, release) => {
 
 // DB_SCHEMA (chỉ dùng khi test): mọi truy vấn chạy trong schema riêng, không chạm dữ liệu ở public
 const schema = process.env.DB_SCHEMA;
-if (schema) {
-    if (!/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('DB_SCHEMA không hợp lệ');
-    con.on('connect', (client) => client.query(`SET search_path TO ${schema}, extensions`));
-}
+if (schema && !/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('DB_SCHEMA không hợp lệ');
+// tasks.due_date / created_at là timestamp không múi giờ, lưu theo giờ Việt Nam; phiên phải cùng múi giờ
+// thì so sánh với NOW() mới đúng (Supabase pooler luôn mở phiên ở UTC, bỏ qua ALTER DATABASE)
+const timezone = process.env.DB_TIMEZONE || 'Asia/Ho_Chi_Minh';
+con.on('connect', (client) =>
+    client.query(`SET TIME ZONE '${timezone.replace(/'/g, '')}'${schema ? `; SET search_path TO ${schema}, extensions` : ''}`)
+);
 
 con.on('error', (err) => {
     console.error('Cảnh báo ngắt kết nối tạm thời từ PostgreSQL (idle client):', err.message);

@@ -32,11 +32,17 @@ export const GoogleSignInScreen: React.FC<ScreenProps<typeof Routes.GOOGLE_SIGNI
   const s = useStyles();
   const { loginWithGoogle, error } = useAuthStore();
   const [phase, setPhase] = useState<Phase>('opening');
+  // error của store dùng chung với màn Đăng nhập; chỉ hiện khi chính lần đăng nhập Google này thất bại
+  const [failed, setFailed] = useState(false);
   const opened = phase !== 'opening';
 
   const signIn = async (idToken: string) => {
     setPhase('signing');
-    if (!(await loginWithGoogle(idToken))) setPhase('choose');
+    setFailed(false);
+    if (!(await loginWithGoogle(idToken))) {
+      setFailed(true);
+      setPhase('choose');
+    }
   };
 
   return (
@@ -59,7 +65,7 @@ export const GoogleSignInScreen: React.FC<ScreenProps<typeof Routes.GOOGLE_SIGNI
           Flowse chỉ nhận tên và email của bạn. Email phải là email công việc đã được mời vào nơi làm việc.
         </AppText>
       </View>
-      {error && phase === 'choose' ? <Banner tone="danger" text={error} /> : null}
+      {failed && error ? <Banner tone="danger" text={error} /> : null}
       {opened ? (
         <Animated.View entering={FadeInDown.duration(260)}>
           {config.demo ? (

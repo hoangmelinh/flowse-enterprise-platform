@@ -1,6 +1,6 @@
 // Dữ liệu demo "Công ty An Phát · Nhà máy Bình Dương" khớp app mobile (fixtures) và Figma: node src/config/seed_anphat.js
 // Chạy lại được: người dùng theo email, không gian / danh sách / thiết bị theo tên hoặc mã, việc theo tên.
-// Mọi tài khoản demo dùng chung mật khẩu DEMO_PASSWORD (in ra khi chạy).
+// Tài khoản mới dùng chung mật khẩu DEMO_PASSWORD (in ra khi chạy).
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
@@ -9,6 +9,8 @@ import Incident from '../models/Incident.js';
 
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'Flowse@2026';
 const WS_NAME = 'Công ty An Phát · Nhà máy Bình Dương';
+// Tài khoản đã có giữ mật khẩu cũ; thêm --reset-passwords để đặt lại tất cả về DEMO_PASSWORD
+const RESET_PASSWORDS = process.argv.includes('--reset-passwords');
 
 const PEOPLE = [
   ['minhanh', 'Nguyễn Minh Anh', 'minhanh@anphat.vn', 'manager'],
@@ -39,9 +41,10 @@ async function main() {
   for (const [username, name, email] of PEOPLE) {
     const u = await one(
       `INSERT INTO users (username, name, email, password_hash) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name,
+         password_hash = CASE WHEN $5 THEN EXCLUDED.password_hash ELSE users.password_hash END
        RETURNING user_id`,
-      [username, name, email, hash]
+      [username, name, email, hash, RESET_PASSWORDS]
     );
     id[username] = u.user_id;
   }
