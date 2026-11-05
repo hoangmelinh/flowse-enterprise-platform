@@ -41,3 +41,6 @@ graphify-out/
 # Skill cho AI agent (cài bằng npx skills), không commit
 .agents/
 skills-lock.json
+
+# Kế hoạch và kịch bản làm việc cá nhân, không đưa lên GitHub
+tasks/

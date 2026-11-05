@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import sharp from "sharp";
+import crypto from "crypto";
 
 const router = express.Router();
 
@@ -27,7 +28,8 @@ router.post("/", upload.single("file"), async (req, res) => {
             return res.status(400).json({ error: "Không tìm thấy file" });
         }
 
-        const timestamp = Date.now();
+        // Tên tệp có phần ngẫu nhiên để không ai đoán được đường dẫn tệp của người khác
+        const timestamp = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
         const originalName = req.file.originalname.replace(/\s+/g, '-');
         const ext = path.extname(originalName).toLowerCase();
         const baseName = path.basename(originalName, ext);

@@ -141,7 +141,9 @@ export const findOverdueTasksForAi = async (userId, args = {}) => {
   let query = `
     SELECT t.task_id, t.name, t.due_date,
            ts.status_name AS status, t.priority,
-           s.name AS space_name
+           s.name AS space_name,
+           (SELECT string_agg(u.name, ', ') FROM task_assigns ta JOIN users u ON u.user_id = ta.user_id
+             WHERE ta.task_id = t.task_id AND ta.deleted_at IS NULL) AS assignee_names
     FROM tasks t
     JOIN lists l ON t.list_id = l.list_id
     JOIN spaces s ON l.space_id = s.space_id

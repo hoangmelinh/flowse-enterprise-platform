@@ -1,3 +1,4 @@
+import { resolveListForUser } from "../models/Permission.js";
 import con from "../config/connect.js";
 import WorkflowEngine from "../core/WorkflowEngine.js";
 import Incident from "../models/Incident.js";
@@ -233,6 +234,12 @@ export const createWorkItem = async (req, res, next) => {
 
     const userId = req.user.user_id;
 
+    // Danh sách phải thuộc công ty của người tạo; không gửi thì lấy danh sách của công ty họ
+    const targetListId = await resolveListForUser(userId, list_id ?? null);
+    if (list_id && !targetListId) {
+      return res.status(403).json({ success: false, message: "Danh sách không thuộc nơi làm việc của bạn" });
+    }
+
     if (work_item_type === "INCIDENT") {
       const incResult = await Incident.reportIncident({
         title: itemTitle,
@@ -241,7 +248,7 @@ export const createWorkItem = async (req, res, next) => {
         reported_by: userId,
         severity: priority === "Urgent" ? "CRITICAL" : priority === "High" ? "HIGH" : "MEDIUM",
         evidence_urls: evidence_urls || [],
-        list_id: list_id || null,
+        list_id: targetListId,
       });
 
       return res.status(201).json({
@@ -252,14 +259,6 @@ export const createWorkItem = async (req, res, next) => {
     }
 
     // Với TASK hoặc REQUEST
-    let targetListId = list_id;
-    if (!targetListId) {
-      const defaultListRes = await con.query(
-        `SELECT list_id FROM lists WHERE deleted_at IS NULL ORDER BY list_id ASC LIMIT 1`
-      );
-      targetListId = defaultListRes.rows[0]?.list_id;
-    }
-
     if (!targetListId) {
       return res.status(400).json({ success: false, message: "Không tìm thấy List phù hợp để tạo Work Item" });
     }

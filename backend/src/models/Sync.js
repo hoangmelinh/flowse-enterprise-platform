@@ -14,19 +14,33 @@ class Sync {
     for (const act of actions) {
       const { idempotency_key, action_type, payload, base_version, force_apply } = act;
 
-      // 1. Kiểm tra idempotency: Nếu action này đã xử lý trước đó rồi thì trả về kết quả cũ
-      const existing = await con.query(
-        `SELECT * FROM offline_sync_logs WHERE idempotency_key = $1`,
-        [idempotency_key]
+      // 1. Giữ chỗ khoá trước khi làm (INSERT ... ON CONFLICT), nên hai request song song chỉ một bên được làm
+      const claim = await con.query(
+        `INSERT INTO offline_sync_logs (user_id, idempotency_key, action_type, payload, base_version, server_version, status)
+         VALUES ($1, $2, $3, $4, $5, $5, 'PROCESSING')
+         ON CONFLICT (idempotency_key) DO NOTHING
+         RETURNING sync_id`,
+        [userId, idempotency_key, action_type, JSON.stringify(payload ?? {}), base_version || 1]
       );
-      if (existing.rows.length > 0) {
-        results.push({
-          idempotency_key,
-          status: "ALREADY_APPLIED",
-          result: existing.rows[0],
-        });
+      if (claim.rows.length === 0) {
+        const existing = (await con.query(`SELECT * FROM offline_sync_logs WHERE idempotency_key = $1`, [idempotency_key])).rows[0];
+        if (existing?.user_id !== userId) {
+          // Khoá của người khác: không trả lại payload của họ
+          results.push({ idempotency_key, status: "REJECTED", error: "idempotency_key đã được dùng" });
+        } else if (existing.status === "PROCESSING") {
+          // Đang chạy ở request khác: client giữ bản nháp và gửi lại sau. Kẹt quá 5 phút (server dừng giữa chừng) thì nhả khoá
+          if (Date.now() - new Date(existing.applied_at).getTime() > 5 * 60 * 1000) {
+            await con.query(`DELETE FROM offline_sync_logs WHERE sync_id = $1 AND status = 'PROCESSING'`, [existing.sync_id]);
+          }
+          results.push({ idempotency_key, status: "IN_PROGRESS" });
+        } else {
+          results.push({ idempotency_key, status: "ALREADY_APPLIED", result: existing });
+        }
         continue;
       }
+      const syncId = claim.rows[0].sync_id;
+      const finish = (status, serverVersion, detail = null) =>
+        con.query(`UPDATE offline_sync_logs SET status = $2, server_version = $3, conflict_detail = $4, applied_at = CURRENT_TIMESTAMP WHERE sync_id = $1`, [syncId, status, serverVersion, detail]);
 
       // 2. Xử lý từng loại action
       try {
@@ -82,11 +96,7 @@ class Sync {
 
             if (!force_apply && base_version && currentTask.version !== base_version) {
               // Xung đột phiên bản (409 Conflict)
-              await con.query(
-                `INSERT INTO offline_sync_logs (user_id, idempotency_key, action_type, payload, base_version, server_version, status, conflict_detail)
-                 VALUES ($1, $2, $3, $4, $5, $6, 'CONFLICT', $7)`,
-                [userId, idempotency_key, action_type, JSON.stringify(payload), base_version, currentTask.version, "Task has been updated by another user."]
-              );
+              await finish("CONFLICT", currentTask.version, "Task has been updated by another user.");
 
               results.push({
                 idempotency_key,
@@ -137,11 +147,7 @@ class Sync {
         }
 
         // 3. Lưu log đồng bộ thành công vào offline_sync_logs
-        await con.query(
-          `INSERT INTO offline_sync_logs (user_id, idempotency_key, action_type, payload, base_version, server_version, status)
-           VALUES ($1, $2, $3, $4, $5, $6, 'APPLIED')`,
-          [userId, idempotency_key, action_type, JSON.stringify(payload), base_version || 1, serverVersion]
-        );
+        await finish("APPLIED", serverVersion);
 
         results.push({
           idempotency_key,
@@ -152,6 +158,8 @@ class Sync {
 
       } catch (err) {
         console.error(`[Sync] Lỗi thực thi action [${action_type}]:`, err.message);
+        // Thất bại thì nhả khoá để client gửi lại được
+        await con.query(`DELETE FROM offline_sync_logs WHERE sync_id = $1`, [syncId]).catch(() => {});
         results.push({
           idempotency_key,
           status: "FAILED",

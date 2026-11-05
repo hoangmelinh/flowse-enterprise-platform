@@ -101,15 +101,6 @@ export const getDowntimeStats = async (req, res, next) => {
   }
 };
 
-export const cleanTestData = async (req, res, next) => {
-  try {
-    const result = await Incident.cleanTestData();
-    res.json({ success: true, message: `Đã dọn dẹp ${result.cleanedCount} sự cố kiểm thử thành công.`, data: result });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const analyzeEvidence = async (req, res, next) => {
   try {
     const { imageUrl, incidentTitle, assetName, symptom } = req.body;

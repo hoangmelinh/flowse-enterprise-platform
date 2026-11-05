@@ -72,6 +72,7 @@ export type RootStackParamList = {
   [Routes.PRODUCTION]: undefined;
   [Routes.SEARCH]: undefined;
   [Routes.FORGOT_PASSWORD]: undefined;
+  [Routes.GOOGLE_SIGNIN]: undefined;
   [Routes.CHECK_EMAIL]: { email: string };
   [Routes.NEW_PASSWORD]: undefined;
   [Routes.ACCOUNT_LOCKED]: undefined;

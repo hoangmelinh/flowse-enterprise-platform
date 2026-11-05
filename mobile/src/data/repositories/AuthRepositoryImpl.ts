@@ -7,7 +7,16 @@ export class AuthRepositoryImpl implements IAuthRepository {
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
     // Backend: POST /auth/signin { email, password } -> { user: { ..., access_token } }
     const res = await apiClient.post('/auth/signin', { email, password });
-    const user = res.data.user;
+    return this.saveSession(res.data.user);
+  }
+
+  /** Backend: POST /auth/google { idToken } → cùng dạng { user: { ..., access_token } } như đăng nhập thường */
+  async loginWithGoogle(idToken: string): Promise<{ user: User; token: string }> {
+    const res = await apiClient.post('/auth/google', { idToken });
+    return this.saveSession(res.data.user);
+  }
+
+  private async saveSession(user: any): Promise<{ user: User; token: string }> {
     const token: string = user.access_token;
 
     await secureStorage.saveToken(token);

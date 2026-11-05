@@ -42,7 +42,9 @@ export const getSocket = (): Socket => {
  */
 export const updateSocketAuth = (token: string) => {
   if (socket) {
-    socket.emit("REFRESH_AUTH", { token });
+    // Server từ chối kết nối không token và không tự thử lại, nên đăng nhập xong phải kết nối lại
+    if (socket.connected) socket.emit("REFRESH_AUTH", { token });
+    else socket.connect();
   }
 };
 

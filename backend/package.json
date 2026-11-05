@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --test-concurrency=1 --test-global-setup=test/global-setup.js \"test/**/*.test.js\"",
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "db:setup": "node src/config/setup_db.js",
+    "db:migrate": "node src/config/setup_db.js --migrate"
   },
   "type": "module",
   "keywords": [],

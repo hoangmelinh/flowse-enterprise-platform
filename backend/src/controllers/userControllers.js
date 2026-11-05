@@ -185,14 +185,17 @@ export const requestPasswordChangeOtp = async (req, res) => {
             attempts: 0,
         });
 
+        if (!resend || !process.env.EMAIL_FROM) {
+            return res.status(503).json({ message: 'Máy chủ chưa cấu hình gửi email (RESEND_API_KEY, EMAIL_FROM)' });
+        }
         const { error } = await resend.emails.send({
-            from: 'Flowise <noreply@contact.flowise.id.vn>',
+            from: process.env.EMAIL_FROM,
             to: [user.email],
-            subject: 'Ma xac thuc doi mat khau Flowise',
+            subject: 'Ma xac thuc doi mat khau Flowse',
             html: `
                 <div style="font-family: sans-serif; max-width: 480px; margin: auto; padding: 32px; border: 1px solid #e2e8f0; border-radius: 12px;">
                     <h2 style="color: #0058be; margin-bottom: 8px;">Xac thuc doi mat khau</h2>
-                    <p style="color: #5f6368; margin-bottom: 24px;">Ban vua yeu cau doi mat khau tren Flowise. Nhap ma OTP ben duoi de xac nhan:</p>
+                    <p style="color: #5f6368; margin-bottom: 24px;">Ban vua yeu cau doi mat khau tren Flowse. Nhap ma OTP ben duoi de xac nhan:</p>
                     <div style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #141b2b; text-align: center; background: #f0f4ff; border-radius: 8px; padding: 16px 0; margin-bottom: 24px;">${otp}</div>
                     <p style="color: #9aa0a6; font-size: 13px;">Ma co hieu luc trong <strong>10 phut</strong>. Neu ban khong thuc hien yeu cau nay, hay bo qua email nay.</p>
                 </div>

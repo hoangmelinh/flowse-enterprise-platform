@@ -7,6 +7,42 @@ import pool from '../config/connect.js';
 // ============================================================
 
 /**
+ * Vai trò (chữ thường) của user trong workspace chứa việc `taskId` (task → list → space → workspace).
+ * Rỗng nếu user không là thành viên workspace đó. `db` cho phép chạy trong transaction đang mở.
+ */
+export const getWorkspaceRolesForTask = async (userId, taskId, db = pool) => {
+    const result = await db.query(
+        `SELECT LOWER(r.role_name) AS role_name
+         FROM tasks t
+         JOIN lists l ON l.list_id = t.list_id
+         JOIN spaces s ON s.space_id = l.space_id
+         JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+         JOIN roles r ON r.role_id = wm.role_id
+         WHERE t.task_id = $2`,
+        [userId, taskId]
+    );
+    return result.rows.map((r) => r.role_name);
+};
+
+/**
+ * Danh sách hợp lệ để `userId` tạo việc vào. Có `listId`: chỉ trả về khi danh sách thuộc workspace user là thành viên.
+ * Không có `listId`: danh sách đầu tiên trong các workspace của user. Trả null nếu không có.
+ */
+export const resolveListForUser = async (userId, listId = null, db = pool) => {
+    const result = await db.query(
+        `SELECT l.list_id
+         FROM lists l
+         JOIN spaces sp ON sp.space_id = l.space_id AND sp.deleted_at IS NULL
+         JOIN workspace_members wm ON wm.workspace_id = sp.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+         WHERE l.deleted_at IS NULL AND ($2::int IS NULL OR l.list_id = $2)
+         ORDER BY l.list_id
+         LIMIT 1`,
+        [userId, listId]
+    );
+    return result.rows[0]?.list_id ?? null;
+};
+
+/**
  * Tìm space_id dựa vào task_id
  */
 export const getSpaceIdByTaskId = async (taskId) => {

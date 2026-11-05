@@ -1,6 +1,8 @@
 import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
 import Department from "./Department.js";
+import { getWorkspaceRolesForTask } from "./Permission.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
 
 class Approval {
   /**
@@ -8,36 +10,22 @@ class Approval {
    * Tuân thủ quy tắc cách ly thẩm quyền phê duyệt theo Department Management Scope
    */
   static async getPendingApprovals(userId) {
-    // 1. Lấy danh sách phòng ban mà user có quyền quản lý (hoặc null nếu là Admin)
-    const managedDeptIds = await Department.getManagedDepartmentIds(userId);
-
-    let scopeClause = "";
-    const values = [];
-
-    if (managedDeptIds !== null) {
-      if (managedDeptIds.length > 0) {
-        // Cấp quản lý: Xem phiếu chỉ định đích danh HOẶC phiếu chờ duyệt trong phân xưởng quản lý
-        values.push(userId); // $1
-        values.push(managedDeptIds); // $2
-        scopeClause = `
+    // Chỉ phòng ban user trực tiếp làm trưởng (và cấp dưới); vai trò admin/manager xét theo từng workspace bên dưới
+    const managedDeptIds = await Department.getManagedDepartmentIds(userId, 'member');
+    const values = [userId, managedDeptIds];
+    const scopeClause = `
+      AND (
+        a.approver_id = $1
+        OR (
+          a.approver_id IS NULL
           AND (
-            a.approver_id = $1 
-            OR (
-              a.approver_id IS NULL 
-              AND (
-                t.department_id = ANY($2::int[]) 
-                OR ast.department_id = ANY($2::int[])
-                OR (t.department_id IS NULL AND ast.department_id IS NULL)
-              )
-            )
+            LOWER(r.role_name) IN ('admin', 'manager')
+            OR t.department_id = ANY($2::int[])
+            OR ast.department_id = ANY($2::int[])
           )
-        `;
-      } else {
-        // Thành viên thông thường (không quản lý phòng ban): Chỉ xem phiếu chỉ định đích danh
-        values.push(userId); // $1
-        scopeClause = `AND a.approver_id = $1`;
-      }
-    }
+        )
+      )
+    `;
 
     const query = `
       SELECT 
@@ -56,6 +44,10 @@ class Approval {
         ast.department_id AS asset_department_id
       FROM approvals a
       JOIN tasks t ON a.task_id = t.task_id
+      JOIN lists l ON l.list_id = t.list_id
+      JOIN spaces s ON s.space_id = l.space_id
+      JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+      JOIN roles r ON r.role_id = wm.role_id
       JOIN users u ON t.created_by = u.user_id
       LEFT JOIN incidents inc ON a.incident_id = inc.incident_id
       LEFT JOIN assets ast ON inc.asset_id = ast.asset_id
@@ -99,15 +91,13 @@ class Approval {
       const existingApp = checkRes.rows[0];
 
       // 2. Kiểm tra thẩm quyền phê duyệt của approverId
-      const wsRoleRes = await client.query(
-        `SELECT LOWER(r.role_name) as role_name 
-         FROM workspace_members wm 
-         JOIN roles r ON wm.role_id = r.role_id 
-         WHERE wm.user_id = $1 AND wm.deleted_at IS NULL`,
-        [approverId]
-      );
-      const isWsAdmin = wsRoleRes.rows.some((r) => r.role_name === 'admin');
-      const isWsManager = wsRoleRes.rows.some((r) => r.role_name === 'manager');
+      // Vai trò xét trong đúng workspace chứa phiếu: admin/manager công ty khác không có quyền ở đây
+      const wsRoles = await getWorkspaceRolesForTask(approverId, existingApp.task_id, client);
+      if (wsRoles.length === 0) {
+        throw new AppError("Forbidden: Phiếu không thuộc nơi làm việc của bạn.", 403, 'FORBIDDEN');
+      }
+      const isWsAdmin = wsRoles.includes('admin');
+      const isWsManager = wsRoles.includes('manager');
 
       // Quy tắc phân định trách nhiệm (Separation of Duties): Người tạo không được tự phê duyệt
       if (existingApp.created_by === approverId && !isWsAdmin) {
@@ -117,7 +107,7 @@ class Approval {
       // Xác minh quyền duyệt theo cấp bậc doanh nghiệp & người được chỉ định
       const isDesignatedApprover = existingApp.approver_id === approverId;
       const targetDeptId = existingApp.task_department_id || existingApp.asset_department_id;
-      const isDeptManager = targetDeptId ? await Department.isManagerOfDepartment(approverId, targetDeptId) : false;
+      const isDeptManager = targetDeptId ? (await Department.getManagedDepartmentIds(approverId, 'member')).includes(targetDeptId) : false;
 
       if (!isWsAdmin && !isWsManager && !isDesignatedApprover && !isDeptManager) {
         throw new Error("Forbidden: Bạn không có thẩm quyền phê duyệt phiếu đề xuất này theo phân cấp phòng ban.");
@@ -136,12 +126,8 @@ class Approval {
       const res = await client.query(updateQuery, [status, approverId, decisionNote || null, approvalId]);
       const appRecord = res.rows[0];
 
-      // 1. Xác định incident_id (qua khóa ngoại trực tiếp hoặc fallback qua request_note)
-      let incId = appRecord.incident_id;
-      if (!incId && appRecord.request_note) {
-        const match = appRecord.request_note.match(/sự cố #(\d+)/i);
-        if (match && match[1]) incId = parseInt(match[1], 10);
-      }
+      // 1. Sự cố liên quan chỉ lấy từ khoá ngoại incident_id (không đoán từ ghi chú: "sự cố #N" có thể trỏ sự cố khác)
+      const incId = appRecord.incident_id;
 
       let incidentData = null;
 

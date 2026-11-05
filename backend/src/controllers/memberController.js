@@ -84,12 +84,13 @@ export const InviteMember = async (req, res) => {
 
         // 5. Gửi email nếu dịch vụ Resend đã được cấu hình
         let emailSent = false;
-        if (resend) {
+        // Chỉ gửi khi có khóa Resend và EMAIL_FROM thuộc tên miền đã xác minh; không thì người mời copy invitationLink
+        if (resend && process.env.EMAIL_FROM) {
             try {
                 const { data, error } = await resend.emails.send({
-                    from: "Flowise <invite@contact.flowise.id.vn>",
+                    from: process.env.EMAIL_FROM,
                     to: [email],
-                    subject: `${inviterName} đã mời bạn tham gia ${workspaceName} trên Flowise`,
+                    subject: `${inviterName} đã mời bạn tham gia ${workspaceName} trên Flowse`,
                     html: `
                         <div style="font-family: sans-serif; padding: 20px; color: #333;">
                             <h2>Chào bạn,</h2>

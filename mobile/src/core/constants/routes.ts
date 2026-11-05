@@ -52,6 +52,7 @@ export const Routes = {
   SEARCH: 'Search',
   // A · Tài khoản
   FORGOT_PASSWORD: 'ForgotPassword',
+  GOOGLE_SIGNIN: 'GoogleSignIn',
   CHECK_EMAIL: 'CheckEmail',
   NEW_PASSWORD: 'NewPassword',
   ACCOUNT_LOCKED: 'AccountLocked',

@@ -51,10 +51,9 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
   }
 
   async assignWorkItem(workItemId: number, assigneeId: number): Promise<WorkItem> {
-    const res = await apiClient.post(`/tasks/${workItemId}/assign`, {
-      assignee_id: assigneeId,
-    });
-    return this.mapToWorkItem(res.data?.task || res.data);
+    // backend chỉ trả { message }, nên đọc lại việc sau khi giao
+    await apiClient.post(`/tasks/${workItemId}/assignees`, { userId: assigneeId });
+    return this.getWorkItemById(workItemId);
   }
 
   async createTask(data: {
@@ -63,13 +62,14 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
     listId: number;
     priority?: string;
   }): Promise<WorkItem> {
-    const res = await apiClient.post('/tasks', {
-      name: data.title,
+    // backend: POST /work-items → 201 { success, data: task }; list_id phải thuộc workspace của người tạo
+    const res = await apiClient.post('/work-items', {
+      title: data.title,
       description: data.description,
       list_id: data.listId,
       priority: data.priority || 'Normal',
     });
-    return this.mapToWorkItem(res.data?.task || res.data);
+    return this.mapToWorkItem(res.data?.data);
   }
 
   private mapToWorkItem(item: any): WorkItem {

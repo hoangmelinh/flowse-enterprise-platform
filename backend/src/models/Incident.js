@@ -2,31 +2,35 @@ import con from "../config/connect.js";
 import NotificationService from "../services/notificationService.js";
 import Asset from "./Asset.js";
 import socketService from "../services/socketService.js";
+import { resolveListForUser } from "./Permission.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
 
 import Department from "./Department.js";
 
 class Incident {
-  static async getAll(user = null) {
-    let whereClause = "";
-    const values = [];
+  static async getAll(user) {
+    // Luôn giới hạn trong workspace user là thành viên (việc → danh sách → không gian → workspace)
+    const values = [user.user_id];
+    let whereClause = `WHERE EXISTS (
+      SELECT 1 FROM lists l JOIN spaces sp ON sp.space_id = l.space_id
+      JOIN workspace_members wm ON wm.workspace_id = sp.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+      WHERE l.list_id = t.list_id
+    )`;
 
-    if (user && user.user_id) {
-      // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
-      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
+    // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
+    const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
 
-      // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
-      if (accessibleDeptIds !== null) {
-        values.push(user.user_id);
-        values.push(accessibleDeptIds);
-        whereClause = `
-          WHERE (
-            inc.reported_by = $1 
-            OR tech.assignee_id = $1 
-            OR a.department_id = ANY($2::int[])
-            OR a.department_id IS NULL
-          )
-        `;
-      }
+    // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
+    if (accessibleDeptIds !== null) {
+      values.push(accessibleDeptIds);
+      whereClause += `
+        AND (
+          inc.reported_by = $1 
+          OR tech.assignee_id = $1 
+          OR a.department_id = ANY($2::int[])
+          OR a.department_id IS NULL
+        )
+      `;
     }
 
     const query = `
@@ -119,14 +123,19 @@ class Incident {
       await client.query("BEGIN");
 
       // Tìm list_id mặc định nếu không truyền
-      let targetListId = list_id;
+      // Danh sách phải thuộc công ty của người báo (list_id từ web, mobile hay sync đều kiểm ở đây)
+      let targetListId = await resolveListForUser(reported_by, list_id ?? null, client);
+      if (list_id && !targetListId) {
+        throw new AppError("Danh sách không thuộc nơi làm việc của bạn", 403, "FORBIDDEN");
+      }
       if (!targetListId) {
-        const listRes = await client.query(`SELECT list_id FROM lists WHERE deleted_at IS NULL ORDER BY list_id ASC LIMIT 1`);
-        targetListId = listRes.rows[0]?.list_id;
-        if (!targetListId) {
-          // Tự động khởi tạo Space & List mặc định cho Vận Hành Hiện Trường nếu chưa có
-          const wsRes = await client.query(`SELECT workspace_id FROM workspaces WHERE deleted_at IS NULL ORDER BY workspace_id ASC LIMIT 1`);
-          const workspaceId = wsRes.rows[0]?.workspace_id || 1;
+          // Chưa có danh sách nào: tạo không gian Vận hành trong workspace của chính người báo
+          const wsRes = await client.query(
+            `SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL ORDER BY workspace_id LIMIT 1`,
+            [reported_by]
+          );
+          const workspaceId = wsRes.rows[0]?.workspace_id;
+          if (!workspaceId) throw new AppError("Bạn chưa thuộc nơi làm việc nào", 403, "FORBIDDEN");
 
           const spRes = await client.query(
             `INSERT INTO spaces (workspace_id, name, description, color, created_by)
@@ -152,7 +161,6 @@ class Incident {
             [spaceId, reported_by || null]
           );
           targetListId = newListRes.rows[0].list_id;
-        }
       }
 
       // Lấy workflow INCIDENT_FLOW và Initial State (REPORTED)
@@ -768,52 +776,6 @@ class Incident {
    * Dọn dẹp dữ liệu kiểm thử mock (Các sự cố có tiêu đề 'Test Gate%' hoặc 'Test %')
    * Phục vụ Admin làm sạch giao diện và đưa Downtime về 0 trước khi chạy thật.
    */
-  static async cleanTestData() {
-    const client = await con.connect();
-    try {
-      await client.query("BEGIN");
-
-      const testTasksRes = await client.query(`
-        SELECT t.task_id, inc.incident_id 
-        FROM tasks t
-        LEFT JOIN incidents inc ON t.task_id = inc.task_id
-        WHERE t.name ILIKE 'Test Gate%' OR t.name ILIKE 'Test %'
-      `);
-
-      if (testTasksRes.rows.length === 0) {
-        await client.query("COMMIT");
-        return { cleanedCount: 0 };
-      }
-
-      const taskIds = testTasksRes.rows.map(r => r.task_id).filter(Boolean);
-      const incIds = testTasksRes.rows.map(r => r.incident_id).filter(Boolean);
-
-      if (incIds.length > 0) {
-        await client.query(`DELETE FROM approvals WHERE incident_id = ANY($1::int[])`, [incIds]);
-        await client.query(`DELETE FROM incidents WHERE incident_id = ANY($1::int[])`, [incIds]);
-      }
-
-      if (taskIds.length > 0) {
-        await client.query(`DELETE FROM approvals WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM sla_instances WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM task_assigns WHERE task_id = ANY($1::int[])`, [taskIds]);
-        await client.query(`DELETE FROM time_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM activity_logs WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM comments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM attachments WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM incidents WHERE task_id = ANY($1::int[])`, [taskIds]).catch(() => {});
-        await client.query(`DELETE FROM tasks WHERE task_id = ANY($1::int[])`, [taskIds]);
-      }
-
-      await client.query("COMMIT");
-      return { cleanedCount: testTasksRes.rows.length };
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
 }
 
 export default Incident;

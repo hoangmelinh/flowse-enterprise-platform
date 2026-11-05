@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Routes } from '../../../core/constants/routes';
 import { usePrefs } from '../../state/prefsStore';
@@ -99,12 +99,11 @@ export const LoginScreen: React.FC = () => {
 
         <View style={styles.actions}>
           <Button title="Đăng nhập" onPress={submit} loading={isLoading} disabled={!canSubmit} />
-          {/* shortcut: mobile chưa nối Google Sign-In (backend đã có POST /auth/google), cần expo-auth-session + client ID */}
           <Button
             title="Tiếp tục với Google"
             variant="secondary"
             icon={<GoogleLogo />}
-            onPress={() => Alert.alert('Đăng nhập Google', 'Tính năng đang được kết nối trên ứng dụng di động.')}
+            onPress={() => nav.navigate(Routes.GOOGLE_SIGNIN)}
           />
         </View>
       </KeyboardAvoidingView>

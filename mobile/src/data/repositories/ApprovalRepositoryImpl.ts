@@ -4,16 +4,17 @@ import apiClient from '../api/apiClient';
 
 export class ApprovalRepositoryImpl implements IApprovalRepository {
   async getPendingApprovals(): Promise<Approval[]> {
-    const res = await apiClient.get('/approvals');
-    return (res.data || []).map((a: any) => this.mapToApproval(a));
+    // backend: GET /approvals/pending → { success, data: [...] } (chỉ phiếu trong workspace của mình)
+    const res = await apiClient.get('/approvals/pending');
+    return (res.data?.data ?? []).map((a: any) => this.mapToApproval(a));
   }
 
   async makeDecision(params: ApprovalDecisionParams): Promise<Approval> {
     const res = await apiClient.post(`/approvals/${params.approvalId}/decision`, {
       status: params.status,
-      decision_note: params.decisionNote,
+      decisionNote: params.decisionNote,
     });
-    return this.mapToApproval(res.data?.approval || res.data);
+    return this.mapToApproval(res.data?.data);
   }
 
   private mapToApproval(a: any): Approval {
