@@ -4,17 +4,20 @@ import { useNavigation } from '@react-navigation/native';
 import { StyleSheet } from 'react-native';
 import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   House, SquareCheckBig, ScanQrCode, FileText, Inbox, TriangleAlert, CircleUser, LayoutGrid, Users, ClipboardCheck, Wrench, Factory,
   Building, Package, ShoppingCart, LucideIcon,
 } from 'lucide-react-native';
 import { Routes } from '../../core/constants/routes';
+import config from '../../core/config';
 import { approvals } from '../../data/demo/fixtures';
 import { text, useColors } from '../../core/theme';
 import { RootStackParamList, MainTabParamList } from './types';
 import { useAuthStore } from '../state/authStore';
 import { HomeRole, usePrefs } from '../state/prefsStore';
 import { useHomeRole } from '../state/useHomeRole';
+import { useNotifications } from '../state/useNotifications';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ContextSelectScreen } from '../screens/auth/ContextSelectScreen';
@@ -80,7 +83,7 @@ const work: TabDef = { name: Routes.WORK_ITEMS, title: 'Công việc', icon: Squ
 const me: TabDef = { name: Routes.PROFILE, title: 'Tôi', icon: CircleUser, component: ProfileScreen };
 const scan: TabDef = { name: Routes.QR_SCANNER, title: 'Quét', icon: ScanQrCode, component: QRScannerScreen };
 const incidents: TabDef = { name: Routes.INCIDENTS, title: 'Sự cố', icon: TriangleAlert, component: IncidentsScreen };
-// shortcut: số chưa đọc của Hộp thư lấy theo Figma; đổi sang số thật khi nối API thông báo
+// Badge mẫu theo vai trò; chế độ thật dùng tổng chưa đọc từ server.
 const inbox = (badge?: number): TabDef => ({ name: Routes.INBOX, title: 'Hộp thư', icon: Inbox, component: InboxScreen, badge });
 const approvalsTab: TabDef = { name: Routes.TAB_APPROVALS, title: 'Duyệt', icon: ClipboardCheck, component: ApprovalsTab, badge: approvals.length };
 // "Báo sự cố" mở form chồng lên (form dùng replace của stack), không phải tab nội dung
@@ -109,6 +112,11 @@ const MainTabs: React.FC = () => {
   const role = useHomeRole();
   const tabs = ROLE_TABS[role];
   const nav = useNavigation<any>();
+  const { unreadCount } = useNotifications();
+  const queryClient = useQueryClient();
+  useEffect(() => () => {
+    queryClient.removeQueries({ queryKey: ['notifications'] });
+  }, [queryClient]);
   // A10: lần đầu vào app thì hỏi quyền một lần
   useEffect(() => {
     SecureStore.getItemAsync('perm_seen').then((seen) => {
@@ -138,7 +146,7 @@ const MainTabs: React.FC = () => {
           key={t.name}
           name={t.name}
           component={t.component}
-          options={{ title: t.title, tabBarIcon: tabIcon(t.icon), tabBarBadge: t.badge }}
+          options={{ title: t.title, tabBarIcon: tabIcon(t.icon), tabBarBadge: !config.demo && t.name === Routes.INBOX ? unreadCount || undefined : t.badge }}
           listeners={
             t.open
               ? {

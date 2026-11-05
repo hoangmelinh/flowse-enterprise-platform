@@ -1,26 +1,50 @@
-import React, { useMemo, useState } from 'react';
-import { View, ScrollView, FlatList, Switch, StyleSheet, KeyboardAvoidingView, Platform, Linking } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Hash, Layers, SquarePen, Users } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, ScrollView, FlatList, Switch, StyleSheet, KeyboardAvoidingView, Platform, Linking, RefreshControl, ActivityIndicator } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Bell, Hash, Layers, SquarePen, Users, WifiOff } from 'lucide-react-native';
 import { space, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
+import config from '../../../core/config';
+import { Notification } from '../../../domain/entities/notification';
 import { chatMessages, conversations, notifications } from '../../../data/demo/fixtures';
 import {
-  AppText, Avatar, Banner, Bubble, Button, Chips, Composer, Group, IconButton, PressableScale, Row, Screen, ScreenHeader, ScrollPage, Segmented, Tag,
+  AppText, Avatar, Banner, Bubble, Button, Chips, Composer, EmptyState, Group, IconButton, PressableScale, Row, Screen, ScreenHeader, ScrollPage, Segmented, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import { useNotifications } from '../../state/useNotifications';
 
 /** J01 + J05 — Hộp thư: Thông báo | Tin nhắn. */
 export const InboxScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const [tab, setTab] = useState(0);
   const [f, setF] = useState('Tất cả');
-  const unread = notifications.filter((n) => n.unread).length;
+  const live = useNotifications();
+  const source: ((typeof notifications)[number] | Notification)[] = config.demo ? notifications : live.notifications;
+  const unread = config.demo ? notifications.filter((n) => n.unread).length : live.unreadCount;
+  const busy = live.markRead.isPending || live.markAllRead.isPending;
+  const actionError = live.markRead.error || live.markAllRead.error;
   const msgUnread = conversations.reduce((a, x) => a + x.unread, 0);
   const notis = useMemo(
-    () => notifications.filter((n) => (f === 'Chưa đọc' ? n.unread : f === '@ Nhắc tôi' ? n.kind === 'mention' : f === 'Duyệt' ? n.kind === 'approval' : true)),
-    [f]
+    () => source.filter((n) => (f === 'Chưa đọc' ? n.unread : f === '@ Nhắc tôi' ? n.kind === 'mention' : f === 'Duyệt' ? n.kind === 'approval' : true)),
+    [f, source]
   );
+  const { refetch } = live;
+  useFocusEffect(useCallback(() => {
+    if (!config.demo) void refetch();
+  }, [refetch]));
+
+  const openNotification = (n: Notification) => {
+    if (busy) return;
+    live.markRead.reset();
+    live.markAllRead.reset();
+    const openTask = () => {
+      if (n.entityType === 'task' && n.entityId != null) {
+        nav.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: n.entityId });
+      }
+    };
+    if (n.unread) live.markRead.mutate(n.id, { onSuccess: openTask });
+    else openTask();
+  };
 
   return (
     <Screen>
@@ -29,16 +53,34 @@ export const InboxScreen: React.FC = () => {
         caption={tab === 0 ? `${unread} chưa đọc` : `${msgUnread} tin nhắn chưa đọc`}
         right={tab === 1 ? <IconButton icon={SquarePen} label="Tin nhắn mới" onPress={() => nav.navigate(Routes.NEW_MESSAGE)} /> : undefined}
       />
-      <ScrollView contentContainerStyle={styles.page}>
+      <ScrollView
+        contentContainerStyle={styles.page}
+        refreshControl={!config.demo && tab === 0 ? <RefreshControl refreshing={live.isRefetching && !live.isFetchingNextPage} onRefresh={() => { void refetch(); }} /> : undefined}
+      >
         <Segmented items={['Thông báo', `Tin nhắn · ${msgUnread}`]} value={tab} onChange={setTab} />
         {tab === 0 ? (
           <>
             <Chips items={['Tất cả', 'Chưa đọc', '@ Nhắc tôi', 'Duyệt']} value={f} onChange={setF} />
-            <Group>
+            {!config.demo && actionError ? <Banner tone="danger" text={actionError.message} /> : null}
+            {!config.demo && live.isError && source.length > 0 ? <Banner tone="danger" text={live.error?.message || 'Không tải được thông báo. Vui lòng thử lại.'} /> : null}
+            {!config.demo && unread > 0 ? (
+              <Button title="Đánh dấu tất cả đã đọc" variant="secondary" size="sm" disabled={busy} loading={live.markAllRead.isPending}
+                onPress={() => { live.markRead.reset(); live.markAllRead.mutate(); }} />
+            ) : null}
+            {!config.demo && live.isLoading ? <ActivityIndicator accessibilityLabel="Đang tải thông báo" /> :
+              !config.demo && live.isError && source.length === 0 ? (
+                <EmptyState icon={WifiOff} title="Không tải được thông báo" body={live.error?.message} actionTitle="Thử lại" onAction={refetch} />
+              ) : !config.demo && notis.length === 0 ? (
+                <EmptyState icon={Bell} title="Chưa có thông báo" body="Thông báo phù hợp sẽ xuất hiện ở đây khi có." />
+              ) : <Group>
               {notis.map((n) => (
-                <NotiRow key={n.id} n={n} onPress={() => nav.navigate(n.kind === 'approval' ? Routes.APPROVALS : n.kind === 'request' ? Routes.REQUEST_DETAIL : Routes.COMMENTS, { requestId: 39, code: 'VP-2610-031' })} />
+                <NotiRow key={n.id} n={n} disabled={!config.demo && busy} onPress={() => {
+                  if (config.demo) nav.navigate(n.kind === 'approval' ? Routes.APPROVALS : n.kind === 'request' ? Routes.REQUEST_DETAIL : Routes.COMMENTS, { requestId: 39, code: 'VP-2610-031' });
+                  else if ('entityType' in n) openNotification(n);
+                }} />
               ))}
-            </Group>
+            </Group>}
+            {!config.demo && live.hasNextPage ? <Button title="Tải thêm" variant="secondary" loading={live.isFetchingNextPage} disabled={live.isFetching || busy} onPress={() => { void live.fetchNextPage(); }} /> : null}
           </>
         ) : (
           <Group>
@@ -52,10 +94,10 @@ export const InboxScreen: React.FC = () => {
   );
 };
 
-const NotiRow: React.FC<{ n: (typeof notifications)[number]; onPress: () => void }> = ({ n, onPress }) => {
+const NotiRow: React.FC<{ n: (typeof notifications)[number]; onPress: () => void; disabled?: boolean }> = ({ n, onPress, disabled }) => {
   const c = useColors();
   return (
-    <PressableScale accessibilityRole="button" onPress={onPress} scaleTo={0.99} pressedBackground={c.subtle} style={[styles.row, n.unread && { backgroundColor: c.accentSoft }]}>
+    <PressableScale accessibilityRole="button" onPress={onPress} disabled={disabled} scaleTo={0.99} pressedBackground={c.subtle} style={[styles.row, n.unread && { backgroundColor: c.accentSoft }]}>
       <Avatar name={n.who} />
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="bodyMedium" numberOfLines={1}>{n.title}</AppText>
