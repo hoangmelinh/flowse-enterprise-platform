@@ -59,7 +59,7 @@ export const GoogleSignInScreen: React.FC<ScreenProps<typeof Routes.GOOGLE_SIGNI
       <GoogleDoor onOpened={() => setPhase((p) => (p === 'opening' ? 'choose' : p))} />
       <View style={s.copy}>
         <AppText variant="heading" style={s.center}>
-          {phase === 'opening' ? 'Đang mở cửa Google…' : phase === 'signing' ? 'Đang đăng nhập Flowse…' : 'Chọn tài khoản Google'}
+          {phase === 'opening' ? 'Đang tiếp tục với Google…' : phase === 'signing' ? 'Đang đăng nhập Flowse…' : 'Chọn tài khoản Google'}
         </AppText>
         <AppText variant="caption" tone="muted" style={s.center}>
           Flowse chỉ nhận tên và email của bạn. Email phải là email công việc đã được mời vào nơi làm việc.
