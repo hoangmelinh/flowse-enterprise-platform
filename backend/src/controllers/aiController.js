@@ -14,6 +14,9 @@ import { createTaskForList } from "../models/Task.js";
 import Incident from "../models/Incident.js";
 import Asset from "../models/Asset.js";
 import dotenv from "dotenv";
+
+// Model Groq cho Flowse AI. llama-3.3-70b-versatile đã ngừng; gpt-oss suy nghĩ trước khi trả lời nên dùng reasoning_effort thấp
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 dotenv.config();
 
 const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
@@ -317,7 +320,8 @@ export const chatWithAI = async (req, res) => {
             try {
                 completion = await groq.chat.completions.create({
                     messages: messages,
-                    model: "llama-3.3-70b-versatile",
+                    model: GROQ_MODEL,
+                    reasoning_effort: "low",
                     tools: tools,
                     tool_choice: "auto",
                 });
@@ -667,7 +671,8 @@ QUY TẮC:
                             content: `Viết mô tả task cho: "${taskName}"`
                         }
                     ],
-                    model: "llama-3.3-70b-versatile",
+                    model: GROQ_MODEL,
+                    reasoning_effort: "low",
                     max_tokens: 300,
                     temperature: 0.7,
                 });
@@ -720,7 +725,8 @@ CHỈ trả về JSON, KHÔNG giải thích thêm.`
                             content: `Task: "${taskName}"${description ? `\nMô tả: "${description}"` : ''}`
                         }
                     ],
-                    model: "llama-3.3-70b-versatile",
+                    model: GROQ_MODEL,
+                    reasoning_effort: "low",
                     max_tokens: 100,
                     temperature: 0.3,
                 });
@@ -952,7 +958,8 @@ Trả về định dạng JSON thuần túy (không kèm giải thích) đúng c
                         { role: "system", content: "Bạn là AI phân tích vận hành công nghiệp cấp Enterprise. Luôn phản hồi JSON hợp lệ, không giải thích ngoài JSON." },
                         { role: "user", content: prompt }
                     ],
-                    model: "llama-3.3-70b-versatile",
+                    model: GROQ_MODEL,
+                    reasoning_effort: "low",
                     response_format: { type: "json_object" },
                     temperature: 0.3,
                     max_tokens: 1400
@@ -1080,7 +1087,8 @@ Thời gian dừng: ${incident.downtime_minutes || 0} phút
 SLA: ${incident.sla_status || 'N/A'}`
                         }
                     ],
-                    model: "llama-3.3-70b-versatile",
+                    model: GROQ_MODEL,
+                    reasoning_effort: "low",
                     max_tokens: 300,
                     temperature: 0.3
                 });
