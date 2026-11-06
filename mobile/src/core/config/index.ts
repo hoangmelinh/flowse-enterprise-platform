@@ -1,7 +1,11 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Lấy IP máy chủ phát triển khi debug bằng máy thật hoặc máy ảo Android (10.0.2.2)
+// Máy thật chạy Expo Go: backend chạy cùng máy với Metro, nên lấy IP từ địa chỉ Metro (đổi Wi-Fi vẫn đúng).
+// Không có Metro (bản build): máy ảo Android dùng 10.0.2.2, còn lại localhost.
 const getDevHost = () => {
+  const metroHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  if (metroHost) return metroHost;
   if (Platform.OS === 'android') {
     return '10.0.2.2';
   }
