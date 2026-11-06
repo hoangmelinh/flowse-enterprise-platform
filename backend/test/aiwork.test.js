@@ -137,3 +137,9 @@ test('Work: thiếu quyền thì AI nhận lỗi và giải thích, không có �
   assert.match(out.response, /không có quyền xoá/);
   assert.equal((await sql('SELECT COUNT(*)::int n FROM ai_actions')).rows[0].n, before);
 });
+
+test('tên khớp theo từ trọn vẹn: "an" không khớp "Manager A" (lỗi cũ: "Hà" khớp cả "Thành", "Phạm")', async () => {
+  await assert.rejects(propose(U.managerA.id, 'CREATE_TASK', { title: 'X', space_name: 'Kế hoạch AI', assignee_names: ['an'] }), /Không tìm thấy thành viên/);
+  const ok = await propose(U.managerA.id, 'CREATE_TASK', { title: 'X', space_name: 'kế hoạch', assignee_names: ['manager'] });
+  assert.deepEqual(ok.summary.rows[2], ['Người làm', 'Manager A']);
+});

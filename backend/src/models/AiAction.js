@@ -22,11 +22,17 @@ const requirePerm = async (space, userId, perm, what) => {
     if (!(await can(space.space_id, userId, perm))) fail(`Bạn không có quyền ${what} trong không gian "${space.name}".`, 403);
 };
 
-/** Chọn đúng một mục theo tên: khớp hẳn trước, rồi khớp một phần; nhiều kết quả thì hỏi lại. */
+const words = (s) => norm(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * Chọn đúng một mục theo tên: khớp hẳn trước, rồi khớp theo từ trọn vẹn ("Hà" khớp "Trần Thu Hà"
+ * nhưng không khớp "Thành"); nhiều kết quả thì hỏi lại.
+ */
 const pick = (rows, name, label, key = "name") => {
     const n = norm(name);
+    const q = words(name);
     const exact = rows.filter((r) => norm(r[key]) === n);
-    const hits = exact.length ? exact : rows.filter((r) => norm(r[key]).includes(n));
+    const hits = exact.length ? exact : rows.filter((r) => q.length && q.every((w) => words(r[key]).includes(w)));
     if (hits.length === 1) return hits[0];
     if (!hits.length) fail(`Không tìm thấy ${label} "${name}". Có: ${rows.map((r) => r[key]).join(", ") || "không có"}.`);
     fail(`"${name}" khớp nhiều ${label}: ${hits.map((r) => r[key]).join(", ")}. Hỏi người dùng chọn một.`);
