@@ -9,12 +9,13 @@ export interface Approval {
   taskDescription?: string;
   priority: WorkItemPriority;
   workItemType: WorkItemType;
-  requesterId: number;
+  requesterId?: number;
   requesterName: string;
   requesterEmail: string;
   requesterAvatar?: string;
   stepOrder: number;
   status: ApprovalStatus;
+  requestNote?: string;
   decisionNote?: string;
   decidedAt?: string;
   createdAt: string;
