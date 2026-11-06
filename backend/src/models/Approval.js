@@ -86,7 +86,11 @@ class Approval {
       );
 
       if (checkRes.rows.length === 0) {
-        throw new Error("Approval record not found or already processed");
+        // Hai người cùng duyệt một phiếu: người sau nhận 409 để app tải lại danh sách
+        const had = await client.query("SELECT 1 FROM approvals WHERE approval_id = $1", [approvalId]);
+        throw had.rows.length
+          ? new AppError("Phiếu đã được người khác xử lý.", 409, "APPROVAL_ALREADY_DECIDED")
+          : new AppError("Không tìm thấy phiếu duyệt.", 404, "NOT_FOUND");
       }
       const existingApp = checkRes.rows[0];
 

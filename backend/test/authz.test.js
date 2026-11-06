@@ -53,3 +53,13 @@ test('danh sách chờ duyệt không lộ phiếu của công ty khác', async 
   const b = await api('GET', '/approvals/pending', { as: U.managerB });
   assert.ok(ids(b).includes(id));
 });
+
+test('duyệt lần hai: 409 kèm câu tiếng Việt (không phải lỗi 500); phiếu không tồn tại: 404', async () => {
+  const id = await pendingApproval();
+  assert.equal((await api('POST', `/approvals/${id}/decision`, { as: U.managerB, body: { status: 'APPROVED' } })).status, 200);
+  const again = await api('POST', `/approvals/${id}/decision`, { as: U.adminB, body: { status: 'REJECTED', decisionNote: 'muộn' } });
+  assert.equal(again.status, 409, JSON.stringify(again.body));
+  assert.match(again.body.message, /đã được người khác xử lý/);
+  assert.equal((await sql('SELECT status FROM approvals WHERE approval_id = $1', [id])).rows[0].status, 'APPROVED');
+  assert.equal((await api('POST', '/approvals/999999/decision', { as: U.managerB, body: { status: 'APPROVED' } })).status, 404);
+});
