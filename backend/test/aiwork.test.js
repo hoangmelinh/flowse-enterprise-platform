@@ -143,3 +143,28 @@ test('tên khớp theo từ trọn vẹn: "an" không khớp "Manager A" (lỗi 
   const ok = await propose(U.managerA.id, 'CREATE_TASK', { title: 'X', space_name: 'kế hoạch', assignee_names: ['manager'] });
   assert.deepEqual(ok.summary.rows[2], ['Người làm', 'Manager A']);
 });
+
+test('người thuộc hai công ty không chuyển được việc sang không gian của công ty kia', async () => {
+  const id = await newTask('Việc không được rời công ty A');
+  await sql("INSERT INTO workspace_members (workspace_id, user_id, role_id) VALUES ($1, $2, (SELECT role_id FROM roles WHERE role_name = 'manager'))", [WS.B.id, U.managerA.id]);
+  try {
+    const spaceB = (await sql("INSERT INTO spaces (workspace_id, name, created_by) VALUES ($1, 'Kho công ty B', $2) RETURNING space_id", [WS.B.id, U.adminB.id])).rows[0].space_id;
+    await sql("INSERT INTO lists (space_id, name) VALUES ($1, 'Nhập kho')", [spaceB]);
+    await assert.rejects(propose(U.managerA.id, 'UPDATE_TASK', { task_id: id, space_name: 'Kho công ty B' }), /công ty khác/);
+  } finally {
+    await sql('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [WS.B.id, U.managerA.id]);
+  }
+});
+
+test('hạn không tồn tại (31/02, 25:00) bị chặn ngay lúc đề xuất, không đợi tới lúc áp dụng', async () => {
+  for (const due_date of ['2026-02-31', '2026-11-20 25:00', '2026-11-20 10:75'])
+    await assert.rejects(propose(U.managerA.id, 'CREATE_TASK', { title: 'X', space_name: 'Kế hoạch AI', due_date }), /không hợp lệ/, due_date);
+});
+
+test('search_tasks tìm theo mã việc ("việc #25"), không nhầm sang việc có số 25 trong tên', async () => {
+  const id = await newTask('Việc tìm theo mã');
+  await newTask(`Lô ${id} không phải việc cần tìm`);
+  const { searchTasksForAi } = await import('../src/models/AiAction.js');
+  assert.deepEqual((await searchTasksForAi(U.managerA.id, { task_id: id })).map((t) => t.task_id), [id]);
+  assert.deepEqual(await searchTasksForAi(U.managerA.id, { task_id: taskB }), [], 'không thấy việc công ty khác');
+});

@@ -16,6 +16,7 @@ const fn = (name, description, properties, required = []) => ({ type: "function"
 
 const tools = [
     fn("search_tasks", "Tìm việc người dùng xem được. Luôn gọi trước khi sửa/giao/xoá để lấy đúng task_id.", {
+        task_id: { type: ["integer", "null"], description: "Mã việc khi người dùng nói \"việc #25\"" },
         query: str("Một phần tên việc"),
         space_name: str("Tên không gian"),
         assignee_name: str("Tên người làm"),

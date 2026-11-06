@@ -44,7 +44,7 @@ const VISIBLE = `s.deleted_at IS NULL AND (
     OR (s.is_private = FALSE AND EXISTS (SELECT 1 FROM workspace_members wm WHERE wm.workspace_id = s.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL)))`;
 
 const findSpace = async (userId, name) => {
-    const { rows } = await con.query(`SELECT s.space_id, s.name FROM spaces s WHERE ${VISIBLE} ORDER BY s.name`, [userId]);
+    const { rows } = await con.query(`SELECT s.space_id, s.name, s.workspace_id FROM spaces s WHERE ${VISIBLE} ORDER BY s.name`, [userId]);
     return pick(rows, name, "không gian");
 };
 
@@ -63,7 +63,7 @@ const findTask = async (userId, taskId) => {
     if (!Number.isInteger(Number(taskId)) || taskId === null || taskId === "") fail("Thiếu mã việc (task_id). Tìm việc bằng search_tasks trước.");
     const { rows } = await con.query(
         `SELECT t.task_id, t.name, t.priority, t.due_date, t.status_id, ts.status_name,
-                l.list_id, l.name AS list_name, s.space_id, s.name AS space_name
+                l.list_id, l.name AS list_name, s.space_id, s.name AS space_name, s.workspace_id
          FROM tasks t JOIN lists l ON l.list_id = t.list_id JOIN spaces s ON s.space_id = l.space_id
          LEFT JOIN task_status ts ON ts.status_id = t.status_id
          WHERE t.task_id = $2 AND t.deleted_at IS NULL AND l.deleted_at IS NULL AND ${VISIBLE}`,
@@ -81,9 +81,11 @@ const findMembers = async (space, names) => {
 /** "2026-11-06" hoặc "2026-11-06 15:00" theo giờ Việt Nam (cột due_date lưu giờ VN). Chỉ có ngày thì hạn 17:00. */
 const parseDue = (d) => {
     if (d == null || d === "") return undefined;
-    const m = String(d).trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/);
-    if (!m || Number.isNaN(Date.parse(m[1]))) fail(`Hạn "${d}" không hợp lệ, cần dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm.`);
-    return `${m[1]} ${m[2] || "17:00"}:00`;
+    const m = String(d).trim().match(/^((\d{4})-(\d{2})-(\d{2}))(?:[ T]((\d{2}):(\d{2})))?/);
+    // Date.parse nhận cả 2026-02-31 (tự đổi sang 03/03), nên dựng lại ngày rồi so với chuỗi gốc
+    const ok = m && new Date(Date.UTC(+m[2], +m[3] - 1, +m[4])).toISOString().startsWith(m[1]) && (!m[5] || (+m[6] < 24 && +m[7] < 60));
+    if (!ok) fail(`Hạn "${d}" không hợp lệ, cần dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm.`);
+    return `${m[1]} ${m[5] || "17:00"}:00`;
 };
 const parsePriority = (p) => {
     if (p == null || p === "") return undefined;
@@ -117,7 +119,7 @@ const resolve = async (userId, type, a) => {
     }
 
     const task = await findTask(userId, a.task_id);
-    const here = { space_id: task.space_id, name: task.space_name };
+    const here = { space_id: task.space_id, name: task.space_name, workspace_id: task.workspace_id };
 
     if (type === "UPDATE_TASK") {
         await requirePerm(here, userId, "TASK_UPDATE", "sửa việc");
@@ -134,6 +136,8 @@ const resolve = async (userId, type, a) => {
         // Chuyển sang không gian / danh sách khác: trạng thái là của từng không gian nên đổi theo
         let target = here;
         if (a.space_name) target = await findSpace(userId, a.space_name);
+        // Người làm, trạng thái, phòng ban của việc thuộc công ty cũ: không cho chuyển việc sang công ty khác
+        if (target.workspace_id !== here.workspace_id) fail("Không chuyển được việc sang không gian của công ty khác.");
         if (target.space_id !== here.space_id) await requirePerm(target, userId, "TASK_CREATE", "chuyển việc vào");
         if (a.space_name || a.list_name) {
             const list = await findList(target, a.list_name);
@@ -256,6 +260,7 @@ export const searchTasksForAi = async (userId, a = {}) => {
     const params = [userId];
     const where = [];
     const like = (col, v) => (params.push(`%${v}%`), where.push(`${col} ILIKE $${params.length}`));
+    if (Number.isInteger(Number(a.task_id)) && a.task_id !== "") (params.push(Number(a.task_id)), where.push(`t.task_id = $${params.length}`));
     if (a.query) like("t.name", a.query);
     if (a.space_name) like("s.name", a.space_name);
     if (a.status_name) like("ts.status_name", a.status_name);
