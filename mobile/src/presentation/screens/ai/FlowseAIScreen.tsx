@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { FileText, LayoutGrid, TriangleAlert, Plus, History, CloudOff, Lock, CircleHelp } from 'lucide-react-native';
-import { radius, space, Colors, makeStyles, useColors } from '../../../core/theme';
+import { radius, space, Colors, ColorToken, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { aiSuggestions } from '../../../data/demo/fixtures';
 import {
@@ -10,7 +10,7 @@ import {
 import { ScreenProps } from '../../navigation/types';
 import * as Clipboard from 'expo-clipboard';
 import config from '../../../core/config';
-import { AiRepositoryImpl } from '../../../data/repositories/AiRepositoryImpl';
+import { AiAction, AiRepositoryImpl, aiErrorText } from '../../../data/repositories/AiRepositoryImpl';
 
 const aiRepo = new AiRepositoryImpl();
 import { AILaunch, AILogo } from './AILaunch';
@@ -19,7 +19,7 @@ const ICONS = [FileText, LayoutGrid, TriangleAlert, Plus];
 // shortcut: bản nháp mẫu theo Figma L02, Ngắn hơn / Trang trọng hơn trả lại cùng bản; nối POST /ai/chat để soạn thật
 const DRAFT = 'Kính gửi anh Tuấn,\nĐơn PO-2410 sẽ giao ngày 30/10 thay vì 28/10 do lô vải về muộn. Chúng tôi ưu tiên dây chuyền A2 và cập nhật lại trước 17:00 hôm nay.';
 type Card = 'draft' | 'summary' | 'proposal' | 'applied' | 'missing' | 'denied' | 'offline';
-type Msg = { id: number; mine: boolean; text: string; card?: Card; streaming?: boolean };
+type Msg = { id: number; mine: boolean; text: string; card?: Card; action?: AiAction; streaming?: boolean };
 
 /**
  * Trả lời hiện dần từng chữ như đang gõ. Có chấm "đang soạn" trước chữ đầu tiên.
@@ -72,6 +72,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
   const finish = (id: number) => setMsgs((x) => x.map((m) => (m.id === id ? { ...m, streaming: false } : m)));
   const listRef = useRef<FlatList<Msg>>(null);
   const toEnd = useCallback(() => listRef.current?.scrollToEnd({ animated: true }), []);
+  const setAction = (id: number, action: AiAction) => setMsgs((x) => x.map((m) => (m.id === id ? { ...m, action } : m)));
   const replaceCard = (id: number, card?: Card) => setMsgs((x) => (card ? x.map((m) => (m.id === id ? { ...m, card, text: cardText[card] } : m)) : x.filter((m) => m.id !== id)));
 
   useEffect(() => {
@@ -81,15 +82,18 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
 
   const [thinking, setThinking] = useState(false);
   const run = async (q: string, work: boolean) => {
-    if (!work && !config.demo) {
-      // Có backend: Chat hỏi AI thật (đã biết việc đang mở của người dùng); chữ vẫn hiện dần như đang gõ
+    if (!config.demo) {
+      // Có backend: Chat hỏi AI thật; Work để AI đọc dữ liệu thật và soạn đề xuất (chỉ ghi khi bấm Áp dụng)
       push({ mine: true, text: q });
       setThinking(true);
       try {
         const history = msgs.filter((m) => !m.card).map((m) => ({ role: m.mine ? ('user' as const) : ('assistant' as const), content: m.text }));
-        push({ mine: false, text: await aiRepo.chat(q, history), streaming: true });
-      } catch {
-        push({ mine: false, text: 'Flowse AI chưa trả lời được. Kiểm tra kết nối rồi hỏi lại nhé.' });
+        if (work) {
+          const { text, action } = await aiRepo.work(q, history);
+          push({ mine: false, text, action: action ?? undefined, streaming: true });
+        } else push({ mine: false, text: await aiRepo.chat(q, history), streaming: true });
+      } catch (e) {
+        push({ mine: false, text: aiErrorText(e) });
       } finally {
         setThinking(false);
       }
@@ -155,6 +159,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
           renderItem={({ item }) => (
             <View style={{ gap: space.sm }}>
               {item.streaming ? <StreamBubble text={item.text} onDone={() => finish(item.id)} onGrow={toEnd} /> : <Bubble text={item.text} mine={item.mine} />}
+              {item.action && !item.streaming ? <ActionCard action={item.action} onChange={(a) => setAction(item.id, a)} navigation={navigation} /> : null}
               {item.card && !item.streaming ? <AICard card={item.card} onChange={(c) => replaceCard(item.id, c)} onAsk={(q) => run(q, false)} navigation={navigation} /> : null}
             </View>
           )}
@@ -163,6 +168,53 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
       </KeyboardAvoidingView>
       {launching ? <AILaunch onDone={launched} /> : null}
     </Screen>
+  );
+};
+
+const STATUS_TAG: Record<AiAction['status'], [string, ColorToken]> = {
+  PENDING: ['Chờ xác nhận', 'warning'],
+  APPLYING: ['Đang áp dụng', 'progress'],
+  APPLIED: ['Đã áp dụng', 'success'],
+  CANCELLED: ['Đã hủy', 'muted'],
+  FAILED: ['Không áp dụng được', 'danger'],
+};
+
+/** Đề xuất thật của chế độ Work: xem lại rồi Áp dụng / Hủy. Backend kiểm lại quyền lúc áp dụng. */
+const ActionCard: React.FC<{ action: AiAction; onChange: (a: AiAction) => void; navigation: ScreenProps<typeof Routes.FLOWSE_AI>['navigation'] }> = ({ action, onChange, navigation }) => {
+  const s = useStyles();
+  const [busy, setBusy] = useState<'apply' | 'cancel' | null>(null);
+  const [error, setError] = useState('');
+  const decide = async (apply: boolean) => {
+    setBusy(apply ? 'apply' : 'cancel');
+    try {
+      onChange(apply ? await aiRepo.apply(action.action_id) : await aiRepo.cancel(action.action_id));
+    } catch (e) {
+      // Lỗi lúc áp dụng (mất quyền, việc đã bị xoá, đã xử lý): không cho bấm lại, nhờ AI soạn lại
+      setError(aiErrorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const [label, tone] = STATUS_TAG[action.status];
+  const taskId = action.result?.task_id;
+  return (
+    <View style={s.card}>
+      <Tag label={`${action.summary.title} · ${label}`} tone={tone} />
+      <View>
+        {action.summary.rows.map(([k, v]) => <KV key={k} label={k} value={v} />)}
+      </View>
+      {action.status === 'PENDING' && !error ? (
+        <View style={s.actions}>
+          <Button title="Hủy" size="sm" variant="secondary" style={s.flex} loading={busy === 'cancel'} disabled={!!busy} onPress={() => decide(false)} />
+          <Button title="Áp dụng" size="sm" style={s.flex} loading={busy === 'apply'} disabled={!!busy} onPress={() => decide(true)} />
+        </View>
+      ) : null}
+      {error ? <Banner tone="danger" text={error} /> : null}
+      {action.status === 'APPLIED' && action.result?.message ? <Banner text={action.result.message} /> : null}
+      {action.status === 'APPLIED' && taskId && action.action_type !== 'DELETE_TASK' ? (
+        <Row title="Mở công việc" onPress={() => navigation.navigate(Routes.WORK_ITEM_DETAIL, { workItemId: taskId, title: action.summary.rows[0]?.[1] })} />
+      ) : null}
+    </View>
   );
 };
 
@@ -297,7 +349,7 @@ export const AiReviewScreen: React.FC<ScreenProps<typeof Routes.AI_REVIEW>> = ({
   );
 };
 
-const HISTORY: [string, string, string, 'warning' | 'success' | 'muted' | 'progress'][] = [
+const HISTORY: [string, string, string, ColorToken][] = [
   ['Kiểm tra cảm biến băng tải', '29/10 23:42 · Cập nhật trạng thái', 'Chờ gửi', 'warning'],
   ['Kiểm tra lô vải 24', '29/10 23:40 · Tạo & giao việc', 'Đã áp dụng', 'success'],
   ['Báo cáo sản lượng ca chiều', '28/10 16:05 · Nhắc việc', 'Đã hủy', 'muted'],
@@ -307,11 +359,21 @@ const HISTORY: [string, string, string, 'warning' | 'success' | 'muted' | 'progr
 /** L10 — Lịch sử thao tác của Flowse AI (chỉ thao tác thay đổi dữ liệu). */
 export const AiHistoryScreen: React.FC<ScreenProps<typeof Routes.AI_HISTORY>> = ({ navigation }) => {
   const [f, setF] = useState('Tất cả');
-  const list = HISTORY.filter((h) => f === 'Tất cả' || h[2] === f);
+  // Có backend: đề xuất thật trong bảng ai_actions (30 ngày); chế độ xem thử giữ dữ liệu mẫu
+  const [live, setLive] = useState<AiAction[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!config.demo) aiRepo.actions().then(setLive, (e) => setError(aiErrorText(e)));
+  }, []);
+  const when = (d: string) => new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const rows: [string, string, string, ColorToken][] = config.demo
+    ? HISTORY
+    : (live ?? []).map((a) => [a.summary.rows[0]?.[1] ?? a.summary.title, `${when(a.created_at)} · ${a.summary.title}`, ...STATUS_TAG[a.status]]);
+  const list = rows.filter((h) => f === 'Tất cả' || h[2] === f);
   return (
     <ScrollPage
       title="Lịch sử thao tác"
-      caption="Flowse AI · 7 ngày gần đây"
+      caption={`Flowse AI · ${config.demo ? 7 : 30} ngày gần đây`}
       onBack={navigation.goBack}
       footer={
         <BottomBar>
@@ -320,9 +382,12 @@ export const AiHistoryScreen: React.FC<ScreenProps<typeof Routes.AI_HISTORY>> = 
       }
     >
       <Chips items={['Tất cả', 'Đã áp dụng', 'Đã hủy']} value={f} onChange={setF} />
+      {error ? <Banner tone="danger" text={error} /> : null}
+      {!config.demo && !live && !error ? <AppText tone="muted">Đang tải…</AppText> : null}
+      {live && !list.length ? <AppText tone="muted">Chưa có thao tác nào.</AppText> : null}
       <Group>
-        {list.map(([t, sub, tag, tone]) => (
-          <Row key={t} title={t} subtitle={sub} trailing={<Tag label={tag} tone={tone} />} chevron={false} />
+        {list.map(([t, sub, tag, tone], i) => (
+          <Row key={`${i}-${t}`} title={t} subtitle={sub} trailing={<Tag label={tag} tone={tone} />} chevron={false} />
         ))}
       </Group>
       <AppText variant="caption" tone="muted">Chỉ lưu thao tác thay đổi dữ liệu. Nội dung Chat không nằm trong lịch sử này.</AppText>
