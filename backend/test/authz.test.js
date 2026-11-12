@@ -63,3 +63,15 @@ test('duyệt lần hai: 409 kèm câu tiếng Việt (không phải lỗi 500);
   assert.equal((await sql('SELECT status FROM approvals WHERE approval_id = $1', [id])).rows[0].status, 'APPROVED');
   assert.equal((await api('POST', '/approvals/999999/decision', { as: U.managerB, body: { status: 'APPROVED' } })).status, 404);
 });
+
+test('space_id trong body không đổi được nơi kiểm quyền sang công ty khác', async () => {
+  const spaceA = (await sql('INSERT INTO spaces (workspace_id, name, created_by) VALUES ($1, $2, $3) RETURNING space_id', [WS.A.id, 'Không gian A', U.adminA.id])).rows[0].space_id;
+  const put = await api('PUT', `/tasks/${taskB}`, { as: U.adminA, body: { space_id: spaceA, name: 'Bị sửa' } });
+  assert.equal(put.status, 403, JSON.stringify(put.body));
+  const del = await api('DELETE', `/tasks/${taskB}`, { as: U.adminA, body: { space_id: spaceA } });
+  assert.equal(del.status, 403, JSON.stringify(del.body));
+  const row = (await sql('SELECT name, deleted_at FROM tasks WHERE task_id = $1', [taskB])).rows[0];
+  assert.deepEqual([row.name, row.deleted_at], ['Mua vật tư B', null]);
+  const space = await api('POST', `/spaces/workspaces/${WS.B.id}`, { as: U.adminA, body: { space_id: spaceA, name: 'Lọt vào B' } });
+  assert.equal(space.status, 403, JSON.stringify(space.body));
+});

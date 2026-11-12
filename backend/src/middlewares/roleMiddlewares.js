@@ -3,7 +3,7 @@ import {
     checkInheritedWorkspacePermission,
     checkWorkspacePermission,
 } from '../models/Permission.js';
-import { getDirectSpaceId, resolveSpaceIdFromParams } from '../utils/resolveSpace.js';
+import { resolveSpaceId } from '../utils/resolveSpace.js';
 
 export const requirePermission = (requiredPermission, options = {}) => async (req, res, next) => {
     const { allowNoSpace = false } = options;
@@ -13,13 +13,9 @@ export const requirePermission = (requiredPermission, options = {}) => async (re
             return res.status(401).json({ message: 'Chua xac thuc. Vui long dang nhap.' });
         }
 
-        let spaceId = getDirectSpaceId(req);
-
-        if (!spaceId) {
-            const lookup = await resolveSpaceIdFromParams(req.params);
-            if (lookup.error) return res.status(404).json({ message: lookup.error });
-            spaceId = lookup.spaceId;
-        }
+        const lookup = await resolveSpaceId(req);
+        if (lookup.error) return res.status(404).json({ message: lookup.error });
+        const spaceId = lookup.spaceId;
 
         const workspaceId = req.params.workspaceId
             || req.body?.workspaceId || req.body?.workspace_id
