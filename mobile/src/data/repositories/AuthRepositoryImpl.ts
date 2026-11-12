@@ -1,7 +1,16 @@
 import { IAuthRepository } from '../../domain/repositories/IAuthRepository';
-import { User, Workspace } from '../../domain/entities/auth';
+import { User, UserCapabilities, UserContext, Workspace } from '../../domain/entities/auth';
 import apiClient from '../api/apiClient';
 import secureStorage from '../local/secureStorage';
+
+// Tên quyền trên /users/contexts (backend tính theo vai trò và phòng ban) → tên trong app
+const CAPABILITY_KEYS: [keyof UserCapabilities, string][] = [
+  ['canScanQR', 'can_scan_qr'], ['canReportIncident', 'can_report_incident'], ['canTriageIncident', 'can_triage_incident'],
+  ['canExecuteRepair', 'can_execute_repair'], ['canVerifyIncident', 'can_verify_incident'], ['canCloseIncident', 'can_close_incident'],
+  ['canRunInspection', 'can_run_inspection'], ['canApprove', 'can_approve'], ['canCreateTask', 'can_create_task'], ['canAssignWork', 'can_assign_work'],
+];
+export const toCapabilities = (raw: Record<string, unknown> = {}): UserCapabilities =>
+  Object.fromEntries(CAPABILITY_KEYS.map(([app, api]) => [app, raw[api] === true])) as unknown as UserCapabilities;
 
 export class AuthRepositoryImpl implements IAuthRepository {
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
@@ -69,15 +78,21 @@ export class AuthRepositoryImpl implements IAuthRepository {
     }
   }
 
-  async getUserWorkspaces(): Promise<Workspace[]> {
-    const res = await apiClient.get('/workspaces');
-    return (res.data || []).map((w: any) => ({
+  async getContexts(workspaceId?: number | null): Promise<UserContext> {
+    const res = await apiClient.get('/users/contexts', { params: workspaceId ? { workspaceId } : undefined });
+    const d = res.data?.data || {};
+    const workspaces: Workspace[] = (d.workspaces || []).map((w: any) => ({
       id: w.workspace_id,
       name: w.name,
       slug: w.slug,
       description: w.description,
       role: w.role_name || 'member',
     }));
+    return {
+      workspaces,
+      currentWorkspace: workspaces.find((w) => w.id === d.current_workspace_id) || null,
+      capabilities: toCapabilities(d.capabilities),
+    };
   }
 
   async switchWorkspace(workspaceId: number): Promise<void> {

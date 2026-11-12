@@ -34,8 +34,15 @@ export async function resolveSpaceIdFromParams(params = {}) {
     return { spaceId: null, error: null };
 }
 
-export function getDirectSpaceId(req) {
-    return req.params.spaceId || req.params.space_id
-        || req.body?.spaceId || req.body?.space_id
-        || null;
+/**
+ * Không gian dùng để kiểm quyền cho request. URL đi trước (spaceId, hoặc dò từ taskId, listId...).
+ * Body chỉ dùng khi URL không có tham số nào: nếu body đi trước, người gọi tự chọn không gian
+ * của mình để kiểm quyền rồi thao tác trên tài nguyên của công ty khác.
+ */
+export async function resolveSpaceId(req) {
+    const fromUrl = req.params.spaceId || req.params.space_id;
+    if (fromUrl) return { spaceId: fromUrl, error: null };
+    const lookup = await resolveSpaceIdFromParams(req.params);
+    if (lookup.spaceId || lookup.error || Object.keys(req.params).length) return lookup;
+    return { spaceId: req.body?.spaceId || req.body?.space_id || null, error: null };
 }

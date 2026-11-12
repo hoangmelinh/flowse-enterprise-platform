@@ -396,12 +396,12 @@ class Asset {
     console.log(`[Asset] Đã tính toán và lưu Health Score cho ${assetsRes.rows.length} thiết bị.`);
   }
 
-  static async create({ asset_code, name, location, department_id, qr_token, specs = {} }) {
+  static async create({ asset_code, name, location, department_id, qr_token, specs = {}, workspace_id }) {
     const token = qr_token || `QR-${asset_code}-${Date.now()}`;
     const res = await con.query(
-      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, specs, health_score)
-       VALUES ($1, $2, $3, $4, $5, $6, 100) RETURNING *`,
-      [asset_code, name, location, department_id, token, JSON.stringify(specs)]
+      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, specs, health_score, workspace_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 100, $7) RETURNING *`,
+      [asset_code, name, location, department_id, token, JSON.stringify(specs), workspace_id]
     );
     return res.rows[0];
   }

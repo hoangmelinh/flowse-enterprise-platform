@@ -65,6 +65,18 @@ const routes: Partial<Record<string, () => unknown>> = {
   'POST /auth/signout': () => ({ message: 'ok' }),
   'GET /users/profile': () => ({ success: true, user }),
   'GET /workspaces': () => [{ workspace_id: 1, name: 'Nhà máy Bình Dương', slug: 'binh-duong', role_name: 'manager' }],
+  'GET /users/contexts': () => ({
+    success: true,
+    data: {
+      user,
+      workspaces: [{ workspace_id: 1, name: 'Nhà máy Bình Dương', slug: 'binh-duong', role_name: 'manager' }],
+      current_workspace_id: 1,
+      capabilities: {
+        can_scan_qr: true, can_report_incident: true, can_triage_incident: true, can_execute_repair: true, can_verify_incident: true,
+        can_close_incident: true, can_run_inspection: true, can_approve: true, can_create_task: true, can_assign_work: true,
+      },
+    },
+  }),
   'GET /tasks/my-tasks': () => [{ id: 1, name: 'Đang làm', tasks: myTasks }],
 };
 

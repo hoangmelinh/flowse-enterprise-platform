@@ -45,7 +45,7 @@ export const resolveQrContext = async (req, res, next) => {
 
 export const createAsset = async (req, res, next) => {
   try {
-    const created = await Asset.create(req.body);
+    const created = await Asset.create({ ...req.body, workspace_id: req.workspaceId });
     res.status(201).json({ success: true, data: created });
   } catch (error) {
     next(error);

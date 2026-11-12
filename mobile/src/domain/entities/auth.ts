@@ -1,4 +1,5 @@
-export type UserRoleName = 'admin' | 'manager' | 'technician' | 'qa' | 'member';
+// Đúng 3 vai trò trong bảng roles; kỹ thuật / QA là phòng ban, xem capabilities từ /users/contexts
+export type UserRoleName = 'admin' | 'manager' | 'member';
 
 export interface User {
   id: number;
@@ -25,6 +26,12 @@ export interface Department {
   name: string;
   code: string;
   managerId?: number;
+}
+
+export interface UserContext {
+  workspaces: Workspace[];
+  currentWorkspace: Workspace | null;
+  capabilities: UserCapabilities;
 }
 
 export interface UserCapabilities {

@@ -1,5 +1,5 @@
 import con from '../config/connect.js';
-import { getDirectSpaceId, resolveSpaceIdFromParams } from '../utils/resolveSpace.js';
+import { resolveSpaceId } from '../utils/resolveSpace.js';
 
 export const requireWorkspaceMembership = async (req, res, next) => {
     try {
@@ -31,13 +31,9 @@ export const requireSpaceMembership = async (req, res, next) => {
         const userId = req.user?.user_id;
         if (!userId) return res.status(401).json({ message: 'Chua xac thuc.' });
 
-        let spaceId = getDirectSpaceId(req);
-
-        if (!spaceId) {
-            const lookup = await resolveSpaceIdFromParams(req.params);
-            if (lookup.error) return res.status(404).json({ message: lookup.error });
-            spaceId = lookup.spaceId;
-        }
+        const lookup = await resolveSpaceId(req);
+        if (lookup.error) return res.status(404).json({ message: lookup.error });
+        const spaceId = lookup.spaceId;
 
         if (!spaceId) {
             return res.status(404).json({ message: 'Khong tim thay resource hoac da bi xoa.' });

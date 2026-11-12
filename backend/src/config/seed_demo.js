@@ -73,12 +73,12 @@ async function seed() {
   let deptId = 1;
   if (deptCheck.rows.length === 0) {
     const dRes = await client.query(`
-      INSERT INTO departments (name, code, manager_id) VALUES
-      ('Phòng Bảo trì & Cơ điện', 'MAINT_ENG', 1),
-      ('Phân xưởng Gia công CNC', 'WORKSHOP_CNC', 1),
-      ('Phòng Quản lý Chất lượng QA/QC', 'QA_QC', 1)
+      INSERT INTO departments (name, code, manager_id, workspace_id) VALUES
+      ('Phòng Bảo trì & Cơ điện', 'MAINT_ENG', 1, $1),
+      ('Phân xưởng Gia công CNC', 'WORKSHOP_CNC', 1, $1),
+      ('Phòng Quản lý Chất lượng QA/QC', 'QA_QC', 1, $1)
       RETURNING department_id;
-    `);
+    `, [workspaceId]);
     deptId = dRes.rows[0].department_id;
   } else {
     deptId = deptCheck.rows[0].department_id;
@@ -89,13 +89,13 @@ async function seed() {
   let assetId1;
   if (assetCheck.rows.length === 0) {
     const a1 = await client.query(`
-      INSERT INTO assets (asset_code, name, location, department_id, qr_token, status, specs)
+      INSERT INTO assets (asset_code, name, location, department_id, qr_token, status, specs, workspace_id)
       VALUES 
-      ('CNC-VF4-01', 'Máy Phay CNC 5 Trục Haas VF-4SS', 'Khu B - Dây chuyền 01', $1, 'QR-ASSET-CNC-VF4-01-A9F2', 'MAINTENANCE', '{"speed": "12000 RPM", "power": "30HP"}'::jsonb),
-      ('ROBOT-ABB-02', 'Cánh tay Robot Hàn Tự động ABB IRB 2600', 'Khu C - Trạm Robot 02', $1, 'QR-ASSET-ROBOT-ABB-02-C7E1', 'OPERATIONAL', '{"payload": "20kg", "reach": "1.65m"}'::jsonb),
-      ('COMP-AC-75', 'Hệ thống Nén khí Trung tâm Atlas Copco GA75', 'Nhà điều hành Năng lượng', $1, 'QR-ASSET-COMP-AC-75-D4B8', 'OPERATIONAL', '{"pressure": "8.5 bar"}'::jsonb)
+      ('CNC-VF4-01', 'Máy Phay CNC 5 Trục Haas VF-4SS', 'Khu B - Dây chuyền 01', $1, 'QR-ASSET-CNC-VF4-01-A9F2', 'MAINTENANCE', '{"speed": "12000 RPM", "power": "30HP"}'::jsonb, $2),
+      ('ROBOT-ABB-02', 'Cánh tay Robot Hàn Tự động ABB IRB 2600', 'Khu C - Trạm Robot 02', $1, 'QR-ASSET-ROBOT-ABB-02-C7E1', 'OPERATIONAL', '{"payload": "20kg", "reach": "1.65m"}'::jsonb, $2),
+      ('COMP-AC-75', 'Hệ thống Nén khí Trung tâm Atlas Copco GA75', 'Nhà điều hành Năng lượng', $1, 'QR-ASSET-COMP-AC-75-D4B8', 'OPERATIONAL', '{"pressure": "8.5 bar"}'::jsonb, $2)
       RETURNING asset_id
-    `, [deptId]);
+    `, [deptId, workspaceId]);
     assetId1 = a1.rows[0].asset_id;
     console.log("Assets seeded.");
   } else {
