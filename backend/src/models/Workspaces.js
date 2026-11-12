@@ -7,7 +7,8 @@ export const findAllWorkspacesByUserId = async (user_id) => {
         LEFT JOIN roles r ON r.role_id = wm.role_id
                 WHERE wm.user_id = $1
                     AND w.deleted_at IS NULL
-                    AND wm.deleted_at IS NULL`;
+                    AND wm.deleted_at IS NULL
+                ORDER BY w.workspace_id`;
         const values = [user_id];
         const result = await con.query(query, values);
         return result.rows;

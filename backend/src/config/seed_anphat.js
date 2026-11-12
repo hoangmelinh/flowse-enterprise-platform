@@ -73,8 +73,11 @@ async function main() {
   const dPlan = await dept('AP_PLAN', 'Phòng Kế hoạch', id.dungtq);
   const dPack = await dept('AP_PACK', 'Xưởng đóng gói', id.dungtq);
   const dLineA2 = await dept('AP_LINE_A2', 'Dây chuyền A2', id.dungtq, dPack);
-  await dept('AP_MAINT', 'Tổ bảo trì', id.huypq);
-  await dept('AP_QA', 'QA/QC', id.ngoctt);
+  const dMaint = await dept('AP_MAINT', 'Tổ bảo trì', id.huypq);
+  const dQa = await dept('AP_QA', 'QA/QC', id.ngoctt);
+  // Phòng ban của nhân viên: quyết định trang chủ (Kỹ thuật / Văn phòng) và quyền sửa chữa, QA trên /users/contexts
+  for (const [deptId, people] of [[dMaint, ['thanhld', 'namnh']], [dLineA2, ['khanhvv', 'tamlm']], [dPlan, ['hatt']], [dQa, ['ngoctt']]])
+    await con.query('UPDATE users SET department_id = $1 WHERE user_id = ANY($2::int[])', [deptId, people.map((u) => id[u])]);
 
   // Không gian, danh sách và trạng thái
   const space = async (name, description) => {

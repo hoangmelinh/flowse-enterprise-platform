@@ -92,3 +92,16 @@ test('admin chỉ quản trị thiết bị và phòng ban của công ty mình'
   assert.equal(own.body.data.workspace_id, WS.A.id);
   assert.equal((await api('POST', `/assets/${assetB}/rotate-qr`, { as: U.adminB })).status, 200);
 });
+
+test('/users/contexts tính quyền theo nơi làm việc đang chọn', async () => {
+  await sql("INSERT INTO workspace_members (workspace_id, user_id, role_id) VALUES ($1, $2, (SELECT role_id FROM roles WHERE role_name = 'member'))", [WS.B.id, U.managerA.id]);
+  try {
+    const at = async (ws) => (await api('GET', `/users/contexts?workspaceId=${ws}`, { as: U.managerA })).body.data;
+    const a = await at(WS.A.id), b = await at(WS.B.id);
+    assert.deepEqual([a.current_workspace_id, a.capabilities.can_approve], [WS.A.id, true]);
+    assert.deepEqual([b.current_workspace_id, b.capabilities.can_approve, b.capabilities.can_execute_repair], [WS.B.id, false, false]);
+    assert.deepEqual(a.workspaces.map((w) => w.workspace_id), [WS.A.id, WS.B.id]);
+  } finally {
+    await sql('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [WS.B.id, U.managerA.id]);
+  }
+});
