@@ -75,3 +75,20 @@ test('space_id trong body không đổi được nơi kiểm quyền sang công 
   const space = await api('POST', `/spaces/workspaces/${WS.B.id}`, { as: U.adminA, body: { space_id: spaceA, name: 'Lọt vào B' } });
   assert.equal(space.status, 403, JSON.stringify(space.body));
 });
+
+test('admin chỉ quản trị thiết bị và phòng ban của công ty mình', async () => {
+  const deptB = (await sql("INSERT INTO departments (name, code, workspace_id) VALUES ('Tổ B', 'T_B', $1) RETURNING department_id", [WS.B.id])).rows[0].department_id;
+  const assetB = (await sql("INSERT INTO assets (asset_code, name, qr_token, department_id, workspace_id) VALUES ('B-01', 'Máy B', 'qr-b-01', $1, $2) RETURNING asset_id", [deptB, WS.B.id])).rows[0].asset_id;
+
+  assert.equal((await api('POST', `/assets/${assetB}/rotate-qr`, { as: U.adminA })).status, 403);
+  assert.equal((await sql('SELECT qr_token FROM assets WHERE asset_id = $1', [assetB])).rows[0].qr_token, 'qr-b-01');
+  assert.equal((await api('PUT', `/departments/${deptB}`, { as: U.adminA, body: { name: 'Bị sửa' } })).status, 403);
+  assert.equal((await api('POST', '/assets', { as: U.adminA, body: { asset_code: 'A-LỌT', name: 'x', department_id: deptB } })).status, 403);
+  assert.equal((await api('POST', '/departments', { as: U.adminA, body: { name: 'x', code: 'X_B', workspace_id: WS.B.id } })).status, 403);
+  assert.equal((await api('POST', '/departments', { as: U.managerA, body: { name: 'x', code: 'X_A' } })).status, 403);
+
+  const own = await api('POST', '/departments', { as: U.adminA, body: { name: 'Tổ A', code: 'T_A' } });
+  assert.equal(own.status, 201, JSON.stringify(own.body));
+  assert.equal(own.body.data.workspace_id, WS.A.id);
+  assert.equal((await api('POST', `/assets/${assetB}/rotate-qr`, { as: U.adminB })).status, 200);
+});

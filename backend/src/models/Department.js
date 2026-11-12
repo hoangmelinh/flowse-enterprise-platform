@@ -26,12 +26,12 @@ class Department {
     return res.rows[0] || null;
   }
 
-  static async create({ name, code, manager_id = null, parent_id = null }) {
+  static async create({ name, code, manager_id = null, parent_id = null, workspace_id }) {
     const res = await con.query(
-      `INSERT INTO departments (name, code, manager_id, parent_id)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO departments (name, code, manager_id, parent_id, workspace_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [name, code, manager_id, parent_id]
+      [name, code, manager_id, parent_id, workspace_id]
     );
     return res.rows[0];
   }

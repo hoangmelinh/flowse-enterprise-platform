@@ -1,4 +1,5 @@
 import Department from "../models/Department.js";
+import { departmentWorkspace } from "../middlewares/roleMiddlewares.js";
 
 export const getDepartments = async (req, res, next) => {
   try {
@@ -45,7 +46,7 @@ export const createDepartment = async (req, res, next) => {
     if (!name || !code) {
       return res.status(400).json({ success: false, message: "Name and code are required" });
     }
-    const created = await Department.create({ name, code, manager_id, parent_id });
+    const created = await Department.create({ name, code, manager_id, parent_id, workspace_id: req.workspaceId });
     res.status(201).json({
       success: true,
       data: created,
@@ -57,6 +58,11 @@ export const createDepartment = async (req, res, next) => {
 
 export const updateDepartment = async (req, res, next) => {
   try {
+    // Không cho gắn phòng ban vào cây của công ty khác
+    const { parent_id } = req.body || {};
+    if (parent_id && (await departmentWorkspace(parent_id)) !== req.workspaceId) {
+      return res.status(400).json({ success: false, message: "Phòng ban cha không thuộc nơi làm việc này" });
+    }
     const updated = await Department.update(req.params.id, req.body);
     res.json({
       success: true,

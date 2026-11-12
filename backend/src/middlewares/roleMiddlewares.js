@@ -74,30 +74,47 @@ export const taskOfApproval = async (req) =>
 export const taskOfIncident = async (req) =>
     (await pool.query('SELECT task_id FROM incidents WHERE incident_id = $1', [req.params.id])).rows[0]?.task_id;
 
-export const requireAdmin = async (req, res, next) => {
+/** workspace_id của một dòng: undefined khi không có id (tạo mới), null khi không tìm thấy. */
+const ownerWorkspace = (table, key) => async (id) =>
+    id == null || id === '' ? undefined
+        : (await pool.query(`SELECT workspace_id FROM ${table} WHERE ${key} = $1`, [id])).rows[0]?.workspace_id ?? null;
+export const assetWorkspace = ownerWorkspace('assets', 'asset_id');
+export const departmentWorkspace = ownerWorkspace('departments', 'department_id');
+
+/**
+ * Chỉ admin của workspace sở hữu tài nguyên mới đi tiếp. `getWorkspaceId(req)` trả workspace của tài nguyên
+ * (hoặc của phòng ban cha khi tạo mới). Không có thì lấy workspace_id trong body, rồi workspace duy nhất
+ * mà user làm admin. Workspace đã kiểm được gắn vào req.workspaceId để controller lưu.
+ */
+export const requireAdmin = (getWorkspaceId) => async (req, res, next) => {
     try {
         const userId = req.user?.user_id;
         if (!userId) {
             return res.status(401).json({ message: 'Chưa xác thực. Vui lòng đăng nhập.' });
         }
 
-        // Kiểm tra xem user có vai trò admin trong workspace hoặc hệ thống không
-        const roleRes = await pool.query(
-            `SELECT LOWER(r.role_name) as role_name 
-             FROM workspace_members wm 
-             JOIN roles r ON wm.role_id = r.role_id 
-             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL AND LOWER(r.role_name) = 'admin'
-             LIMIT 1`,
-            [userId]
-        );
+        let workspaceId = await getWorkspaceId(req);
+        if (workspaceId === null) return res.status(404).json({ message: 'Không tìm thấy dữ liệu.' });
 
-        // shortcut: phòng ban và thiết bị chưa có cột workspace nên admin của bất kỳ workspace nào đều sửa được; thêm workspace_id khi làm Việc 8
-        if (roleRes.rows.length > 0) {
+        const adminOf = (await pool.query(
+            `SELECT wm.workspace_id
+             FROM workspace_members wm
+             JOIN roles r ON wm.role_id = r.role_id
+             WHERE wm.user_id = $1 AND wm.deleted_at IS NULL AND LOWER(r.role_name) = 'admin'`,
+            [userId]
+        )).rows.map((r) => r.workspace_id);
+
+        workspaceId ??= Number(req.body?.workspace_id) || (adminOf.length === 1 ? adminOf[0] : undefined);
+        if (!workspaceId && adminOf.length > 1) {
+            return res.status(400).json({ message: 'Thiếu workspace_id: bạn quản trị nhiều nơi làm việc.' });
+        }
+        if (adminOf.includes(Number(workspaceId))) {
+            req.workspaceId = Number(workspaceId);
             return next();
         }
 
         return res.status(403).json({
-            message: 'Forbidden: Bạn cần quyền Quản trị viên (Admin) để thực hiện thao tác này.'
+            message: 'Forbidden: Bạn cần quyền Quản trị viên (Admin) tại nơi làm việc này.'
         });
     } catch (error) {
         console.error('[requireAdmin] Error:', error);

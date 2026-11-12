@@ -62,13 +62,13 @@ async function main() {
     );
   }
 
-  // Phòng ban / phân xưởng (bảng departments chưa có cột workspace, dùng mã AP_ để khỏi trùng)
+  // Phòng ban / phân xưởng (mã phòng ban là duy nhất trên toàn hệ thống nên dùng tiền tố AP_)
   const dept = async (code, name, managerId, parentId = null) =>
     (await one(
-      `INSERT INTO departments (name, code, manager_id, parent_id) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, manager_id = EXCLUDED.manager_id, parent_id = EXCLUDED.parent_id
+      `INSERT INTO departments (name, code, manager_id, parent_id, workspace_id) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, manager_id = EXCLUDED.manager_id, parent_id = EXCLUDED.parent_id, workspace_id = EXCLUDED.workspace_id
        RETURNING department_id`,
-      [name, code, managerId, parentId]
+      [name, code, managerId, parentId, wsId]
     )).department_id;
   const dPlan = await dept('AP_PLAN', 'Phòng Kế hoạch', id.dungtq);
   const dPack = await dept('AP_PACK', 'Xưởng đóng gói', id.dungtq);
@@ -124,10 +124,10 @@ async function main() {
   // Thiết bị Dây chuyền A2
   const asset = async (code, name, location) =>
     (await one(
-      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, status) VALUES ($1, $2, $3, $4, $5, 'OPERATIONAL')
-       ON CONFLICT (asset_code) DO UPDATE SET name = EXCLUDED.name, location = EXCLUDED.location, department_id = EXCLUDED.department_id
+      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, status, workspace_id) VALUES ($1, $2, $3, $4, $5, 'OPERATIONAL', $6)
+       ON CONFLICT (asset_code) DO UPDATE SET name = EXCLUDED.name, location = EXCLUDED.location, department_id = EXCLUDED.department_id, workspace_id = EXCLUDED.workspace_id
        RETURNING asset_id`,
-      [code, name, location, dLineA2, crypto.randomBytes(12).toString('hex')]
+      [code, name, location, dLineA2, crypto.randomBytes(12).toString('hex'), wsId]
     )).asset_id;
   const bt07 = await asset('BT-07', 'Băng tải con lăn 6 m', 'Dây chuyền A2 · Xưởng đóng gói');
   await asset('MD-03', 'Máy dán thùng', 'Dây chuyền A2 · Cuối chuyền');
