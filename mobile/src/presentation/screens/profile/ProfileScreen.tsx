@@ -7,6 +7,7 @@ import {
 } from 'lucide-react-native';
 import { space } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
+import { config } from '../../../core/config';
 import { approvals, inspections, syncQueue } from '../../../data/demo/fixtures';
 import { useAuthStore } from '../../state/authStore';
 import { AppText, Avatar, Group, Row, ScrollPage, SectionHeader } from '../../components/ui';
@@ -65,7 +66,8 @@ export const ProfileScreen: React.FC = () => {
       </Group>
       <Group>
         <Row icon={KeyRound} title="Quyền truy cập" subtitle="Camera, thông báo, vị trí" onPress={go(Routes.PERMISSIONS)} />
-        <Row icon={LayoutDashboard} title="Trang chủ theo vai trò" subtitle="Xem thử B01–B12 và trạng thái" onPress={go(Routes.ROLE_PICKER)} />
+        {/* Công cụ xem thử: dùng thật thì trang chủ đi theo quyền của nơi làm việc */}
+        {config.demo ? <Row icon={LayoutDashboard} title="Trang chủ theo vai trò" subtitle="Xem thử B01–B12 và trạng thái" onPress={go(Routes.ROLE_PICKER)} /> : null}
       </Group>
       <Group>
         <Row icon={LogOut} iconTone="danger" title="Đăng xuất" titleTone="danger" chevron={false} onPress={isLoading ? undefined : logout} />

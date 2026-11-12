@@ -27,6 +27,12 @@ export interface Department {
   managerId?: number;
 }
 
+export interface UserContext {
+  workspaces: Workspace[];
+  currentWorkspace: Workspace | null;
+  capabilities: UserCapabilities;
+}
+
 export interface UserCapabilities {
   canScanQR: boolean;
   canReportIncident: boolean;

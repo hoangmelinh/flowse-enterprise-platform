@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { User, Workspace, UserCapabilities } from '../../domain/entities/auth';
-import { AuthRepositoryImpl } from '../../data/repositories/AuthRepositoryImpl';
+import { AuthRepositoryImpl, toCapabilities } from '../../data/repositories/AuthRepositoryImpl';
+import secureStorage from '../../data/local/secureStorage';
+import { usePrefs } from './prefsStore';
 
 const authRepo = new AuthRepositoryImpl();
 
@@ -23,37 +25,25 @@ interface AuthState {
   switchWorkspace: (workspace: Workspace) => Promise<void>;
 }
 
-const computeCapabilities = (role: string): UserCapabilities => {
-  const r = role.toLowerCase();
-  const isAdmin = r === 'admin';
-  const isManager = r === 'manager' || isAdmin;
-  const isTech = r === 'technician' || isAdmin;
-  const isQA = r === 'qa' || isAdmin;
+// Chưa đăng nhập: không có quyền nào
+const NO_CAPABILITIES = toCapabilities();
 
-  return {
-    canScanQR: true,
-    canReportIncident: true,
-    canTriageIncident: isManager,
-    canExecuteRepair: isTech,
-    canVerifyIncident: isQA || isManager,
-    canCloseIncident: isManager,
-    canRunInspection: isQA || isTech || isManager,
-    canApprove: isManager,
-    canCreateTask: true,
-    canAssignWork: isManager,
-  };
-};
+/**
+ * Nơi làm việc và quyền do backend tính (/users/contexts): theo vai trò trong nơi đó và phòng ban, không đoán từ tên vai trò.
+ * Mở lại app thì về nơi đã chọn lần trước; nơi đó không còn thì backend trả nơi đầu tiên.
+ */
+async function loadContext(workspaceId?: number | null) {
+  const ctx = await authRepo.getContexts(workspaceId ?? (await secureStorage.getCurrentWorkspaceId()));
+  if (ctx.currentWorkspace) await authRepo.switchWorkspace(ctx.currentWorkspace.id);
+  return ctx;
+}
 
 /** Đăng nhập chung cho mật khẩu và Google: lưu phiên, tải nơi làm việc, tính quyền. */
 async function signIn(set: (p: Partial<AuthState>) => void, call: () => Promise<{ user: User; token: string }>): Promise<boolean> {
   set({ isLoading: true, error: null });
   try {
     const { user, token } = await call();
-    const workspaces = await authRepo.getUserWorkspaces();
-    const currentWorkspace = workspaces[0] || null;
-
-    const effectiveRole = currentWorkspace?.role || user.role || 'member';
-    const capabilities = computeCapabilities(effectiveRole);
+    const { workspaces, currentWorkspace, capabilities } = await loadContext();
 
     set({
       user,
@@ -78,7 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   currentWorkspace: null,
   workspaces: [],
-  capabilities: computeCapabilities('member'),
+  capabilities: NO_CAPABILITIES,
   isLoading: true,
   isInitialized: false,
   error: null,
@@ -89,12 +79,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     set({ isLoading: true });
     await authRepo.logout();
+    // Vai trò xem thử ở Tôi là của người vừa đăng xuất, không để sang người đăng nhập sau trên cùng máy
+    usePrefs.getState().set({ homeRole: null });
     set({
       user: null,
       token: null,
       currentWorkspace: null,
       workspaces: [],
-      capabilities: computeCapabilities('member'),
+      capabilities: NO_CAPABILITIES,
       isLoading: false,
     });
   },
@@ -114,16 +106,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
-      const workspaces = await authRepo.getUserWorkspaces();
-      const currentWorkspace = workspaces[0] || null;
-      const effectiveRole = currentWorkspace?.role || user.role || 'member';
+      const { workspaces, currentWorkspace, capabilities } = await loadContext();
 
       set({
         user,
         token,
         workspaces,
         currentWorkspace,
-        capabilities: computeCapabilities(effectiveRole),
+        capabilities,
         isLoading: false,
       });
     } catch {
@@ -134,12 +124,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   switchWorkspace: async (workspace) => {
-    await authRepo.switchWorkspace(workspace.id);
-    const currentUser = get().user;
-    const effectiveRole = workspace.role || currentUser?.role || 'member';
-    set({
-      currentWorkspace: workspace,
-      capabilities: computeCapabilities(effectiveRole),
-    });
+    const { workspaces, currentWorkspace, capabilities } = await loadContext(workspace.id);
+    set({ workspaces, currentWorkspace, capabilities });
   },
 }));
