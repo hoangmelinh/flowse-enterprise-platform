@@ -38,19 +38,6 @@ export const getAccessibleSpacesForUser = async (userId) => {
   return result.rows;
 };
 
-export const getFirstWorkspaceForUser = async (userId) => {
-  const result = await con.query(
-    `SELECT workspace_id
-     FROM workspace_members
-     WHERE user_id = $1 AND deleted_at IS NULL
-     ORDER BY joined_at ASC
-     LIMIT 1`,
-    [userId]
-  );
-
-  return result.rows[0] || null;
-};
-
 export const findTasksForAi = async (userId, args = {}) => {
   let query = `
     SELECT t.task_id, t.name, t.due_date, t.completed_at,
@@ -201,17 +188,4 @@ export const findAssignableMembersForSpace = async (spaceId) => {
   );
 
   return result.rows;
-};
-
-export const findDefaultListIdForSpace = async (spaceId) => {
-  const result = await con.query(
-    `SELECT list_id
-     FROM lists
-     WHERE space_id = $1 AND deleted_at IS NULL
-     ORDER BY position ASC
-     LIMIT 1`,
-    [spaceId]
-  );
-
-  return result.rows[0]?.list_id || null;
 };

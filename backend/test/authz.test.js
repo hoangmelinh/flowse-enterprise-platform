@@ -130,3 +130,18 @@ test('nhập tay mã máy trên /assets/resolve: thấy máy công ty mình, cô
   assert.equal((await api('GET', '/assets/resolve?code=B-CODE', { as: U.adminA })).status, 404);
   assert.equal((await api('GET', '/assets/resolve', { as: U.adminA })).status, 400);
 });
+
+test('thống kê dừng máy và tóm tắt sự cố bằng AI: không lẫn dữ liệu công ty khác', async () => {
+  const { makeIncident } = await import('./helpers.js');
+  const asset = (await sql("INSERT INTO assets (asset_code, name, qr_token, workspace_id) VALUES ('A-STAT', 'Máy A thống kê', 'flw_tok_a_stat', $1) RETURNING asset_id", [WS.A.id])).rows[0].asset_id;
+  const inc = await makeIncident(WS.A.id, U.memberA.id);
+  await sql('UPDATE incidents SET asset_id = $1, resolved_at = now(), downtime_minutes = 77 WHERE incident_id = $2', [asset, inc]);
+  const top = async (who) => {
+    const r = await api('GET', '/incidents/stats/downtime-mttr?period=all', { as: who });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return (r.body.data ?? r.body).topDowntimeAssets.map((a) => a.asset_code);
+  };
+  assert.ok((await top(U.adminA)).includes('A-STAT'));
+  assert.ok(!(await top(U.managerB)).includes('A-STAT'));
+  assert.equal((await api('POST', '/ai/summarize-incident', { as: U.managerB, body: { incident_id: inc } })).status, 404);
+});

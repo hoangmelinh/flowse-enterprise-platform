@@ -94,7 +94,7 @@ export const deleteIncident = async (req, res, next) => {
 export const getDowntimeStats = async (req, res, next) => {
   try {
     const { period = "month" } = req.query;
-    const stats = await Incident.getDowntimeAndMTTRStats(period);
+    const stats = await Incident.getDowntimeAndMTTRStats(period, req.user.user_id);
     res.json({ success: true, data: stats });
   } catch (error) {
     next(error);

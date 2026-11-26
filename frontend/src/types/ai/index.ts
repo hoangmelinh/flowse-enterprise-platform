@@ -1,5 +1,7 @@
 export interface ActionCardData {
     card_id: string;
+    /** Đề xuất lưu ở server (ai_actions): xác nhận thì gọi /ai/actions/:id/apply, server kiểm quyền rồi mới tạo */
+    action_id?: number;
     action_type: 'CREATE_INCIDENT' | 'CREATE_TASK' | 'REQUEST_PARTS' | 'ASSIGN_TECHNICIAN' | 'SCHEDULE_MAINTENANCE';
     title: string;
     subtitle?: string;
