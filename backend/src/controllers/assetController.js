@@ -50,14 +50,14 @@ export const getAssetById = async (req, res, next) => {
 
 export const resolveQrContext = async (req, res, next) => {
   try {
-    const { token } = req.query;
-    if (!token) {
-      return res.status(400).json({ success: false, message: "QR token is required" });
+    const { token, code } = req.query;
+    if (!token && !code) {
+      return res.status(400).json({ success: false, message: "Cần mã QR (token) hoặc mã thiết bị (code)." });
     }
 
-    const context = await Asset.resolveQrToken(token);
+    const context = await Asset.resolveQrToken(token, code);
     if (!context) {
-      return res.status(404).json({ success: false, message: "Asset not found for this QR token" });
+      return res.status(404).json({ success: false, message: "Không tìm thấy thiết bị." });
     }
 
     res.json({

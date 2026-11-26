@@ -43,13 +43,14 @@ class Asset {
   /**
    * Resolve QR token để trả về Digital Context cho Mobile / Field Worker
    */
-  static async resolveQrToken(token) {
+  static async resolveQrToken(token, code = null) {
+    // Quét tem: tra theo token; nhập tay mã in dưới QR (VD BT-07): tra theo mã máy
     const assetRes = await con.query(
-      `SELECT a.*, d.name AS department_name 
+      `SELECT a.*, d.name AS department_name
        FROM assets a
        LEFT JOIN departments d ON a.department_id = d.department_id
-       WHERE a.qr_token = $1`,
-      [token]
+       WHERE ($1::text IS NOT NULL AND a.qr_token = $1) OR ($1::text IS NULL AND upper(a.asset_code) = upper($2))`,
+      [token || null, code || null]
     );
 
     if (assetRes.rows.length === 0) {

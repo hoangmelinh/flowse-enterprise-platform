@@ -79,7 +79,11 @@ const ownerWorkspace = (table, key) => async (id) =>
     id == null || id === '' ? undefined
         : (await pool.query(`SELECT workspace_id FROM ${table} WHERE ${key} = $1`, [id])).rows[0]?.workspace_id ?? null;
 export const assetWorkspace = ownerWorkspace('assets', 'asset_id');
-export const assetWorkspaceByQr = ownerWorkspace('assets', 'qr_token');
+const byQr = ownerWorkspace('assets', 'qr_token');
+const byCode = async (code) =>
+    code ? (await pool.query('SELECT workspace_id FROM assets WHERE upper(asset_code) = upper($1)', [code])).rows[0]?.workspace_id ?? null : undefined;
+/** Workspace của thiết bị trên /assets/resolve: theo token quét được, hoặc mã máy nhập tay. */
+export const assetWorkspaceByQr = (token, code) => (token ? byQr(token) : byCode(code));
 
 /**
  * Chỉ thành viên workspace sở hữu thiết bị mới xem / quét / kiểm tra được. Không phải thì 404 (không lộ thiết bị có tồn tại).

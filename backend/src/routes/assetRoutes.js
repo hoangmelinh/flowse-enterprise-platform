@@ -16,7 +16,7 @@ const ownAsset = requireAssetMember((req) => assetWorkspace(req.params.id));
 
 const router = Router();
 
-router.get("/resolve", requireAssetMember((req) => assetWorkspaceByQr(req.query.token)), resolveQrContext);
+router.get("/resolve", requireAssetMember((req) => assetWorkspaceByQr(req.query.token, req.query.code)), resolveQrContext);
 router.get("/", getAssets);
 router.get("/:id/health-record", ownAsset, getAssetHealthRecord);
 router.get("/:id", ownAsset, getAssetById);

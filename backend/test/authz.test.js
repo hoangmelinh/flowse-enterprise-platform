@@ -123,3 +123,10 @@ test('thiết bị tạo mới không truyền mã QR: mã ngẫu nhiên, không
   assert.equal(res.status, 201, JSON.stringify(res.body));
   assert.match(res.body.data.qr_token, /^flw_tok_[0-9a-f]{24}$/);
 });
+
+test('nhập tay mã máy trên /assets/resolve: thấy máy công ty mình, công ty khác 404', async () => {
+  await sql("INSERT INTO assets (asset_code, name, qr_token, workspace_id) VALUES ('B-CODE', 'Máy B2', 'flw_tok_b_code', $1)", [WS.B.id]);
+  assert.equal((await api('GET', '/assets/resolve?code=b-code', { as: U.managerB })).body.data.asset.asset_code, 'B-CODE');
+  assert.equal((await api('GET', '/assets/resolve?code=B-CODE', { as: U.adminA })).status, 404);
+  assert.equal((await api('GET', '/assets/resolve', { as: U.adminA })).status, 400);
+});
