@@ -258,7 +258,7 @@ class WorkflowEngine {
         for (const field of transition.required_fields) {
           // Mỗi trường phải có giá trị riêng; ghi chú chỉ thoả trường "note"
           const val = field === "note" ? note : field === "evidence_url" ? metadata?.evidence_urls : metadata?.[field];
-          if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
+          if (val === undefined || val === null || (typeof val === "string" && !val.trim()) || (Array.isArray(val) && val.length === 0)) {
             throw new AppError(`Bước chuyển này bắt buộc phải cung cấp thông tin [${field}].`, 400, "MISSING_FIELD", { field });
           }
         }
@@ -344,6 +344,15 @@ class WorkflowEngine {
                downtime_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 60))
            WHERE incident_id = $1 AND resolved_at IS NULL`,
           [incId]
+        );
+      }
+
+      // 6b'. Nguyên nhân và cách sửa do kỹ thuật viên ghi: lịch sử máy và nguồn cho AI khi quét QR
+      const said = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 2000) : null);
+      if (incId && (said(metadata?.root_cause) || said(metadata?.resolution))) {
+        await client.query(
+          `UPDATE incidents SET root_cause = COALESCE($2, root_cause), resolution = COALESCE($3, resolution) WHERE incident_id = $1`,
+          [incId, said(metadata.root_cause), said(metadata.resolution)]
         );
       }
 

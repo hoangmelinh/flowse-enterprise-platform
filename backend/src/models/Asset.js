@@ -231,11 +231,13 @@ class Asset {
     const allIncRes = await con.query(
       `SELECT
          inc.incident_id, inc.severity, inc.symptom, inc.created_at,
-         inc.resolved_at, inc.downtime_minutes,
+         inc.resolved_at, inc.downtime_minutes, inc.root_cause, inc.resolution,
          t.name AS task_name,
          ws.name AS state_name, ws.color AS state_color,
          ws.is_terminal,
-         u.name AS reporter_name
+         u.name AS reporter_name,
+         (SELECT string_agg(fu.name, ', ') FROM task_assigns ta JOIN users fu ON fu.user_id = ta.user_id
+          WHERE ta.task_id = t.task_id AND ta.deleted_at IS NULL) AS fixer_names
        FROM incidents inc
        JOIN tasks t ON inc.task_id = t.task_id
        LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
@@ -261,6 +263,9 @@ class Asset {
         state_color: inc.state_color,
         downtime_minutes: inc.downtime_minutes,
         actor: inc.reporter_name,
+        fixer: inc.fixer_names,
+        root_cause: inc.root_cause,
+        resolution: inc.resolution,
         occurred_at: inc.created_at,
         resolved_at: inc.resolved_at,
       });

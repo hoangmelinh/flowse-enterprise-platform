@@ -1,4 +1,31 @@
+import Groq from "groq-sdk";
 import Asset from "../models/Asset.js";
+import { explainAssetHistory, repairHistory } from "../services/assetInsightService.js";
+
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+
+/**
+ * POST /assets/:id/ai-insight { symptom? }: quét QR xong hỏi "máy này hay hỏng gì, vì sao, sửa thế nào".
+ * Chưa có lần sửa nào ghi nguyên nhân thì trả "chưa đủ dữ liệu" mà không cần AI.
+ */
+export const explainAsset = async (req, res, next) => {
+  try {
+    const record = await Asset.getHealthRecord(req.params.id);
+    if (!record) return res.status(404).json({ success: false, message: "Không tìm thấy thiết bị." });
+    const symptom = typeof req.body?.symptom === "string" ? req.body.symptom : "";
+    if (!groq && repairHistory(record).length) {
+      return res.status(503).json({ success: false, message: "Flowse AI chưa được cấu hình (thiếu GROQ_API_KEY)." });
+    }
+    res.json({ success: true, data: await explainAssetHistory(groq, record, symptom) });
+  } catch (error) {
+    // Lỗi từ Groq (có status) không lộ chi tiết ra ngoài
+    if (error?.status && !error.statusCode) {
+      console.warn("[ai-insight] Groq lỗi:", error.message);
+      return res.status(502).json({ success: false, message: "Flowse AI đang bận, thử lại sau ít phút." });
+    }
+    next(error);
+  }
+};
 
 export const getAssets = async (req, res, next) => {
   try {
