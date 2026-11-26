@@ -15,7 +15,9 @@ const con = new Pool({
         database: process.env.DB_NAME || 'flowse_enterprise',
         port: parseInt(process.env.DB_PORT || '5432', 10),
     }),
-    max: 20, 
+    // Supabase Session pooler chỉ cho 15 kết nối trên cả project; để 10 chừa chỗ cho seed / migration.
+    // Hết kết nối thì request xếp hàng chờ (tối đa connectionTimeoutMillis) thay vì bị pooler từ chối thành lỗi 500.
+    max: 10,
     idleTimeoutMillis: 30000, 
     connectionTimeoutMillis: 10000,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
