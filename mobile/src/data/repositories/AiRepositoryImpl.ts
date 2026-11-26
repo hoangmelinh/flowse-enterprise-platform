@@ -22,9 +22,10 @@ export const aiErrorText = (e: unknown) =>
  * Work: POST /ai/work → { data: { response, action } }; áp dụng / huỷ qua /ai/actions/:id.
  */
 export class AiRepositoryImpl {
-  async chat(message: string, history: AiTurn[]): Promise<string> {
+  /** Chat cũng có thể soạn việc (draft_task): trả đề xuất để áp dụng như chế độ Work, không ghi thẳng */
+  async chat(message: string, history: AiTurn[]): Promise<{ text: string; action: AiAction | null }> {
     const res = await apiClient.post('/ai/chat', { message, history: history.slice(-12) });
-    return toPlainText(String(res.data?.response ?? ''));
+    return { text: toPlainText(String(res.data?.response ?? '')), action: res.data?.action ?? null };
   }
 
   async work(message: string, history: AiTurn[]): Promise<{ text: string; action: AiAction | null }> {

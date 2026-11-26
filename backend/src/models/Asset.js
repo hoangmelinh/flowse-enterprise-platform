@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import con from "../config/connect.js";
 import Department from "./Department.js";
 import { AppError } from "../middlewares/errorMiddleware.js";
@@ -5,9 +6,10 @@ import { AppError } from "../middlewares/errorMiddleware.js";
 const VALID_ASSET_STATUSES = ["OPERATIONAL", "MAINTENANCE", "FAULTY", "DECOMMISSIONED"];
 
 class Asset {
-  static async getAll(user = null, workspaceId = null, allowedWorkspaceIds = null) {
-    const conditions = [];
-    const values = [];
+  /** Thiết bị `user` được xem: chỉ trong các công ty user là thành viên (không có user thì rỗng), rồi lọc theo phòng ban. */
+  static async getAll(user = null) {
+    const values = [user?.user_id ?? null];
+    let scopeClause = `WHERE a.workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL)`;
 
     if (workspaceId) {
       values.push(Number(workspaceId));
@@ -27,7 +29,7 @@ class Asset {
       const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, null, workspaceId);
       if (accessibleDeptIds !== null) {
         values.push(accessibleDeptIds);
-        conditions.push(`(a.department_id = ANY($${values.length}::int[]) OR a.department_id IS NULL)`);
+        scopeClause += ` AND (a.department_id = ANY($2::int[]) OR a.department_id IS NULL)`;
       }
     }
 
@@ -60,13 +62,14 @@ class Asset {
   /**
    * Resolve QR token để trả về Digital Context cho Mobile / Field Worker
    */
-  static async resolveQrToken(token) {
+  static async resolveQrToken(token, code = null) {
+    // Quét tem: tra theo token; nhập tay mã in dưới QR (VD BT-07): tra theo mã máy
     const assetRes = await con.query(
-      `SELECT a.*, d.name AS department_name 
+      `SELECT a.*, d.name AS department_name
        FROM assets a
        LEFT JOIN departments d ON a.department_id = d.department_id
-       WHERE a.qr_token = $1`,
-      [token]
+       WHERE ($1::text IS NOT NULL AND a.qr_token = $1) OR ($1::text IS NULL AND upper(a.asset_code) = upper($2))`,
+      [token || null, code || null]
     );
 
     if (assetRes.rows.length === 0) {
@@ -248,11 +251,13 @@ class Asset {
     const allIncRes = await con.query(
       `SELECT
          inc.incident_id, inc.severity, inc.symptom, inc.created_at,
-         inc.resolved_at, inc.downtime_minutes,
+         inc.resolved_at, inc.downtime_minutes, inc.root_cause, inc.resolution,
          t.name AS task_name,
          ws.name AS state_name, ws.color AS state_color,
          ws.is_terminal,
-         u.name AS reporter_name
+         u.name AS reporter_name,
+         (SELECT string_agg(fu.name, ', ') FROM task_assigns ta JOIN users fu ON fu.user_id = ta.user_id
+          WHERE ta.task_id = t.task_id AND ta.deleted_at IS NULL) AS fixer_names
        FROM incidents inc
        JOIN tasks t ON inc.task_id = t.task_id
        LEFT JOIN workflow_states ws ON t.current_state_id = ws.state_id
@@ -278,6 +283,9 @@ class Asset {
         state_color: inc.state_color,
         downtime_minutes: inc.downtime_minutes,
         actor: inc.reporter_name,
+        fixer: inc.fixer_names,
+        root_cause: inc.root_cause,
+        resolution: inc.resolution,
         occurred_at: inc.created_at,
         resolved_at: inc.resolved_at,
       });
@@ -415,19 +423,9 @@ class Asset {
     console.log(`[Asset] Đã tính toán và lưu Health Score cho ${assetsRes.rows.length} thiết bị.`);
   }
 
-  static async create({ asset_code, name, location, department_id, qr_token, status = "OPERATIONAL", specs = {}, manufacturer, model, serial_number, description, workspace_id }) {
-    const normalizedStatus = String(status || "OPERATIONAL").toUpperCase();
-    if (!VALID_ASSET_STATUSES.includes(normalizedStatus)) {
-      throw new AppError(`Trạng thái thiết bị không hợp lệ (${normalizedStatus}). Chỉ chấp nhận: ${VALID_ASSET_STATUSES.join(", ")}`, 400, "INVALID_ASSET_STATUS");
-    }
-    const mergedSpecs = {
-      ...(specs && typeof specs === "object" ? specs : {}),
-      ...(manufacturer ? { manufacturer } : {}),
-      ...(model ? { model } : {}),
-      ...(serial_number ? { serial_number } : {}),
-      ...(description ? { notes: description } : {}),
-    };
-    const token = qr_token || `flw_tok_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  static async create({ asset_code, name, location, department_id, qr_token, specs = {}, workspace_id }) {
+    // Mã in trên tem phải không đoán được (trước đây là QR-<mã>-<thời gian>)
+    const token = qr_token || `flw_tok_${crypto.randomBytes(12).toString("hex")}`;
     const res = await con.query(
       `INSERT INTO assets (asset_code, name, location, department_id, qr_token, status, specs, health_score, workspace_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 100, $8) RETURNING *`,

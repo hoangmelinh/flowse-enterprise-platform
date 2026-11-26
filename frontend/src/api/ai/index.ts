@@ -28,6 +28,13 @@ export const draftAIAction = async (
     return beApi.post('ai/draft-action', { prompt, context });
 };
 
+/** Áp dụng đề xuất của Flowse AI (tạo việc...): server kiểm lại quyền, mỗi đề xuất chỉ áp dụng được một lần */
+export const applyAIAction = async (
+    actionId: number
+): Promise<{ data: { status: string; result?: { message?: string; task_id?: number } } }> => {
+    return beApi.post(`ai/actions/${actionId}/apply`);
+};
+
 export const summarizeIncidentAI = async (
     incidentId: number
 ): Promise<{ success: boolean; summary: string; incident_id: number; asset_code?: string }> => {

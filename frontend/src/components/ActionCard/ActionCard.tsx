@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { ActionCardData } from '@/types/ai';
 import { reportIncident } from '@/api/incidents';
+import { applyAIAction } from '@/api/ai';
 
 interface ActionCardProps {
     card: ActionCardData;
@@ -111,6 +112,18 @@ export const ActionCard: React.FC<ActionCardProps> = ({
                     duration: 7
                 });
                 onExecuteSuccess?.(res, card);
+            } else if (card.action_type === 'CREATE_TASK') {
+                // Việc do AI soạn: server kiểm lại quyền, không gian, người làm rồi mới tạo (cùng cơ chế chế độ Work)
+                if (!card.action_id) throw new Error('Thẻ này đã cũ, hãy nhờ Flowse AI soạn lại.');
+                const res = await applyAIAction(card.action_id);
+                const result = res?.data?.result;
+                setCard(prev => ({
+                    ...prev,
+                    status: 'EXECUTED',
+                    execution_result: { success: true, message: result?.message || 'Đã tạo việc.', created_id: result?.task_id, link: '/home' }
+                }));
+                notification.success({ message: '✅ Đã tạo việc', description: result?.message, duration: 5 });
+                onExecuteSuccess?.(res, card);
             } else {
                 // Task creation or other action
                 setCard(prev => ({
@@ -142,7 +155,7 @@ export const ActionCard: React.FC<ActionCardProps> = ({
             }
         } catch (err: any) {
             setCard(prev => ({ ...prev, status: 'PENDING' }));
-            message.error(err?.message || 'Không thể thực thi Thẻ Hành Động.');
+            message.error(err?.response?.data?.message || err?.message || 'Không thể thực thi Thẻ Hành Động.');
         } finally {
             setExecuting(false);
         }

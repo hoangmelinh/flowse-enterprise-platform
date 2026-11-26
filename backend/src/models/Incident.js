@@ -717,14 +717,11 @@ class Incident {
    * @param {string} [period='month'] - 'today' | 'week' | 'month' | 'all'
    * @param {object} [scope={}] - { workspaceId, allowedWorkspaceIds, userId, accessibleDeptIds }
    */
-  static async getDowntimeAndMTTRStats(period = "month", scope = {}) {
-    const {
-      workspaceId = null,
-      allowedWorkspaceIds = null,
-      userId = null,
-      accessibleDeptIds = null,
-    } = scope || {};
-
+  static async getDowntimeAndMTTRStats(period = "month", userId = null) {
+    // Chỉ tính trong các công ty user là thành viên (không có user thì không có số liệu)
+    const ownTask = `AND EXISTS (SELECT 1 FROM lists l JOIN spaces sp ON sp.space_id = l.space_id
+      JOIN workspace_members wm ON wm.workspace_id = sp.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
+      WHERE l.list_id = t.list_id)`;
     let timeCondition = "";
     if (period === "today") {
       timeCondition = "AND inc.created_at >= DATE_TRUNC('day', CURRENT_TIMESTAMP)";
@@ -781,14 +778,9 @@ class Incident {
         COUNT(CASE WHEN si.status = 'COMPLETED' AND (si.breached_at IS NULL) THEN 1 END)::int AS sla_met_count,
         COUNT(CASE WHEN si.status = 'BREACHED' OR (si.breached_at IS NOT NULL) THEN 1 END)::int AS sla_breached_count
       FROM incidents inc
-      JOIN tasks t ON inc.task_id = t.task_id AND t.deleted_at IS NULL
-      JOIN lists l ON l.list_id = t.list_id
-      JOIN spaces sp ON sp.space_id = l.space_id
-      LEFT JOIN assets a ON inc.asset_id = a.asset_id
-      LEFT JOIN LATERAL (
-        SELECT status, breached_at FROM sla_instances WHERE task_id = inc.task_id ORDER BY sla_instance_id DESC LIMIT 1
-      ) si ON TRUE
-      WHERE 1=1 ${timeCondition} ${scopeWhere}
+      JOIN tasks t ON inc.task_id = t.task_id
+      LEFT JOIN sla_instances si ON inc.task_id = si.task_id
+      WHERE 1=1 ${timeCondition} ${ownTask}
     `;
 
     const topAssetsQuery = `
@@ -801,18 +793,16 @@ class Incident {
         COALESCE(SUM(inc.downtime_minutes), 0)::int AS total_downtime_minutes
       FROM assets a
       JOIN incidents inc ON a.asset_id = inc.asset_id
-      JOIN tasks t ON inc.task_id = t.task_id AND t.deleted_at IS NULL
-      JOIN lists l ON l.list_id = t.list_id
-      JOIN spaces sp ON sp.space_id = l.space_id
-      WHERE inc.resolved_at IS NOT NULL ${timeCondition} ${scopeWhere}
+      JOIN tasks t ON t.task_id = inc.task_id
+      WHERE inc.resolved_at IS NOT NULL ${timeCondition} ${ownTask}
       GROUP BY a.asset_id, a.name, a.asset_code, a.location
       ORDER BY total_downtime_minutes DESC
       LIMIT 5
     `;
 
     const [statsRes, topAssetsRes] = await Promise.all([
-      con.query(statsQuery, values),
-      con.query(topAssetsQuery, values),
+      con.query(statsQuery, [userId]),
+      con.query(topAssetsQuery, [userId]),
     ]);
 
     const stats = statsRes.rows[0];

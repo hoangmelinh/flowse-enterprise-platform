@@ -109,6 +109,7 @@ export const executeTransition = async (req, res, next) => {
       user,
       note,
       metadata,
+      baseVersion: req.body.base_version ?? req.body.baseVersion ?? null,
     });
 
     res.json({

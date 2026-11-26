@@ -149,6 +149,32 @@ async function main() {
   await incident(tuDien, 'Cảm biến cửa tủ điện chập chờn', 'Đèn báo cửa tủ điện nhấp nháy, cảm biến lúc nhận lúc không', 'CRITICAL', id.dungtq, null);
   await incident(dauDoc, 'Đầu đọc QR không nhận tín hiệu', 'Đầu đọc không đọc được mã lô ở đầu dây chuyền A1', 'MEDIUM', id.tamlm, id.thanhld);
 
+  // Lần sửa đã xong, có ghi nguyên nhân và cách sửa: lịch sử máy để Flowse AI giải thích khi quét QR
+  const resolvedState = (await one(
+    `SELECT s.state_id FROM workflow_states s JOIN workflow_definitions d ON d.workflow_id = s.workflow_id WHERE d.code = 'INCIDENT_FLOW' AND s.code = 'RESOLVED'`
+  ))?.state_id;
+  const pastRepair = async (assetId, title, symptom, rootCause, resolution, daysAgo, minutes) => {
+    if (await one(`SELECT 1 FROM incidents WHERE asset_id = $1 AND root_cause = $2`, [assetId, rootCause])) return;
+    const inc = await Incident.reportIncident({ title, symptom, asset_id: assetId, reported_by: id.khanhvv, severity: 'HIGH', list_id: lIncident });
+    await Incident.assignTechnician({ incidentId: inc.incident_id, technicianId: id.thanhld, assignedBy: id.dungtq });
+    await con.query(
+      `UPDATE incidents SET root_cause = $2, resolution = $3, created_at = now() - make_interval(days => $4),
+              resolved_at = now() - make_interval(days => $4) + make_interval(mins => $5), downtime_minutes = $5
+       WHERE incident_id = $1`,
+      [inc.incident_id, rootCause, resolution, daysAgo, minutes]
+    );
+    if (resolvedState) await con.query(`UPDATE tasks SET current_state_id = $2 WHERE task_id = $1`, [inc.task_id, resolvedState]);
+    // Đã sửa xong từ trước: tắt SLA (không cảnh báo hết hạn) và bỏ thông báo "sự cố mới / được giao" vừa sinh ra
+    await con.query(`UPDATE sla_instances SET status = 'COMPLETED', breached_at = NULL WHERE task_id = $1`, [inc.task_id]);
+    await con.query(`DELETE FROM notifications WHERE entity_id = $1 AND type IN ('ASSIGNMENT', 'INCIDENT_REPORTED')`, [inc.task_id]);
+  };
+  await pastRepair(bt07, 'BT-07 rung và kêu ở con lăn giữa', 'Rung mạnh khi chạy trên 70% tải, có tiếng rít',
+    'Vòng bi 6204 ở con lăn số 3 mòn do thiếu mỡ bôi trơn', 'Thay vòng bi 6204-2RS, bơm mỡ các con lăn, chạy thử 70% tải 15 phút', 41, 95);
+  await pastRepair(bt07, 'BT-07 lệch băng, cạ mép khung', 'Băng tải chạy lệch sang phải, mép băng sờn',
+    'Bu lông M10 giá đỡ con lăn đầu lỏng làm con lăn lệch trục', 'Căn lại trục con lăn đầu, siết bu lông M10×35 đúng lực, kiểm tra độ căng băng', 18, 60);
+  await pastRepair(dauDoc, 'Đầu đọc QR đọc chập chờn', 'Đọc được mã lô lúc có lúc không',
+    'Mặt kính đầu đọc bám bụi giấy carton', 'Lau kính bằng khăn khô, chỉnh lại góc đọc 15°, thêm lịch vệ sinh mỗi ca', 9, 25);
+
   // Phiếu chờ duyệt (người duyệt để trống: manager của workspace và trưởng phòng ban đều thấy)
   const request = async (name, by, note, incidentId = null) => {
     const t = await task(lRequest, sPlan, name, { by, type: 'REQUEST', dept: dPlan });

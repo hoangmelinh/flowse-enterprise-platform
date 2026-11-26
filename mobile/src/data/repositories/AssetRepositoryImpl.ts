@@ -1,21 +1,26 @@
 import { IAssetRepository } from '../../domain/repositories/IAssetRepository';
-import { Asset, AssetContext } from '../../domain/entities/asset';
+import { Asset, AssetContext, AssetInsight, AssetRecord } from '../../domain/entities/asset';
 import apiClient from '../api/apiClient';
 
 export class AssetRepositoryImpl implements IAssetRepository {
   async getAllAssets(): Promise<Asset[]> {
     const res = await apiClient.get('/assets');
-    return (res.data || []).map((a: any) => this.mapToAsset(a));
+    return (res.data?.data || []).map((a: any) => this.mapToAsset(a));
   }
 
   async getAssetById(id: number): Promise<Asset> {
     const res = await apiClient.get(`/assets/${id}`);
-    return this.mapToAsset(res.data);
+    return this.mapToAsset(res.data?.data);
   }
 
-  async resolveQrToken(qrToken: string): Promise<AssetContext> {
-    const res = await apiClient.get(`/assets/resolve?token=${encodeURIComponent(qrToken)}`);
-    const data = res.data;
+  resolveQrToken(qrToken: string): Promise<AssetContext> {
+    return this.resolve({ token: qrToken });
+  }
+
+  async resolve(query: { token?: string; code?: string }): Promise<AssetContext> {
+    // backend trả { success, data: { asset, active_incidents, available_checklists } }
+    const res = await apiClient.get('/assets/resolve', { params: query });
+    const data = res.data?.data || {};
 
     return {
       asset: this.mapToAsset(data.asset),
@@ -36,7 +41,42 @@ export class AssetRepositoryImpl implements IAssetRepository {
     };
   }
 
+  async getRecord(assetId: number): Promise<AssetRecord> {
+    const res = await apiClient.get(`/assets/${assetId}/health-record`);
+    const d = res.data?.data || {};
+    return {
+      asset: this.mapToAsset(d.asset),
+      repairs: (d.timeline || [])
+        .filter((e: any) => e.type === 'INCIDENT')
+        .map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          symptom: e.subtitle || undefined,
+          rootCause: e.root_cause || undefined,
+          resolution: e.resolution || undefined,
+          fixer: e.fixer || undefined,
+          occurredAt: e.occurred_at || undefined,
+          resolvedAt: e.resolved_at || undefined,
+          open: e.status !== 'RESOLVED',
+          downtimeMinutes: e.downtime_minutes ?? undefined,
+        })),
+    };
+  }
+
+  async explain(assetId: number, symptom = ''): Promise<AssetInsight> {
+    const res = await apiClient.post(`/assets/${assetId}/ai-insight`, { symptom });
+    const d = res.data?.data || {};
+    return {
+      summary: d.summary || '',
+      likelyCauses: (d.likely_causes || []).map((c: any) => ({ cause: c.cause, incidentIds: c.incident_ids || [] })),
+      steps: d.steps || [],
+      insufficientData: d.insufficient_data === true,
+      safetyNote: d.safety_note || '',
+    };
+  }
+
   private mapToAsset(a: any): Asset {
+    a = a || {};
     return {
       id: a.asset_id,
       assetCode: a.asset_code,

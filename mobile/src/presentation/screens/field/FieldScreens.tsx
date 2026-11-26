@@ -16,6 +16,13 @@ import {
   Screen, ScreenHeader, ScrollPage, SectionHeader, Segmented, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { config } from '../../../core/config';
+import { AssetRepositoryImpl } from '../../../data/repositories/AssetRepositoryImpl';
+import { aiErrorText } from '../../../data/repositories/AiRepositoryImpl';
+
+const assetRepo = new AssetRepositoryImpl();
+const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '');
 
 /** E01 — Quét mã thiết bị: tab của vai trò hiện trường, hoặc màn riêng (có nút quay lại) mở từ vai trò khác. Camera chỉ bật khi màn đang mở để tiết kiệm pin. */
 export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
@@ -33,8 +40,11 @@ export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) =
     if (handled.current || !code.trim()) return;
     handled.current = true; // chặn quét lặp nhiều lần trong 1 lần đưa mã vào khung
     const v = code.trim().toUpperCase();
+    const isCode = /^[A-Z]{1,4}-[A-Z0-9-]{1,10}$/.test(v);
+    // Dùng thật: tem QR chứa token ngẫu nhiên, nhập tay là mã in dưới QR; backend kiểm máy có thuộc nhà máy mình không
+    if (!config.demo) nav.navigate(Routes.ASSET_DETAIL, isCode ? { assetCode: v } : { qrToken: code.trim() });
     // K10: không đúng dạng mã thiết bị Flowse (VD BT-07); K09: mã của nhà máy khác (tiền tố DN-)
-    if (!/^[A-Z]{1,4}-[A-Z0-9-]{1,10}$/.test(v)) nav.navigate(Routes.STATE, { k: 'K10' });
+    else if (!isCode) nav.navigate(Routes.STATE, { k: 'K10' });
     else if (v.startsWith('DN-')) nav.navigate(Routes.STATE, { k: 'K09' });
     else nav.navigate(Routes.ASSET_DETAIL, { assetCode: v });
     setTimeout(() => (handled.current = false), 1200);
@@ -120,10 +130,135 @@ export const QRScannerScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) =
 const SCAN = { bg: '#0E1110', text: '#FFFFFF', frame: 'rgba(255,255,255,0.9)' };
 
 /** E02 — Hồ sơ thiết bị. */
-export const AssetDetailScreen: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>> = ({ route, navigation }) => {
+export const AssetDetailScreen: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>> = (props) =>
+  config.demo ? <DemoAssetDetail {...props} /> : <LiveAssetDetail {...props} />;
+
+/** E02 thật: thông tin máy, sự cố đang mở, hỏi Flowse AI theo lịch sử sửa, và lịch sử sửa (nguyên nhân, cách sửa, người sửa). */
+const LiveAssetDetail: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>> = ({ route, navigation }) => {
   const s = useStyles();
   const c = useColors();
-  const code = route.params.assetCode;
+  const { assetCode, qrToken } = route.params;
+  const ctx = useQuery({
+    queryKey: ['asset-resolve', qrToken ?? assetCode],
+    queryFn: () => assetRepo.resolve(qrToken ? { token: qrToken } : { code: assetCode }),
+    retry: false,
+  });
+  const id = ctx.data?.asset.id;
+  const record = useQuery({ queryKey: ['asset-record', id], queryFn: () => assetRepo.getRecord(id!), enabled: !!id });
+  const [symptom, setSymptom] = useState('');
+  const ask = useMutation({ mutationFn: () => assetRepo.explain(id!, symptom) });
+  const a = ctx.data?.asset;
+  const repairs = record.data?.repairs ?? [];
+  const done = repairs.filter((r) => !r.open && (r.rootCause || r.resolution));
+  const byId = new Map(repairs.map((r) => [r.id, r]));
+  const insight = ask.data;
+
+  if (ctx.isError) {
+    return (
+      <ScrollPage title="Thiết bị" onBack={navigation.goBack}>
+        <EmptyState icon={ScanLine} title="Không tìm thấy thiết bị" body="Mã này không thuộc nhà máy của bạn hoặc chưa được đăng ký. Kiểm tra lại tem QR hoặc mã in bên dưới." actionTitle="Quét lại" onAction={navigation.goBack} />
+      </ScrollPage>
+    );
+  }
+
+  return (
+    <ScrollPage
+      title={a ? a.assetCode : 'Đang tải…'}
+      caption={a?.departmentName}
+      onBack={navigation.goBack}
+      footer={
+        a ? (
+          <BottomBar>
+            <Button title="Báo sự cố" variant="danger" icon={<TriangleAlert size={18} color={c.onAccent} />} onPress={() => navigation.navigate(Routes.REPORT_INCIDENT, { assetCode: a.assetCode })} />
+          </BottomBar>
+        ) : undefined
+      }
+    >
+      {a ? (
+        <>
+          <View style={s.assetCard}>
+            <View style={s.assetIcon}>
+              <Wrench size={28} color={c.accent} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <AppText variant="heading">{a.name}</AppText>
+              <AppText variant="caption" tone="muted">{[a.assetCode, a.location].filter(Boolean).join(' · ')}</AppText>
+              {ctx.data!.activeIncidents.length ? <Tag label="Đang có sự cố" tone="danger" /> : <Tag label="Đang chạy ổn định" tone="success" />}
+            </View>
+          </View>
+
+          <SectionHeader title="Sự cố đang mở" count={ctx.data!.activeIncidents.length} />
+          {ctx.data!.activeIncidents.length ? (
+            <Group>
+              {ctx.data!.activeIncidents.map((i) => (
+                <Row key={i.id} icon={Circle} iconTone="progress" title={i.title} subtitle={`${i.stateName} · báo bởi ${i.reporterName}`} />
+              ))}
+            </Group>
+          ) : (
+            <AppText variant="caption" tone="muted">Không có sự cố nào đang mở.</AppText>
+          )}
+
+          <SectionHeader title="Hỏi Flowse AI" />
+          <View style={{ gap: space.sm }}>
+            <Field label="Máy đang bị gì? (không bắt buộc)" icon={Sparkles} value={symptom} onChangeText={setSymptom} placeholder="Ví dụ: rung và rít khi tăng tải" maxLength={500} />
+            <Button title={insight ? 'Hỏi lại' : 'Xem nguyên nhân hay gặp và cách xử lý'} variant="secondary" loading={ask.isPending} onPress={() => ask.mutate()} icon={<Sparkles size={18} color={c.ink} />} />
+            {ask.isError ? <Banner tone="danger" text={aiErrorText(ask.error)} /> : null}
+            {insight ? (
+              <View style={{ gap: space.sm }}>
+                <Banner tone={insight.insufficientData ? 'warning' : 'accent'} text={insight.summary} />
+                {insight.likelyCauses.length ? (
+                  <Group>
+                    {insight.likelyCauses.map((cause, n) => (
+                      <Row
+                        key={n}
+                        icon={Search}
+                        title={cause.cause}
+                        subtitle={`Theo ${cause.incidentIds.map((x) => (byId.get(x) ? `lần sửa ${day(byId.get(x)!.occurredAt)}` : `sự cố #${x}`)).join(', ')}`}
+                      />
+                    ))}
+                  </Group>
+                ) : null}
+                {insight.steps.length ? (
+                  <View style={{ gap: space.xs }}>
+                    <AppText variant="label" tone="muted">Các bước xử lý gợi ý</AppText>
+                    {insight.steps.map((step, n) => (
+                      <AppText key={n}>{`${n + 1}. ${step}`}</AppText>
+                    ))}
+                  </View>
+                ) : null}
+                <Banner tone="warning" text={insight.safetyNote} />
+              </View>
+            ) : null}
+          </View>
+
+          <SectionHeader title="Lịch sử sửa chữa" count={done.length} />
+          {done.length ? (
+            <Group>
+              {done.map((r) => (
+                <Row
+                  key={r.id}
+                  icon={CircleCheck}
+                  iconTone="success"
+                  title={r.rootCause || r.title}
+                  subtitle={[day(r.occurredAt), r.resolution && `Đã: ${r.resolution}`, r.fixer].filter(Boolean).join(' · ')}
+                />
+              ))}
+            </Group>
+          ) : (
+            <AppText variant="caption" tone="muted">{record.isLoading ? 'Đang tải lịch sử…' : 'Chưa có lần sửa nào được ghi nguyên nhân.'}</AppText>
+          )}
+        </>
+      ) : (
+        <AppText variant="caption" tone="muted">Đang tải thiết bị…</AppText>
+      )}
+    </ScrollPage>
+  );
+};
+
+const DemoAssetDetail: React.FC<ScreenProps<typeof Routes.ASSET_DETAIL>> = ({ route, navigation }) => {
+  const s = useStyles();
+  const c = useColors();
+  const code = route.params.assetCode ?? asset.code;
   const open = incidents.filter((i) => i.asset === code);
   return (
     <ScrollPage

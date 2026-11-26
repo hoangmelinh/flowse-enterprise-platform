@@ -1,16 +1,14 @@
 import Groq from "groq-sdk";
-import { checkInheritedWorkspacePermission, checkSpacePermission, checkWorkspacePermission, getWorkspaceRolesForTask } from "../models/Permission.js";
 import {
     countTasksByStatusForAi,
-    findAssignableMembersForSpace,
-    findDefaultListIdForSpace,
     findOverdueTasksForAi,
     findTasksForAi,
     getAccessibleSpacesForUser,
-    getFirstWorkspaceForUser,
 } from "../models/AI.js";
-import { createSpaces } from "../models/Spaces.js";
-import { createTaskForList, findAllTasksByUserId } from "../models/Task.js";
+import { findAllTasksByUserId } from "../models/Task.js";
+import { proposeAction } from "../models/AiAction.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
+import { getWorkspaceRolesForTask } from "../models/Permission.js";
 import Incident from "../models/Incident.js";
 import Asset from "../models/Asset.js";
 import Department from "../models/Department.js";
@@ -23,39 +21,6 @@ dotenv.config();
 const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
 const tools = [
-    {
-        type: "function",
-        function: {
-            name: "create_task",
-            description: "Tạo một nhiệm vụ (task) mới vào một Space cụ thể. Nếu người dùng chưa chỉ định gán cho ai thì KHÔNG truyền assignee_name.",
-            parameters: {
-                type: "object",
-                properties: {
-                    title: { type: "string", description: "Tiêu đề của nhiệm vụ." },
-                    space_name: { type: "string", description: "Tên của Space muốn tạo task vào." },
-                    due_date: { type: "string", description: "Ngày hết hạn (YYYY-MM-DD)." },
-                    priority: { type: "string", enum: ["High", "Medium", "Low"], description: "Mức độ ưu tiên." },
-                    assignee_name: { type: "string", description: "Tên hoặc username của thành viên muốn gán task. Chỉ truyền khi người dùng đã chỉ rõ tên người được gán." },
-                },
-                required: ["title", "space_name"],
-            },
-        },
-    },
-    {
-        type: "function",
-        function: {
-            name: "create_space",
-            description: "Tạo một không gian làm việc (Space) mới.",
-            parameters: {
-                type: "object",
-                properties: {
-                    name: { type: "string", description: "Tên của Space mới." },
-                    description: { type: "string", description: "Mô tả mục đích." },
-                },
-                required: ["name"],
-            },
-        },
-    },
   // ── NEW: List tasks ────────────────────────────────────────────
   {
     type: "function",
@@ -169,7 +134,7 @@ const overdueTable = (overdue, spaceName) => {
 const handleLocalAIChat = async (message, safeHistory, userId, res) => {
     const lower = message.toLowerCase();
     const realSpaces = await getAccessibleSpacesForUser(userId);
-    const allAssets = await Asset.getAll().catch(() => []);
+    const allAssets = await Asset.getAll({ user_id: userId }).catch(() => []);
 
     // 1. Phán đoán ý định báo cáo sự cố máy móc -> Trả về Action Card (Human-in-the-loop)
     if (
@@ -224,7 +189,7 @@ const handleLocalAIChat = async (message, safeHistory, userId, res) => {
 
     // 2. Phán đoán ý định thống kê downtime & MTTR
     if (lower.includes("downtime") || lower.includes("mttr") || lower.includes("thời gian dừng") || lower.includes("dừng máy")) {
-        const stats = await Incident.getDowntimeAndMTTRStats("month").catch(() => null);
+        const stats = await Incident.getDowntimeAndMTTRStats("month", userId).catch(() => null);
         if (stats) {
             let reply = `📊 **Báo cáo Downtime & Hiệu suất MTTR Phân xưởng (Tháng này):**\n\n`;
             reply += `| Chỉ số | Giá trị |\n|---|---|\n`;
@@ -347,7 +312,7 @@ export const chatWithAI = async (req, res) => {
                 
                 QUY TẮC BẢO MẬT & ACTION CARD (HUMAN-IN-THE-LOOP):
                 1. Khi người dùng muốn báo cáo sự cố hoặc hư hỏng thiết bị, hãy GỌI TOOL draft_incident để tạo Thẻ Hành Động (Action Card) xem trước. TUYỆT ĐỐI không tự động ghi dữ liệu.
-                2. Khi người dùng muốn tạo công việc hoặc nhiệm vụ bảo trì, gọi draft_task hoặc create_task.
+                2. Khi người dùng muốn tạo công việc hoặc nhiệm vụ bảo trì, gọi draft_task (chỉ soạn đề xuất, người dùng xác nhận mới tạo). Không có công cụ tạo Space; muốn tạo Space thì hướng dẫn vào mục Không gian.
                 3. Trình bày nội dung cực kỳ đẹp mắt bằng Markdown. Kèm theo Emojis (✨, 🚀, 📂, 📋, 💡...).
                 
                 CẤU TRÚC PHẢN HỒI CHUẨN MỰC:
@@ -390,7 +355,7 @@ export const chatWithAI = async (req, res) => {
 
             // ── HANDLER: draft_incident (ACTION CARD) ──────────────
             if (functionName === "draft_incident") {
-                const allAssets = await Asset.getAll().catch(() => []);
+                const allAssets = await Asset.getAll({ user_id: userId }).catch(() => []);
                 const matchedAsset = allAssets.find(a => 
                     (functionArgs.asset_code && a.asset_code.toLowerCase().includes(functionArgs.asset_code.toLowerCase())) ||
                     (functionArgs.title && a.asset_code && functionArgs.title.toLowerCase().includes(a.asset_code.toLowerCase()))
@@ -426,141 +391,37 @@ export const chatWithAI = async (req, res) => {
             }
 
             // ── HANDLER: draft_task (ACTION CARD) ──────────────────
+            // Không ghi thẳng: lưu đề xuất (ai_actions, PENDING); người dùng xác nhận thì gọi /ai/actions/:id/apply,
+            // server kiểm lại quyền, không gian, người làm rồi mới tạo việc (giống chế độ Work).
             if (functionName === "draft_task") {
-                const actionCard = {
-                    card_id: `card_task_${Date.now()}`,
-                    action_type: "CREATE_TASK",
-                    title: functionArgs.title,
-                    subtitle: `Nhiệm vụ công việc / bảo trì: ${functionArgs.space_name || "Mặc định"}`,
-                    severity: functionArgs.priority === "Urgent" || functionArgs.priority === "High" ? "HIGH" : "NORMAL",
-                    confidence: 0.92,
-                    payload: {
+                let action;
+                try {
+                    action = await proposeAction(userId, "CREATE_TASK", {
                         title: functionArgs.title,
-                        priority: functionArgs.priority || "Normal",
-                        space_name: functionArgs.space_name || null,
-                        due_date: functionArgs.due_date || null,
-                        assignee_name: functionArgs.assignee_name || null
-                    },
-                    status: "PENDING"
+                        space_name: functionArgs.space_name,
+                        priority: functionArgs.priority,
+                        due_date: functionArgs.due_date,
+                        assignee_names: functionArgs.assignee_name ? [functionArgs.assignee_name] : undefined,
+                    });
+                } catch (err) {
+                    if (!(err instanceof AppError)) throw err;
+                    return res.status(200).json({ response: `Chưa soạn được việc: ${err.message}`, suggestions: ["Xem danh sách Space"] });
+                }
+                const actionCard = {
+                    card_id: `ai_action_${action.action_id}`,
+                    action_id: action.action_id,
+                    action_type: "CREATE_TASK",
+                    title: functionArgs.title || action.summary.title,
+                    subtitle: action.summary.rows.map((r) => r.join(": ")).join(" · "),
+                    severity: functionArgs.priority === "Urgent" || functionArgs.priority === "High" ? "HIGH" : "NORMAL",
+                    payload: action.args,
+                    status: "PENDING",
                 };
-
                 return res.status(200).json({
-                    response: `🤖 **Trợ lý AI đã tạo Thẻ Hành Động (Action Card) cho nhiệm vụ công việc!**\n\n- **Tiêu đề:** ${actionCard.title}\n- **Ưu tiên:** ${functionArgs.priority || "Normal"}\n- **Hạn chót:** ${functionArgs.due_date || "Không quy định"}\n\n*Vui lòng xác nhận để tạo nhiệm vụ vào hệ thống.*`,
+                    response: `Mình đã soạn việc "${functionArgs.title}". Bạn xem lại rồi bấm xác nhận để tạo.`,
                     actionCard,
-                    suggestions: ["Xem tất cả task", "Tạo thêm task"]
-                });
-            }
-
-            // ── HANDLER: create_space ─────────────────────────────
-            if (functionName === "create_space") {
-                const workspace = await getFirstWorkspaceForUser(userId);
-
-                if (!workspace) {
-                    return res.status(200).json({ response: "Bạn chưa thuộc về Workspace nào để tạo Space.", suggestions: [] });
-                }
-                const workspaceId = workspace.workspace_id;
-                const canCreateSpace = await checkWorkspacePermission(workspaceId, userId, "SPACE_CREATE");
-                if (!canCreateSpace) {
-                    return res.status(403).json({
-                        response: "Ban khong co quyen tao Space trong Workspace nay.",
-                        suggestions: []
-                    });
-                }
-
-                await createSpaces(
-                    functionArgs.name,
-                    functionArgs.description || "",
-                    workspaceId,
-                    false,
-                    {
-                        createdBy: userId,
-                        addCreatorAsMember: true,
-                        createDefaultList: true,
-                    }
-                );
-
-                return res.status(200).json({
-                    response: `Da tao Space "${functionArgs.name}" thanh cong. He thong da gan ban lam thanh vien va tao danh sach mac dinh. Ban co muon tao task dau tien cho no khong?`,
-                    suggestions: ["Tao task moi", "Xem danh sach Space"],
-                    suggestedTitle: safeHistory.length === 0 ? `Tao: ${functionArgs.name}` : null
-                });
-            }
-            
-            // ── HANDLER: create_task ──────────────────────────────────────────
-            if (functionName === "create_task") {
-                // Find space by name
-                const spaceMatch = realSpaces.find(
-                    s => s.name.toLowerCase() === functionArgs.space_name.toLowerCase()
-                );
-                if (!spaceMatch) {
-                    return res.status(200).json({
-                        response: `⚠️ Space "${functionArgs.space_name}" không tồn tại. Vui lòng tạo Space trước.`,
-                        suggestions: ["Tạo Space mới", "Xem danh sách Space"]
-                    });
-                }
-
-                // Query danh sách thành viên trong workspace (để gán task)
-                const canCreateTask = await checkSpacePermission(spaceMatch.space_id, userId, "TASK_CREATE")
-                    || await checkInheritedWorkspacePermission(spaceMatch.space_id, userId, "TASK_CREATE");
-                if (!canCreateTask) {
-                    return res.status(403).json({
-                        response: `Ban khong co quyen tao task trong Space "${functionArgs.space_name}".`,
-                        suggestions: []
-                    });
-                }
-                const members = await findAssignableMembersForSpace(spaceMatch.space_id);
-
-                // Nếu chưa chỉ định assignee → hiển thị danh sách thành viên và hỏi
-                if (!functionArgs.assignee_name) {
-                    let memberList = members.map((m, i) => 
-                        `${i + 1}. **${m.name || m.username}** (${m.email})`
-                    ).join('\n');
-
-                    return res.status(200).json({
-                        response: `📋 **Task "${functionArgs.title}"** sẵn sàng được tạo trong Space **${functionArgs.space_name}**!\n\n👥 **Bạn muốn gán task này cho ai?** Danh sách thành viên:\n${memberList}\n\n💡 Hãy cho tôi biết tên người bạn muốn gán, hoặc nói "không gán" để tạo task không gán cho ai.`,
-                        suggestions: members.slice(0, 3).map(m => `Gán cho ${m.name || m.username}`)
-                    });
-                }
-
-                // Đã chỉ định assignee → tìm user trong danh sách members
-                const assigneeName = functionArgs.assignee_name.toLowerCase();
-                const assignee = members.find(m => 
-                    (m.name && m.name.toLowerCase().includes(assigneeName)) ||
-                    (m.username && m.username.toLowerCase().includes(assigneeName))
-                );
-
-                // Tạo task bằng model (tự tìm list_id + status_id mặc định)
-                const listId = await findDefaultListIdForSpace(spaceMatch.space_id);
-                if (!listId) {
-                    return res.status(200).json({
-                        response: `⚠️ Space "${functionArgs.space_name}" chưa có danh sách (List) nào. Vui lòng tạo List trước.`,
-                        suggestions: ["Tạo Space mới"]
-                    });
-                }
-
-                // Tìm status mặc định
-                const newTask = await createTaskForList({
-                    listId,
-                    name: functionArgs.title,
-                    description: null,
-                    priority: functionArgs.priority || 'Normal',
-                    assignee_ids: assignee ? [assignee.user_id] : [],
-                    due_date: functionArgs.due_date || null,
-                    created_by: userId
-                });
-
-                // Gán assignee nếu tìm thấy
-                let assignMsg = '';
-                if (assignee) {
-                    assignMsg = `\n👤 Đã gán cho: **${assignee.name || assignee.username}**`;
-                } else if (assigneeName !== 'không' && assigneeName !== 'không gán') {
-                    assignMsg = `\n⚠️ Không tìm thấy thành viên "${functionArgs.assignee_name}". Task đã được tạo nhưng chưa gán cho ai.`;
-                }
-
-                return res.status(200).json({
-                    response: `✅ **Đã tạo nhiệm vụ: ${newTask.name}** (ID: ${newTask.task_id})\nVào Space: **${functionArgs.space_name}**${assignMsg}`,
-                    suggestions: ["Mở danh sách task", "Tạo thêm task"],
-                    suggestedTitle: safeHistory.length === 0 ? `Task: ${functionArgs.title}` : null
+                    action,
+                    suggestions: ["Xem tất cả task", "Tạo thêm task"],
                 });
             }
 
@@ -925,34 +786,12 @@ export const generateLocalAnalyticsSummary = (stats, openIncidents, criticalInci
  */
 export const getAnalyticsSummary = async (req, res) => {
     try {
-        const { period = "month" } = req.body || {};
-        const bodyWs = req.body?.workspaceId || req.body?.workspace_id || null;
-        const userWsIds = req.userWorkspaceIds || [];
-
-        if (bodyWs) {
-            const parsedWs = Number(bodyWs);
-            if (!Number.isInteger(parsedWs) || parsedWs <= 0) {
-                return res.status(400).json({ message: "workspaceId không hợp lệ" });
-            }
-            if (!userWsIds.includes(parsedWs)) {
-                return res.status(403).json({ message: "Forbidden: Bạn không thuộc Workspace được yêu cầu." });
-            }
-        }
-
-        const workspaceId = bodyWs ? Number(bodyWs) : (req.workspaceId || userWsIds[0] || null);
-        if (!workspaceId) {
-            return res.status(200).json({
-                success: true,
-                data: {
-                    ...generateLocalAnalyticsSummary({ totalIncidents: 0, resolvedIncidents: 0, openIncidents: 0, totalDowntimeMinutes: 0, mttrMinutes: 0, slaMetCount: 0, slaBreachedCount: 0, topDowntimeAssets: [] }, [], [], [], period),
-                    metrics: { totalIncidents: 0, resolvedIncidents: 0, openIncidents: 0, totalDowntimeMinutes: 0, formattedTotalDowntime: "0 phút", mttrMinutes: 0, slaMetCount: 0, slaBreachedCount: 0, topDowntimeAssets: [] },
-                    openIncidentsCount: 0,
-                    criticalIncidentsCount: 0,
-                    period,
-                    generatedAt: new Date().toISOString(),
-                },
-            });
-        }
+        const { period = "month" } = req.body;
+        
+        // 1. Lấy dữ liệu thực tế từ cơ sở dữ liệu
+        const stats = await Incident.getDowntimeAndMTTRStats(period, req.user.user_id);
+        const allIncidents = await Incident.getAll(req.user);
+        const allAssets = await Asset.getAll(req.user);
 
         const accessibleDeptIds = await Department.getAccessibleDepartmentIds(req.user.user_id, null, workspaceId);
 
@@ -1068,7 +907,7 @@ export const draftAction = async (req, res) => {
         const { prompt, context } = req.body;
         if (!prompt) return res.status(400).json({ message: "prompt is required" });
 
-        const allAssets = await Asset.getAll().catch(() => []);
+        const allAssets = await Asset.getAll(req.user).catch(() => []);
         const lower = prompt.toLowerCase();
 
         let matchedAsset = allAssets.find(a => a.asset_code && lower.includes(a.asset_code.toLowerCase()));
@@ -1125,7 +964,9 @@ export const summarizeIncident = async (req, res) => {
         if (!incident_id) return res.status(400).json({ message: "incident_id is required" });
 
         const incident = await Incident.getById(incident_id);
-        if (!incident) return res.status(404).json({ message: "Không tìm thấy sự cố" });
+        // Sự cố của công ty khác: trả như không có
+        if (!incident || !(await getWorkspaceRolesForTask(req.user.user_id, incident.task_id)).length)
+            return res.status(404).json({ message: "Không tìm thấy sự cố" });
 
         const roles = await getWorkspaceRolesForTask(req.user.user_id, incident.task_id);
         if (!roles || roles.length === 0) {

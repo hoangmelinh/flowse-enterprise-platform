@@ -8,7 +8,9 @@ export interface IWorkItemRepository {
     workItemId: number,
     toStateId: number,
     baseVersion: number,
-    note?: string
+    note?: string,
+    /** Trường bắt buộc của bước chuyển, VD root_cause, resolution khi báo sửa xong */
+    metadata?: Record<string, unknown>
   ): Promise<WorkItem>;
   assignWorkItem(workItemId: number, assigneeId: number): Promise<WorkItem>;
   createTask(data: {

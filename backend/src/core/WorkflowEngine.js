@@ -187,7 +187,7 @@ class WorkflowEngine {
   /**
    * Thực hiện chuyển đổi trạng thái (State Transition) với đầy đủ validation và audit trail
    */
-  static async executeTransition({ taskId, toStateId, user, note = "", metadata = {} }) {
+  static async executeTransition({ taskId, toStateId, user, note = "", metadata = {}, baseVersion = null }) {
     const client = await con.connect();
     try {
       await client.query("BEGIN");
@@ -206,6 +206,14 @@ class WorkflowEngine {
       }
       const task = taskRes.rows[0];
       let evidenceToCheck = null;
+
+      // Hai người bấm trên cùng một phiên bản: người sau nhận 409 kèm trạng thái hiện tại, không phải lỗi bước chuyển
+      if (baseVersion != null && Number(task.version ?? 1) !== Number(baseVersion)) {
+        throw new AppError(
+          `Việc vừa được người khác cập nhật, hiện ở trạng thái '${task.current_state_name || "khác"}'. Tải lại để xem.`,
+          409, "VERSION_CONFLICT", { current_state_id: task.current_state_id, version: task.version }
+        );
+      }
 
       // 2. Kiểm tra transition hợp lệ
       const transRes = await client.query(
@@ -250,7 +258,7 @@ class WorkflowEngine {
         for (const field of transition.required_fields) {
           // Mỗi trường phải có giá trị riêng; ghi chú chỉ thoả trường "note"
           const val = field === "note" ? note : field === "evidence_url" ? metadata?.evidence_urls : metadata?.[field];
-          if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
+          if (val === undefined || val === null || (typeof val === "string" && !val.trim()) || (Array.isArray(val) && val.length === 0)) {
             throw new AppError(`Bước chuyển này bắt buộc phải cung cấp thông tin [${field}].`, 400, "MISSING_FIELD", { field });
           }
         }
@@ -336,6 +344,15 @@ class WorkflowEngine {
                downtime_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 60))
            WHERE incident_id = $1 AND resolved_at IS NULL`,
           [incId]
+        );
+      }
+
+      // 6b'. Nguyên nhân và cách sửa do kỹ thuật viên ghi: lịch sử máy và nguồn cho AI khi quét QR
+      const said = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 2000) : null);
+      if (incId && (said(metadata?.root_cause) || said(metadata?.resolution))) {
+        await client.query(
+          `UPDATE incidents SET root_cause = COALESCE($2, root_cause), resolution = COALESCE($3, resolution) WHERE incident_id = $1`,
+          [incId, said(metadata.root_cause), said(metadata.resolution)]
         );
       }
 

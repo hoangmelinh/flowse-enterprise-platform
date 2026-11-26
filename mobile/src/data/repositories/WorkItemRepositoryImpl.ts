@@ -40,12 +40,15 @@ export class WorkItemRepositoryImpl implements IWorkItemRepository {
     workItemId: number,
     toStateId: number,
     baseVersion: number,
-    note?: string
+    note?: string,
+    metadata?: Record<string, unknown>
   ): Promise<WorkItem> {
+    // base_version: người khác đã chuyển trước thì backend trả 409 kèm trạng thái hiện tại
     const res = await apiClient.post(`/workflows/tasks/${workItemId}/transition`, {
       to_state_id: toStateId,
       base_version: baseVersion,
       note,
+      metadata,
     });
     return this.mapToWorkItem(res.data?.task || res.data);
   }

@@ -88,10 +88,8 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
       setThinking(true);
       try {
         const history = msgs.filter((m) => !m.card).map((m) => ({ role: m.mine ? ('user' as const) : ('assistant' as const), content: m.text }));
-        if (work) {
-          const { text, action } = await aiRepo.work(q, history);
-          push({ mine: false, text, action: action ?? undefined, streaming: true });
-        } else push({ mine: false, text: await aiRepo.chat(q, history), streaming: true });
+        const { text, action } = await (work ? aiRepo.work(q, history) : aiRepo.chat(q, history));
+        push({ mine: false, text, action: action ?? undefined, streaming: true });
       } catch (e) {
         push({ mine: false, text: aiErrorText(e) });
       } finally {

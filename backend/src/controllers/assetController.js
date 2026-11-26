@@ -1,13 +1,30 @@
+import Groq from "groq-sdk";
 import Asset from "../models/Asset.js";
-import Department from "../models/Department.js";
+import { explainAssetHistory, repairHistory } from "../services/assetInsightService.js";
 
-const canReadAssetInScope = async (req, asset) => {
-  const userWsIds = req.userWorkspaceIds || [];
-  if (!asset.workspace_id || !userWsIds.includes(Number(asset.workspace_id))) {
-    return false;
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+
+/**
+ * POST /assets/:id/ai-insight { symptom? }: quét QR xong hỏi "máy này hay hỏng gì, vì sao, sửa thế nào".
+ * Chưa có lần sửa nào ghi nguyên nhân thì trả "chưa đủ dữ liệu" mà không cần AI.
+ */
+export const explainAsset = async (req, res, next) => {
+  try {
+    const record = await Asset.getHealthRecord(req.params.id);
+    if (!record) return res.status(404).json({ success: false, message: "Không tìm thấy thiết bị." });
+    const symptom = typeof req.body?.symptom === "string" ? req.body.symptom : "";
+    if (!groq && repairHistory(record).length) {
+      return res.status(503).json({ success: false, message: "Flowse AI chưa được cấu hình (thiếu GROQ_API_KEY)." });
+    }
+    res.json({ success: true, data: await explainAssetHistory(groq, record, symptom) });
+  } catch (error) {
+    // Lỗi từ Groq (có status) không lộ chi tiết ra ngoài
+    if (error?.status && !error.statusCode) {
+      console.warn("[ai-insight] Groq lỗi:", error.message);
+      return res.status(502).json({ success: false, message: "Flowse AI đang bận, thử lại sau ít phút." });
+    }
+    next(error);
   }
-  if (!asset.department_id) return true;
-  return await Department.isDepartmentInScope(req.user.user_id, asset.department_id, null, asset.workspace_id);
 };
 
 export const getAssets = async (req, res, next) => {
@@ -36,14 +53,14 @@ export const getAssetById = async (req, res, next) => {
 
 export const resolveQrContext = async (req, res, next) => {
   try {
-    const { token } = req.query;
-    if (!token) {
-      return res.status(400).json({ success: false, message: "QR token is required" });
+    const { token, code } = req.query;
+    if (!token && !code) {
+      return res.status(400).json({ success: false, message: "Cần mã QR (token) hoặc mã thiết bị (code)." });
     }
 
-    const context = await Asset.resolveQrToken(token);
+    const context = await Asset.resolveQrToken(token, code);
     if (!context) {
-      return res.status(404).json({ success: false, message: "Asset not found for this QR token" });
+      return res.status(404).json({ success: false, message: "Không tìm thấy thiết bị." });
     }
     if (!(await canReadAssetInScope(req, context.asset))) {
       return res.status(403).json({ success: false, message: "Forbidden: Mã QR thiết bị thuộc Workspace khác." });
