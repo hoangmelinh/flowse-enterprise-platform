@@ -168,7 +168,7 @@ const overdueTable = (overdue, spaceName) => {
 const handleLocalAIChat = async (message, safeHistory, userId, res) => {
     const lower = message.toLowerCase();
     const realSpaces = await getAccessibleSpacesForUser(userId);
-    const allAssets = await Asset.getAll().catch(() => []);
+    const allAssets = await Asset.getAll({ user_id: userId }).catch(() => []);
 
     // 1. Phán đoán ý định báo cáo sự cố máy móc -> Trả về Action Card (Human-in-the-loop)
     if (
@@ -389,7 +389,7 @@ export const chatWithAI = async (req, res) => {
 
             // ── HANDLER: draft_incident (ACTION CARD) ──────────────
             if (functionName === "draft_incident") {
-                const allAssets = await Asset.getAll().catch(() => []);
+                const allAssets = await Asset.getAll({ user_id: userId }).catch(() => []);
                 const matchedAsset = allAssets.find(a => 
                     (functionArgs.asset_code && a.asset_code.toLowerCase().includes(functionArgs.asset_code.toLowerCase())) ||
                     (functionArgs.title && a.asset_code && functionArgs.title.toLowerCase().includes(a.asset_code.toLowerCase()))
@@ -943,7 +943,7 @@ export const getAnalyticsSummary = async (req, res) => {
         // 1. Lấy dữ liệu thực tế từ cơ sở dữ liệu
         const stats = await Incident.getDowntimeAndMTTRStats(period);
         const allIncidents = await Incident.getAll();
-        const allAssets = await Asset.getAll();
+        const allAssets = await Asset.getAll(req.user);
 
         const openIncidents = allIncidents.filter(i => i.state_code !== 'RESOLVED' && i.state_code !== 'CLOSED');
         const criticalIncidents = openIncidents.filter(i => i.severity === 'CRITICAL' || i.severity === 'HIGH');
@@ -1038,7 +1038,7 @@ export const draftAction = async (req, res) => {
         const { prompt, context } = req.body;
         if (!prompt) return res.status(400).json({ message: "prompt is required" });
 
-        const allAssets = await Asset.getAll().catch(() => []);
+        const allAssets = await Asset.getAll(req.user).catch(() => []);
         const lower = prompt.toLowerCase();
 
         let matchedAsset = allAssets.find(a => a.asset_code && lower.includes(a.asset_code.toLowerCase()));

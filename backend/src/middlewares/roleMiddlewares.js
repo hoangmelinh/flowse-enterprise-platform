@@ -79,6 +79,27 @@ const ownerWorkspace = (table, key) => async (id) =>
     id == null || id === '' ? undefined
         : (await pool.query(`SELECT workspace_id FROM ${table} WHERE ${key} = $1`, [id])).rows[0]?.workspace_id ?? null;
 export const assetWorkspace = ownerWorkspace('assets', 'asset_id');
+export const assetWorkspaceByQr = ownerWorkspace('assets', 'qr_token');
+
+/**
+ * Chỉ thành viên workspace sở hữu thiết bị mới xem / quét / kiểm tra được. Không phải thì 404 (không lộ thiết bị có tồn tại).
+ * `getWorkspaceId` trả undefined khi request không chỉ thiết bị nào: để controller tự báo thiếu tham số.
+ */
+export const requireAssetMember = (getWorkspaceId) => async (req, res, next) => {
+    try {
+        const workspaceId = await getWorkspaceId(req);
+        if (workspaceId === undefined) return next();
+        const member = workspaceId !== null && (await pool.query(
+            'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 AND deleted_at IS NULL',
+            [workspaceId, req.user?.user_id]
+        )).rows.length > 0;
+        if (member) return next();
+        return res.status(404).json({ success: false, message: 'Không tìm thấy thiết bị.' });
+    } catch (error) {
+        console.error('[requireAssetMember] Error:', error);
+        return res.status(500).json({ message: 'Lỗi server khi kiểm tra quyền truy cập.' });
+    }
+};
 export const departmentWorkspace = ownerWorkspace('departments', 'department_id');
 
 /**

@@ -105,3 +105,21 @@ test('/users/contexts tính quyền theo nơi làm việc đang chọn', async (
     await sql('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [WS.B.id, U.managerA.id]);
   }
 });
+
+test('thiết bị và mã QR của công ty khác: 404, không lẫn vào danh sách', async () => {
+  const assetB = (await sql("INSERT INTO assets (asset_code, name, qr_token, workspace_id) VALUES ('B-QR', 'Máy B', 'flw_tok_b_qr', $1) RETURNING asset_id", [WS.B.id])).rows[0].asset_id;
+  assert.equal((await api('GET', '/assets/resolve?token=flw_tok_b_qr', { as: U.memberA })).status, 404);
+  assert.equal((await api('GET', `/assets/${assetB}`, { as: U.adminA })).status, 404);
+  assert.equal((await api('GET', `/assets/${assetB}/health-record`, { as: U.adminA })).status, 404);
+  assert.equal((await api('GET', `/inspections/assets/${assetB}/checklist`, { as: U.adminA })).status, 404);
+  const list = await api('GET', '/assets', { as: U.adminA });
+  assert.ok(!list.body.data.some((a) => a.asset_id === assetB));
+  assert.equal((await api('GET', '/assets/resolve?token=flw_tok_b_qr', { as: U.managerB })).status, 200);
+  assert.ok((await api('GET', '/assets', { as: U.managerB })).body.data.some((a) => a.asset_id === assetB));
+});
+
+test('thiết bị tạo mới không truyền mã QR: mã ngẫu nhiên, không đoán được', async () => {
+  const res = await api('POST', '/assets', { as: U.adminA, body: { asset_code: 'A-NEW', name: 'Máy mới' } });
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  assert.match(res.body.data.qr_token, /^flw_tok_[0-9a-f]{24}$/);
+});

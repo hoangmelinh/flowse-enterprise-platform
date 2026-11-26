@@ -1,16 +1,18 @@
+import crypto from "crypto";
 import con from "../config/connect.js";
 import Department from "./Department.js";
 
 class Asset {
+  /** Thiết bị `user` được xem: chỉ trong các công ty user là thành viên (không có user thì rỗng), rồi lọc theo phòng ban. */
   static async getAll(user = null) {
-    let scopeClause = "";
-    const values = [];
+    const values = [user?.user_id ?? null];
+    let scopeClause = `WHERE a.workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL)`;
 
     if (user?.user_id) {
       const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id);
       if (accessibleDeptIds !== null) {
         values.push(accessibleDeptIds);
-        scopeClause = `WHERE (a.department_id = ANY($1::int[]) OR a.department_id IS NULL)`;
+        scopeClause += ` AND (a.department_id = ANY($2::int[]) OR a.department_id IS NULL)`;
       }
     }
 
@@ -397,7 +399,8 @@ class Asset {
   }
 
   static async create({ asset_code, name, location, department_id, qr_token, specs = {}, workspace_id }) {
-    const token = qr_token || `QR-${asset_code}-${Date.now()}`;
+    // Mã in trên tem phải không đoán được (trước đây là QR-<mã>-<thời gian>)
+    const token = qr_token || `flw_tok_${crypto.randomBytes(12).toString("hex")}`;
     const res = await con.query(
       `INSERT INTO assets (asset_code, name, location, department_id, qr_token, specs, health_score, workspace_id)
        VALUES ($1, $2, $3, $4, $5, $6, 100, $7) RETURNING *`,
