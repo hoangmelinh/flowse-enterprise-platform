@@ -42,7 +42,8 @@ export type RootStackParamList = {
   [Routes.COMMENTS]: { code: string };
   [Routes.SPACES]: { projectsOnly?: boolean } | undefined;
   [Routes.SPACE_DETAIL]: { spaceId: number; name: string };
-  [Routes.ASSET_DETAIL]: { assetCode: string };
+  // Quét tem: qrToken; nhập tay hoặc mở từ danh sách: assetCode
+  [Routes.ASSET_DETAIL]: { assetCode?: string; qrToken?: string };
   [Routes.REPORT_INCIDENT]: { assetCode?: string } | undefined;
   [Routes.INCIDENT_DETAIL]: { incidentId: number };
   [Routes.INCIDENT_TRIAGE]: { incidentId: number };

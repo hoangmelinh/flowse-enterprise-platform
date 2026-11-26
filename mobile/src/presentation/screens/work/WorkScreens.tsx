@@ -24,8 +24,9 @@ import {
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { dueBucket, dueText, fmtDue, overdueDays } from '../../../core/utils/dueDate';
-import { WorkItem } from '../../../domain/entities/workitem';
+import { WorkItem, WorkflowTransition } from '../../../domain/entities/workitem';
 import { WorkItemRepositoryImpl } from '../../../data/repositories/WorkItemRepositoryImpl';
+import { aiErrorText } from '../../../data/repositories/AiRepositoryImpl';
 import { comments, people, spaces, spaceTree } from '../../../data/demo/fixtures';
 import {
   AppText, Avatar, Banner, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KV, Row,
@@ -36,6 +37,13 @@ import { WorkflowTransitionBar } from '../../components/workflow/WorkflowTransit
 import { ScreenProps } from '../../navigation/types';
 
 const repo = new WorkItemRepositoryImpl();
+// Trường bắt buộc của bước chuyển mà app nhập được bằng chữ; ghi lại vào lịch sử máy và cho Flowse AI đọc khi quét QR
+const REQUIRED_LABELS: Record<string, string> = {
+  root_cause: 'Nguyên nhân hỏng',
+  resolution: 'Đã sửa thế nào',
+  downtime_minutes: 'Thời gian dừng máy (phút)',
+  note: 'Ghi chú',
+};
 export const useMyWork = () => useQuery({ queryKey: ['my-work'], queryFn: () => repo.getMyWorkItems() });
 
 /** Cách một việc hiện trong dòng việc (Figma Task): vòng trạng thái, chữ hạn có màu, cờ ưu tiên. */
@@ -141,13 +149,34 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
   const qc = useQueryClient();
   const item = useQuery({ queryKey: ['work-item', workItemId], queryFn: () => repo.getWorkItemById(workItemId) });
   const transitions = useQuery({ queryKey: ['transitions', workItemId], queryFn: () => repo.getAvailableTransitions(workItemId) });
+  // Bước chuyển cần nhập thêm (VD báo sửa xong: nguyên nhân, cách sửa) thì mở form trước khi gửi
+  const [pending, setPending] = useState<WorkflowTransition | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const asked = pending ? pending.requiredFields.filter((f) => REQUIRED_LABELS[f]) : [];
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['my-work'] });
+    qc.invalidateQueries({ queryKey: ['work-item', workItemId] });
+    qc.invalidateQueries({ queryKey: ['transitions', workItemId] });
+  };
   const move = useMutation({
-    mutationFn: (toStateId: number) => repo.transitionWorkItem(workItemId, toStateId, item.data?.version ?? 1),
+    mutationFn: ({ toStateId, values }: { toStateId: number; values: Record<string, string> }) => {
+      const { note, downtime_minutes, ...rest } = values;
+      const metadata = { ...rest, ...(downtime_minutes ? { downtime_minutes: Number(downtime_minutes) } : {}) };
+      return repo.transitionWorkItem(workItemId, toStateId, item.data?.version ?? 1, note, metadata);
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-work'] });
-      qc.invalidateQueries({ queryKey: ['work-item', workItemId] });
+      setPending(null);
+      setForm({});
+      refresh();
+    },
+    // 409: người khác vừa chuyển trước; tải lại để thấy trạng thái mới. Lỗi khác: hiện đúng lời backend
+    onError: (e) => {
+      Alert.alert('Chưa chuyển được', aiErrorText(e));
+      refresh();
     },
   });
+  const press = (t: WorkflowTransition) =>
+    t.requiredFields.some((f) => REQUIRED_LABELS[f]) ? setPending(t) : move.mutate({ toStateId: t.toStateId, values: {} });
   const w = item.data;
   const v = w ? taskView(w) : undefined;
   const user = useAuthStore((st) => st.user);
@@ -169,13 +198,39 @@ export const WorkItemDetailScreen: React.FC<ScreenProps<typeof Routes.WORK_ITEM_
       onBack={navigation.goBack}
       right={<IconButton icon={Ellipsis} label="Thêm thao tác" onPress={more} />}
       footer={
-        transitions.data?.length ? (
+        pending ? (
           <BottomBar>
-            <WorkflowTransitionBar transitions={transitions.data} isLoading={move.isPending} onTransition={(t) => move.mutate(t.toStateId)} />
+            <Button title="Huỷ" variant="secondary" onPress={() => setPending(null)} />
+            <Button
+              title={pending.transitionName}
+              loading={move.isPending}
+              disabled={asked.some((f) => !(form[f] || '').trim())}
+              onPress={() => move.mutate({ toStateId: pending.toStateId, values: form })}
+            />
+          </BottomBar>
+        ) : transitions.data?.length ? (
+          <BottomBar>
+            <WorkflowTransitionBar transitions={transitions.data} isLoading={move.isPending} onTransition={press} />
           </BottomBar>
         ) : undefined
       }
     >
+      {pending ? (
+        <View style={{ gap: space.sm }}>
+          <SectionHeader title={pending.transitionName} />
+          {asked.map((f) => (
+            <Field
+              key={f}
+              label={REQUIRED_LABELS[f]}
+              value={form[f] ?? ''}
+              onChangeText={(text) => setForm((p) => ({ ...p, [f]: text }))}
+              keyboardType={f === 'downtime_minutes' ? 'number-pad' : 'default'}
+              multiline={f !== 'downtime_minutes'}
+              maxLength={f === 'downtime_minutes' ? 5 : 2000}
+            />
+          ))}
+        </View>
+      ) : null}
       {w ? (
         <>
           <AppText variant="title" style={s.detailTitle}>
