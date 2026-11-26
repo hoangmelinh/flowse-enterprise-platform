@@ -164,6 +164,9 @@ async function main() {
       [inc.incident_id, rootCause, resolution, daysAgo, minutes]
     );
     if (resolvedState) await con.query(`UPDATE tasks SET current_state_id = $2 WHERE task_id = $1`, [inc.task_id, resolvedState]);
+    // Đã sửa xong từ trước: tắt SLA (không cảnh báo hết hạn) và bỏ thông báo "sự cố mới / được giao" vừa sinh ra
+    await con.query(`UPDATE sla_instances SET status = 'COMPLETED', breached_at = NULL WHERE task_id = $1`, [inc.task_id]);
+    await con.query(`DELETE FROM notifications WHERE entity_id = $1 AND type IN ('ASSIGNMENT', 'INCIDENT_REPORTED')`, [inc.task_id]);
   };
   await pastRepair(bt07, 'BT-07 rung và kêu ở con lăn giữa', 'Rung mạnh khi chạy trên 70% tải, có tiếng rít',
     'Vòng bi 6204 ở con lăn số 3 mòn do thiếu mỡ bôi trơn', 'Thay vòng bi 6204-2RS, bơm mỡ các con lăn, chạy thử 70% tải 15 phút', 41, 95);
