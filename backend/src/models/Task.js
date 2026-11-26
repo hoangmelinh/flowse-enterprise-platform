@@ -415,11 +415,10 @@ export const updateTask = async (task_id, updateData) => {
       'sprint_id',
       'is_archived',
       'work_item_type',
-      'workflow_id',
-      'current_state_id',
-      'department_id',
-      'version'
+      'department_id'
     ];
+    // Không nhận workflow_id / current_state_id / version: trạng thái quy trình chỉ đổi qua bước chuyển
+    // (có khoá dòng, kiểm vai trò và duyệt); version do server tăng.
 
     const fieldsToUpdate = [];
     const values = [];
@@ -436,21 +435,32 @@ export const updateTask = async (task_id, updateData) => {
     if (fieldsToUpdate.length === 0) {
       return null;
     }
+    fieldsToUpdate.push('version = COALESCE(version, 1) + 1');
 
+    // Client gửi version đang thấy thì chỉ ghi khi chưa ai sửa trước (khoá lạc quan); không gửi thì ghi đè như cũ
+    const expected = updateData.version ?? null;
+    let versionCheck = '';
+    if (expected !== null) {
+      values.push(expected);
+      versionCheck = ` AND COALESCE(version, 1) = $${paramIndex++}`;
+    }
     values.push(task_id);
 
     const query = `
-      UPDATE tasks 
-      SET ${fieldsToUpdate.join(', ')} 
-      WHERE task_id = $${paramIndex} AND deleted_at IS NULL 
+      UPDATE tasks
+      SET ${fieldsToUpdate.join(', ')}
+      WHERE task_id = $${paramIndex} AND deleted_at IS NULL${versionCheck}
       RETURNING *
     `;
 
     const result = await con.query(query, values);
 
     if (result.rows.length === 0) {
-      const error = new Error("Task không tồn tại hoặc đã bị xóa");
-      error.statusCode = 404;
+      const current = expected !== null && (await findTaskById(task_id));
+      const error = current
+        ? new Error(`Việc đã được người khác cập nhật (phiên bản ${current.version}). Tải lại rồi sửa tiếp.`)
+        : new Error("Task không tồn tại hoặc đã bị xóa");
+      error.statusCode = current ? 409 : 404;
       throw error;
     }
 

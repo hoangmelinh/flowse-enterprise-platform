@@ -28,7 +28,8 @@ const FILES = [
 ];
 const newMigrations = () => fs.readdirSync(migrationsDir).filter((f) => /^(0(1[3-9]|[2-9]\d)|[1-9]\d\d)_.*\.sql$/.test(f)).sort();
 
-export const newClient = () => new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+// DB_SSL=false cho Postgres chạy trên máy (docker compose), giống connect.js
+export const newClient = () => new Client({ connectionString: process.env.DATABASE_URL, ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false } });
 
 /** Chạy toàn bộ file schema theo thứ tự, mỗi file một transaction. Trả về danh sách file đã chạy. */
 export async function applySchema(client) {

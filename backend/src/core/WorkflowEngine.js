@@ -187,7 +187,7 @@ class WorkflowEngine {
   /**
    * Thực hiện chuyển đổi trạng thái (State Transition) với đầy đủ validation và audit trail
    */
-  static async executeTransition({ taskId, toStateId, user, note = "", metadata = {} }) {
+  static async executeTransition({ taskId, toStateId, user, note = "", metadata = {}, baseVersion = null }) {
     const client = await con.connect();
     try {
       await client.query("BEGIN");
@@ -206,6 +206,14 @@ class WorkflowEngine {
       }
       const task = taskRes.rows[0];
       let evidenceToCheck = null;
+
+      // Hai người bấm trên cùng một phiên bản: người sau nhận 409 kèm trạng thái hiện tại, không phải lỗi bước chuyển
+      if (baseVersion != null && Number(task.version ?? 1) !== Number(baseVersion)) {
+        throw new AppError(
+          `Việc vừa được người khác cập nhật, hiện ở trạng thái '${task.current_state_name || "khác"}'. Tải lại để xem.`,
+          409, "VERSION_CONFLICT", { current_state_id: task.current_state_id, version: task.version }
+        );
+      }
 
       // 2. Kiểm tra transition hợp lệ
       const transRes = await client.query(
