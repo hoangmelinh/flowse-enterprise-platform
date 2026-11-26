@@ -61,6 +61,10 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
   const [partName, setPartName] = useState("");
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState("");
+  // Báo sửa xong: nguyên nhân và cách sửa (bắt buộc khi bước chuyển yêu cầu) vào lịch sử máy cho Flowse AI
+  const [rootCause, setRootCause] = useState("");
+  const [resolution, setResolution] = useState("");
+  const needsRepairNote = (t?: WorkflowTransition | null) => !!t?.required_fields?.includes("root_cause");
 
   // State chuyên biệt cho Bằng chứng nghiệm thu & AI Copilot (Giai đoạn 3)
   const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
@@ -175,6 +179,8 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
       setPartName("");
       setQuantity(1);
       setReason("");
+      setRootCause("");
+      setResolution("");
       setEvidenceUrls([]);
       setAiAnalysis(null);
       setModalOpen(true);
@@ -200,6 +206,10 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
         finalNote = `Đề xuất linh kiện: ${partName.trim()} (SL: ${quantity || 1}). Lý do: ${reason.trim()}`;
       }
 
+      if (needsRepairNote(t)) {
+        metadata = { ...(metadata || {}), root_cause: rootCause.trim(), resolution: resolution.trim() };
+      }
+
       if (evidenceUrls.length > 0) {
         metadata = {
           ...(metadata || {}),
@@ -220,6 +230,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
             note: finalNote,
             assignee_id: selectedAssigneeId,
             evidence_urls: evidenceUrls,
+            ...(needsRepairNote(t) ? { root_cause: rootCause.trim(), resolution: resolution.trim() } : {}),
           },
           base_version: 1,
         });
@@ -351,6 +362,10 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
               message.warning("Vui lòng nhập lý do cần thay thế linh kiện!");
               return;
             }
+          }
+          if (needsRepairNote(activeTransition) && (!rootCause.trim() || !resolution.trim())) {
+            message.warning("Vui lòng ghi nguyên nhân hỏng và cách đã sửa!");
+            return;
           }
           if (activeTransition?.to_state_code === "REPORTED" && !note.trim()) {
             message.warning("Vui lòng nhập lý do từ chối tiếp nhận!");
@@ -566,6 +581,24 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Báo sửa xong: nguyên nhân và cách sửa, lưu vào lịch sử máy */}
+        {needsRepairNote(activeTransition) && (
+          <div className="space-y-3 mb-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
+                Nguyên nhân hỏng: <span className="text-red-500">*</span>
+              </label>
+              <Input.TextArea rows={2} maxLength={2000} value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder="Ví dụ: Vòng bi con lăn số 3 mòn do thiếu mỡ bôi trơn" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
+                Đã sửa thế nào: <span className="text-red-500">*</span>
+              </label>
+              <Input.TextArea rows={2} maxLength={2000} value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="Ví dụ: Thay vòng bi 6204-2RS, bơm mỡ, chạy thử 15 phút" />
+            </div>
           </div>
         )}
 
