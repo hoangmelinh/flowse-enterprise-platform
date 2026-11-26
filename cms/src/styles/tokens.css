@@ -1,0 +1,45 @@
+:root {
+  /* Surfaces (Fluent 2 + Linear neutral light canvas) */
+  --surface-canvas: #f4f6f9;
+  --surface-primary: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-hover: #f1f5f9;
+
+  /* Borders */
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* Typography */
+  --text-primary: #111827;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  /* Brand & Semantic */
+  --brand-primary: #0058be;
+  --brand-primary-hover: #00469b;
+  --brand-primary-soft: #eff6ff;
+  --brand-primary-border: #bfdbfe;
+
+  --status-success: #059669;
+  --status-success-bg: #ecfdf5;
+  --status-success-border: #a7f3d0;
+
+  --status-warning: #d97706;
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: #fde68a;
+
+  --status-danger: #dc2626;
+  --status-danger-bg: #fef2f2;
+  --status-danger-border: #fecaca;
+
+  --status-info: #2563eb;
+  --status-info-bg: #eff6ff;
+  --status-info-border: #bfdbfe;
+
+  /* Shape & Elevation */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --focus-ring: 0 0 0 2px rgba(0, 88, 190, 0.22);
+}

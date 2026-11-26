@@ -8,7 +8,7 @@ const LoginPage = lazy(() => import("../pages/AuthPage/LoginPage/LoginPage"));
 const GoogleLoginPage = lazy(() => import("../pages/AuthPage/GoogleLoginPage/GoogleLoginPage"));
 const WorkspaceSetupPage = lazy(() => import("../pages/WorkspaceSetupPage"));
 const InboxPage = lazy(() => import("../pages/InboxPage"));
-const MyTasksPage = lazy(() => import("../pages/MyTasksPage"));
+const MyWorkPage = lazy(() => import("../pages/MyWorkPage"));
 const SpaceViewPage = lazy(() => import('../pages/SpaceViewPage'));
 const ListViewPage = lazy(() => import('../pages/ListViewPage'));
 const TimeTrackingPage = lazy(() => import('../pages/TimeTrackingPage'));
@@ -17,8 +17,7 @@ const AIPage = lazy(() => import('../pages/AIPage'));
 const SprintViewPage = lazy(() => import('../pages/SprintViewPage'));
 const ApprovalCenterPage = lazy(() => import('../pages/ApprovalCenterPage'));
 const IncidentHubPage = lazy(() => import('../pages/IncidentHubPage'));
-const AssetManagementPage = lazy(() => import('../pages/AssetManagementPage'));
-const CMMSAnalyticsPage = lazy(() => import('../pages/CMMSAnalyticsPage'));
+const GovernanceRedirectPage = lazy(() => import('../pages/GovernanceRedirectPage'));
 const AppLayout = lazy(() => import("../layouts/AppLayout"));
 const InvitationPage = lazy(() => import("../pages/InvitationPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
@@ -49,7 +48,7 @@ export const routes: RouteConfig[] = [
         children: [
             {
                 path: '/home',
-                element: <MyTasksPage />
+                element: <MyWorkPage />
             },
             {
                 path: '/inbox',
@@ -65,11 +64,11 @@ export const routes: RouteConfig[] = [
             },
             {
                 path: '/assets',
-                element: <AssetManagementPage />
+                element: <GovernanceRedirectPage section="Quản lý Thiết bị & Tem QR" />
             },
             {
                 path: '/analytics',
-                element: <CMMSAnalyticsPage />
+                element: <GovernanceRedirectPage section="Trung tâm Điều hành CMMS" />
             },
             {
                 path: '/ai',

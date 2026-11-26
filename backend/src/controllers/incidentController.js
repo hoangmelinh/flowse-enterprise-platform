@@ -1,5 +1,6 @@
 import Incident from "../models/Incident.js";
 import AIVisionService from "../services/aiVisionService.js";
+import Department from "../models/Department.js";
 
 export const getIncidents = async (req, res, next) => {
   try {
@@ -94,7 +95,16 @@ export const deleteIncident = async (req, res, next) => {
 export const getDowntimeStats = async (req, res, next) => {
   try {
     const { period = "month" } = req.query;
-    const stats = await Incident.getDowntimeAndMTTRStats(period);
+    const workspaceId = req.workspaceId || null;
+    const accessibleDeptIds = workspaceId
+      ? await Department.getAccessibleDepartmentIds(req.user.user_id, null, workspaceId)
+      : null;
+    const stats = await Incident.getDowntimeAndMTTRStats(period, {
+      workspaceId,
+      allowedWorkspaceIds: req.userWorkspaceIds || [],
+      userId: req.user.user_id,
+      accessibleDeptIds,
+    });
     res.json({ success: true, data: stats });
   } catch (error) {
     next(error);

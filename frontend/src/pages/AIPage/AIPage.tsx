@@ -1,11 +1,19 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { message as antdMessage, Tag, Button } from 'antd';
 import type { AppDispatch } from '@/store/configureStore';
 import { fetchAIChat } from '@/store/modules/ai';
 import type { AIChatMessage, ChatSession } from '@/types/ai';
+import {
+    workWithAI,
+    listAiActions,
+    applyAiAction,
+    cancelAiAction,
+    type AiWorkAction,
+} from '@/api/ai';
 import { 
     Sparkles, 
     Plus, 
@@ -15,21 +23,36 @@ import {
     CheckSquare, 
     FileText,
     History,
-    Blocks,
     Edit,
     Search,
     PanelLeftClose,
     PanelLeftOpen,
     Trash2,
     AlertTriangle,
-    Wrench
+    Wrench,
+    Bot,
+    CheckCircle2,
+    XCircle,
+    ListChecks
 } from 'lucide-react';
 import { ActionCard } from '@/components/ActionCard';
+
+interface WorkMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    action?: AiWorkAction | null;
+}
 
 export default function AIPage() {
     const dispatch = useDispatch<AppDispatch>();
     const { t } = useTranslation('common');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [aiMode, setAiMode] = useState<'ask' | 'work'>('ask');
+    const [workMessages, setWorkMessages] = useState<WorkMessage[]>([]);
+    const [workActions, setWorkActions] = useState<AiWorkAction[]>([]);
+    const [showActionHistory, setShowActionHistory] = useState(false);
+    const [processingActionId, setProcessingActionId] = useState<number | null>(null);
     
     const [sessions, setSessions] = useState<ChatSession[]>(() => {
         const saved = localStorage.getItem('flowise_ai_sessions');
@@ -72,7 +95,64 @@ export default function AIPage() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, workMessages]);
+
+    const loadWorkActions = useCallback(async () => {
+        try {
+            const res = await listAiActions();
+            if (Array.isArray(res?.data)) {
+                setWorkActions(res.data);
+            }
+        } catch {
+            // Ignore when unauthenticated or endpoint offline
+        }
+    }, []);
+
+    useEffect(() => {
+        if (aiMode === 'work' || showActionHistory) {
+            loadWorkActions();
+        }
+    }, [aiMode, showActionHistory, loadWorkActions]);
+
+    const handleApplyWorkAction = async (actionId: number) => {
+        try {
+            setProcessingActionId(actionId);
+            const res = await applyAiAction(actionId);
+            const updated = res?.data;
+            if (updated) {
+                setWorkActions((prev) => prev.map((a) => (a.action_id === actionId ? updated : a)));
+                setWorkMessages((prev) =>
+                    prev.map((m) => (m.action?.action_id === actionId ? { ...m, action: updated } : m))
+                );
+            }
+            antdMessage.success('Đã thực thi đề xuất AI Work Mode');
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            antdMessage.error(msg || 'Không thể thực thi đề xuất');
+        } finally {
+            setProcessingActionId(null);
+        }
+    };
+
+    const handleCancelWorkAction = async (actionId: number) => {
+        try {
+            setProcessingActionId(actionId);
+            const res = await cancelAiAction(actionId);
+            const updated = res?.data;
+            if (updated) {
+                setWorkActions((prev) => prev.map((a) => (a.action_id === actionId ? updated : a)));
+                setWorkMessages((prev) =>
+                    prev.map((m) => (m.action?.action_id === actionId ? { ...m, action: updated } : m))
+                );
+            }
+            antdMessage.info('Đã hủy đề xuất AI');
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            antdMessage.error(msg || 'Không thể hủy đề xuất');
+        } finally {
+            setProcessingActionId(null);
+        }
+    };
 
     const handleNewChat = () => {
         const newId = Date.now().toString();
@@ -106,6 +186,40 @@ export default function AIPage() {
     const handleSendMessage = async (forceText?: string) => {
         const text = forceText || inputValue.trim();
         if (!text || isGenerating) return;
+
+        if (aiMode === 'work') {
+            const userMsg: WorkMessage = { id: Date.now().toString(), role: 'user', content: text };
+            const historyPayload = workMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+            setWorkMessages((prev) => [...prev, userMsg]);
+            setInputValue('');
+            setIsGenerating(true);
+            try {
+                const res = await workWithAI(text, historyPayload);
+                const assistantMsg: WorkMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: res?.data?.response || 'Đã phân tích yêu cầu.',
+                    action: res?.data?.action || null,
+                };
+                setWorkMessages((prev) => [...prev, assistantMsg]);
+                if (res?.data?.action) {
+                    loadWorkActions();
+                }
+            } catch (err: unknown) {
+                const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                setWorkMessages((prev) => [
+                    ...prev,
+                    {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: msg || 'AI Work Mode đang gặp lỗi kết nối.',
+                    },
+                ]);
+            } finally {
+                setIsGenerating(false);
+            }
+            return;
+        }
 
         const userMessage: AIChatMessage = { id: Date.now().toString(), role: 'user', content: text };
         
@@ -212,13 +326,50 @@ export default function AIPage() {
                     </div>
                 </div>
 
-                <div className="flex w-60 flex-col gap-0.5 px-2 mt-2">
-                    <div className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-[var(--color-primary-bg)] px-2.5 py-1.5 text-[13px] font-semibold text-[var(--color-primary)]">
-                        <div className="flex items-center justify-center">
-                            <Sparkles size={14} className="text-[#e84393]" />
-                        </div>
+                <div className="flex w-60 flex-col gap-1 px-2 mt-2">
+                    <button
+                        type="button"
+                        onClick={() => { setAiMode('ask'); setShowActionHistory(false); }}
+                        className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold border-none text-left transition-colors ${
+                            aiMode === 'ask' && !showActionHistory
+                                ? 'bg-[var(--color-primary-bg)] text-[var(--color-primary)]'
+                                : 'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                        }`}
+                    >
+                        <Sparkles size={14} className="text-[#e84393]" />
                         <span>{t('ai.askOrCreate')}</span>
-                    </div>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { setAiMode('work'); setShowActionHistory(false); }}
+                        className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold border-none text-left transition-colors ${
+                            aiMode === 'work' && !showActionHistory
+                                ? 'bg-[var(--color-primary-bg)] text-[var(--color-primary)]'
+                                : 'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                        }`}
+                    >
+                        <Bot size={14} className="text-[#0058be]" />
+                        <span>AI Work Mode</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowActionHistory((v) => !v)}
+                        className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] font-semibold border-none text-left transition-colors ${
+                            showActionHistory
+                                ? 'bg-[var(--color-primary-bg)] text-[var(--color-primary)]'
+                                : 'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                        }`}
+                    >
+                        <span className="flex items-center gap-2.5">
+                            <ListChecks size={14} />
+                            <span>Lịch sử Action</span>
+                        </span>
+                        {workActions.filter((a) => a.status === 'PENDING').length > 0 && (
+                            <Tag color="blue" className="m-0 text-[10px]">
+                                {workActions.filter((a) => a.status === 'PENDING').length}
+                            </Tag>
+                        )}
+                    </button>
                 </div>
                 <div className="mt-6 flex flex-1 flex-col px-2 overflow-y-auto scrollbar-thin">
                     <div className="mb-1 px-2.5 text-[11px] font-extrabold text-[var(--color-text-tertiary)] uppercase tracking-[0.05em]">
@@ -279,7 +430,182 @@ export default function AIPage() {
                     </button>
                 )}
                 
-                {messages.length === 0 ? (
+                {showActionHistory ? (
+                    <div className="flex-1 w-full overflow-y-auto px-8 py-8">
+                        <div className="mx-auto max-w-3xl">
+                            <div className="mb-5 flex items-center justify-between">
+                                <div>
+                                    <h2 className="m-0 text-lg font-extrabold text-[var(--color-on-surface)]">
+                                        Lịch sử AI Work Mode Actions
+                                    </h2>
+                                    <p className="mt-1 mb-0 text-xs text-[var(--color-text-secondary)]">
+                                        Cơ chế Human-in-the-loop: xem xét và xác nhận trước khi AI ghi dữ liệu vào hệ thống.
+                                    </p>
+                                </div>
+                                <Button size="small" onClick={() => setShowActionHistory(false)}>
+                                    Quay lại chat
+                                </Button>
+                            </div>
+                            {workActions.length === 0 ? (
+                                <div className="rounded-xl border border-[var(--color-border-light)] bg-white p-8 text-center text-sm text-slate-500">
+                                    Chưa có action nào từ AI Work Mode.
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {workActions.map((act) => (
+                                        <div key={act.action_id} className="rounded-xl border border-[var(--color-border-light)] bg-white p-4 shadow-2xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Tag color="blue">{act.action_type}</Tag>
+                                                    <span className="text-sm font-bold text-slate-900">{act.summary?.title}</span>
+                                                </div>
+                                                <Tag color={act.status === 'APPLIED' ? 'green' : act.status === 'PENDING' ? 'gold' : 'default'}>
+                                                    {act.status}
+                                                </Tag>
+                                            </div>
+                                            {act.summary?.detail && (
+                                                <p className="mt-2 mb-0 text-xs text-slate-600">{act.summary.detail}</p>
+                                            )}
+                                            {act.status === 'PENDING' && (
+                                                <div className="mt-3 flex items-center gap-2">
+                                                    <Button
+                                                        type="primary"
+                                                        size="small"
+                                                        loading={processingActionId === act.action_id}
+                                                        icon={<CheckCircle2 size={13} />}
+                                                        onClick={() => handleApplyWorkAction(act.action_id)}
+                                                    >
+                                                        Xác nhận thực thi
+                                                    </Button>
+                                                    <Button
+                                                        size="small"
+                                                        danger
+                                                        loading={processingActionId === act.action_id}
+                                                        icon={<XCircle size={13} />}
+                                                        onClick={() => handleCancelWorkAction(act.action_id)}
+                                                    >
+                                                        Hủy bỏ
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : aiMode === 'work' ? (
+                    <div className="flex h-full w-full flex-col justify-between overflow-hidden">
+                        <div className="flex-1 overflow-y-auto px-8 py-8">
+                            <div className="mx-auto flex max-w-3xl flex-col gap-4">
+                                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-bold text-[#0058be]">
+                                        <Bot size={16} />
+                                        <span>AI Work Mode — Giao việc & Tạo Task thông minh</span>
+                                    </div>
+                                    <p className="mt-1 mb-0 text-xs text-slate-600">
+                                        Mô tả công việc bạn muốn tạo hoặc phân công. AI sẽ chuẩn bị Action Card để bạn kiểm tra và bấm xác nhận trước khi thực thi.
+                                    </p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {[
+                                            'Tạo công việc kiểm tra định kỳ tủ điện phân xưởng A cho Bảo trì hạn ngày mai',
+                                            'Tạo task ưu tiên High: kiểm tra rung động trục chính máy CNC-01',
+                                        ].map((sample) => (
+                                            <button
+                                                key={sample}
+                                                type="button"
+                                                onClick={() => handleSendMessage(sample)}
+                                                className="cursor-pointer rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-[#0058be] hover:bg-blue-50"
+                                            >
+                                                {sample}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {workMessages.map((msg) => (
+                                    <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        {msg.role === 'user' ? (
+                                            <div className="max-w-[75%] rounded-2xl bg-[var(--color-surface-container-high)] px-4 py-2.5 text-sm font-medium text-[var(--color-on-surface)]">
+                                                {msg.content}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full max-w-[85%] rounded-2xl border border-[var(--color-border-light)] bg-white p-4 shadow-2xs">
+                                                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[#0058be]">
+                                                    <Bot size={14} /> Flowse Work Copilot
+                                                </div>
+                                                <div className="text-sm text-slate-800 whitespace-pre-line">{msg.content}</div>
+                                                {msg.action && (
+                                                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <Tag color="blue">{msg.action.action_type}</Tag>
+                                                            <Tag color={msg.action.status === 'APPLIED' ? 'green' : msg.action.status === 'PENDING' ? 'gold' : 'default'}>
+                                                                {msg.action.status}
+                                                            </Tag>
+                                                        </div>
+                                                        <div className="mt-1.5 text-sm font-bold text-slate-900">{msg.action.summary?.title}</div>
+                                                        {msg.action.summary?.detail && (
+                                                            <div className="mt-1 text-xs text-slate-600">{msg.action.summary.detail}</div>
+                                                        )}
+                                                        {msg.action.status === 'PENDING' && (
+                                                            <div className="mt-3 flex items-center gap-2">
+                                                                <Button
+                                                                    type="primary"
+                                                                    size="small"
+                                                                    loading={processingActionId === msg.action.action_id}
+                                                                    icon={<CheckCircle2 size={13} />}
+                                                                    onClick={() => handleApplyWorkAction(msg.action!.action_id)}
+                                                                >
+                                                                    Áp dụng (Apply)
+                                                                </Button>
+                                                                <Button
+                                                                    size="small"
+                                                                    danger
+                                                                    loading={processingActionId === msg.action.action_id}
+                                                                    icon={<XCircle size={13} />}
+                                                                    onClick={() => handleCancelWorkAction(msg.action!.action_id)}
+                                                                >
+                                                                    Hủy
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                <div ref={messagesEndRef} />
+                            </div>
+                        </div>
+
+                        <div className="border-t border-[var(--color-border-light)] bg-white px-8 py-4">
+                            <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                <textarea
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                    placeholder="Nhập lệnh cho AI Work Mode (VD: Tạo công việc kiểm tra máy nén khí)..."
+                                    rows={1}
+                                    className="flex-1 resize-none border-none bg-transparent text-sm text-slate-900 outline-none"
+                                />
+                                <Button
+                                    type="primary"
+                                    shape="circle"
+                                    loading={isGenerating}
+                                    disabled={!inputValue.trim()}
+                                    icon={<ArrowRight size={14} />}
+                                    onClick={() => handleSendMessage()}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ) : messages.length === 0 ? (
                     // ==========================================
                     // EMPTY STATE (CENTERED HUB UI)
                     // ==========================================
@@ -298,12 +624,20 @@ export default function AIPage() {
                             <div className="relative w-full rounded-3xl p-0.5 bg-linear-to-r from-[#e3e8f8] via-[#fdecf5] to-[#f0ebff] shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
                                 {/* floating tabs */}
                                 <div className="absolute -top-7.5 left-6 flex">
-                                    <div className="flex h-8 items-center gap-1.5 rounded-t-xl bg-[var(--color-surface-container-lowest)] px-4 text-[13px] font-bold text-[var(--color-primary)] shadow-[0_-2px_10px_rgb(0,0,0,0.02)]">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAiMode('ask')}
+                                        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-t-xl border-none bg-[var(--color-surface-container-lowest)] px-4 text-[13px] font-bold text-[var(--color-primary)] shadow-[0_-2px_10px_rgb(0,0,0,0.02)]"
+                                    >
                                         <Sparkles size={12} className="text-[#e84393]" fill="#e84393" /> Ask
-                                    </div>
-                                    <div className="flex h-8 items-center gap-1.5 rounded-t-xl px-4 text-[13px] font-semibold text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] cursor-pointer">
-                                        <Blocks size={12} /> Agents
-                                    </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAiMode('work')}
+                                        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-t-xl border-none bg-transparent px-4 text-[13px] font-semibold text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+                                    >
+                                        <Bot size={12} /> Work Mode
+                                    </button>
                                 </div>
 
                                 <div className="flex flex-col rounded-[22px] bg-[var(--color-surface-container-lowest)] pt-4 pb-2 px-3">

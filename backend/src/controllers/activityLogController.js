@@ -3,7 +3,9 @@ import {
   createActivity,
   findActivitiesByUserId,
   findActivitiesBySpaceId,
+  findActivitiesByWorkspaceId,
 } from "../models/ActivityLogs.js";
+import Department from "../models/Department.js";
 
 export const getActivitiesByTaskId = async (req, res) => {
   try {
@@ -90,5 +92,29 @@ export const getActivitiesBySpaceId = async (req, res) => {
   } catch (error) {
     console.error("Failed to retrieve space activities:", error.message);
     res.status(500).json({ error: "Failed to retrieve space activities" });
+  }
+};
+
+export const getActivitiesByWorkspaceId = async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { limit = 80, offset = 0, action = null, work_item_type = null, search = null } = req.query;
+    const accessibleDeptIds = await Department.getAccessibleDepartmentIds(
+      req.user.user_id,
+      req.workspaceRole || null,
+      Number(workspaceId)
+    );
+    const activities = await findActivitiesByWorkspaceId(workspaceId, {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      action: action || null,
+      workItemType: work_item_type || null,
+      search: search || null,
+      accessibleDeptIds,
+    });
+    res.status(200).json({ success: true, data: activities });
+  } catch (error) {
+    console.error("Failed to retrieve workspace activities:", error.message);
+    res.status(500).json({ error: "Failed to retrieve workspace activities" });
   }
 };

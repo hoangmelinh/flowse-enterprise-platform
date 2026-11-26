@@ -42,7 +42,7 @@ export const getUserContexts = async (req, res) => {
         );
         const user = userRes.rows[0];
 
-        // 2. Workspace và vai trò trong từng nơi (thứ tự cố định để "nơi đầu tiên" luôn là một)
+        // 3. Workspace và vai trò trong từng nơi (thứ tự cố định để "nơi đầu tiên" luôn là một)
         const wsRes = await con.query(
             `SELECT w.workspace_id, w.name, w.slug, w.description, LOWER(r.role_name) as role_name
              FROM workspace_members wm
@@ -53,21 +53,26 @@ export const getUserContexts = async (req, res) => {
             [userId]
         );
 
-        // 3. Lấy cây phân cấp phòng ban (Enterprise Department Hierarchy)
-        const departmentsTree = await Department.getHierarchyTree();
-
         // 4. Quyền chỉ tính theo nơi làm việc đang chọn (?workspaceId=), không gộp vai trò của nơi khác
         const current = wsRes.rows.find((w) => w.workspace_id === Number(req.query.workspaceId)) || wsRes.rows[0];
         const role = current?.role_name;
         const isWorkspaceAdmin = role === 'admin';
-        const accessibleDeptIds = await Department.getAccessibleDepartmentIds(userId, isWorkspaceAdmin ? 'admin' : 'member');
+        const departmentsTree = current?.workspace_id
+            ? await Department.getHierarchyTree(current.workspace_id)
+            : [];
+        const accessibleDeptIds = await Department.getAccessibleDepartmentIds(
+            userId,
+            isWorkspaceAdmin ? 'admin' : 'member',
+            current?.workspace_id ?? null
+        );
 
         // Phòng ban của user và phòng ban user làm trưởng, trong nơi làm việc đang chọn
         const managed = (await con.query(
-            `SELECT code FROM departments WHERE manager_id = $1 AND workspace_id = $2`,
+            `SELECT department_id, code FROM departments WHERE manager_id = $1 AND workspace_id = $2`,
             [userId, current?.workspace_id ?? null]
-        )).rows.map((d) => d.code);
-        const codes = [user?.department_code, ...managed].filter(Boolean).map((c) => c.toUpperCase());
+        )).rows;
+        const managedDeptIds = managed.map((d) => d.department_id);
+        const codes = [user?.department_code, ...managed.map((d) => d.code)].filter(Boolean).map((c) => c.toUpperCase());
         const isManager = isWorkspaceAdmin || role === 'manager' || managed.length > 0;
         // shortcut: nhận tổ bảo trì / QA theo mã phòng ban (MAINT, QA); thêm cột loại phòng ban khi có thêm nhà máy
         const isTech = codes.some((c) => c.includes('MAINT'));
@@ -84,6 +89,18 @@ export const getUserContexts = async (req, res) => {
             can_approve: isManager,
             can_create_task: true,
             can_assign_work: isManager,
+            // Quyền cho Web Workspace & CMS Quản trị
+            is_admin: isWorkspaceAdmin,
+            is_manager: isManager,
+            can_access_cms: isManager,
+            can_manage_workspace: isWorkspaceAdmin,
+            can_manage_members: isWorkspaceAdmin,
+            can_manage_departments: isWorkspaceAdmin,
+            can_manage_assets: isWorkspaceAdmin,
+            can_manage_workflows: isWorkspaceAdmin,
+            can_manage_inspections: isWorkspaceAdmin,
+            can_view_audit: isManager,
+            can_view_analytics: isManager,
         };
 
         return res.status(200).json({
@@ -92,8 +109,10 @@ export const getUserContexts = async (req, res) => {
                 user,
                 workspaces: wsRes.rows,
                 current_workspace_id: current?.workspace_id ?? null,
+                current_role: role || (isManager ? 'manager' : 'member'),
                 departments: departmentsTree,
                 accessible_department_ids: accessibleDeptIds,
+                managed_department_ids: managedDeptIds,
                 capabilities,
             },
         });

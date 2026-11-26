@@ -5,18 +5,29 @@ class Inspection {
   /**
    * Lấy danh mục toàn bộ mẫu checklist định kỳ (Inspection Templates per API Contract 2.5)
    */
-  static async getAllTemplates() {
+  static async getAllTemplates(workspaceId = null, allowedWorkspaceIds = null) {
+    const values = [];
+    let scopeFilter = `AND c.asset_id IS NULL`;
+    if (workspaceId) {
+      values.push(Number(workspaceId));
+      scopeFilter = `AND (c.asset_id IS NULL OR a.workspace_id = $1)`;
+    } else if (Array.isArray(allowedWorkspaceIds) && allowedWorkspaceIds.length > 0) {
+      values.push(allowedWorkspaceIds.map(Number));
+      scopeFilter = `AND (c.asset_id IS NULL OR a.workspace_id = ANY($1::int[]))`;
+    }
+
     const query = `
       SELECT c.*,
         a.name AS asset_name,
         a.asset_code,
+        a.workspace_id AS asset_workspace_id,
         (SELECT COUNT(*) FROM checklist_items ci WHERE ci.checklist_id = c.checklist_id) AS item_count
       FROM checklists c
       LEFT JOIN assets a ON c.asset_id = a.asset_id
-      WHERE c.is_active = true
+      WHERE c.is_active = true ${scopeFilter}
       ORDER BY c.checklist_id ASC
     `;
-    const res = await con.query(query);
+    const res = await con.query(query, values);
     return res.rows;
   }
 
@@ -184,6 +195,102 @@ class Inspection {
     } finally {
       client.release();
     }
+  }
+
+  static async createTemplate({ asset_id = null, title, description = "", items = [] }) {
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+      const clRes = await client.query(
+        `INSERT INTO checklists (asset_id, title, description, is_active)
+         VALUES ($1, $2, $3, true) RETURNING *`,
+        [asset_id || null, title, description]
+      );
+      const checklist = clRes.rows[0];
+      for (const [idx, item] of items.entries()) {
+        await client.query(
+          `INSERT INTO checklist_items (checklist_id, question, require_evidence, fail_severity, position)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [checklist.checklist_id, item.question, !!item.require_evidence, item.fail_severity || "MEDIUM", idx + 1]
+        );
+      }
+      await client.query("COMMIT");
+      return await this.getById(checklist.checklist_id);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async updateTemplate(checklistId, { asset_id, title, description, is_active, items }) {
+    const client = await con.connect();
+    try {
+      await client.query("BEGIN");
+      const upd = await client.query(
+        `UPDATE checklists
+         SET asset_id = COALESCE($1, asset_id),
+             title = COALESCE($2, title),
+             description = COALESCE($3, description),
+             is_active = COALESCE($4, is_active)
+         WHERE checklist_id = $5 RETURNING *`,
+        [asset_id !== undefined ? asset_id : null, title ?? null, description ?? null, is_active ?? null, checklistId]
+      );
+      if (upd.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+      if (Array.isArray(items)) {
+        await client.query(`DELETE FROM checklist_items WHERE checklist_id = $1`, [checklistId]);
+        for (const [idx, item] of items.entries()) {
+          await client.query(
+            `INSERT INTO checklist_items (checklist_id, question, require_evidence, fail_severity, position)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [checklistId, item.question, !!item.require_evidence, item.fail_severity || "MEDIUM", idx + 1]
+          );
+        }
+      }
+      await client.query("COMMIT");
+      return await this.getById(checklistId);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getRuns(limit = 50, workspaceId = null, accessibleDeptIds = null) {
+    const values = [Number(limit) || 50];
+    const conditions = [];
+    if (workspaceId) {
+      values.push(Number(workspaceId));
+      conditions.push(`a.workspace_id = $${values.length}`);
+    }
+    if (accessibleDeptIds !== null && Array.isArray(accessibleDeptIds)) {
+      values.push(accessibleDeptIds);
+      conditions.push(`(a.department_id = ANY($${values.length}::int[]) OR a.department_id IS NULL)`);
+    }
+    const wsFilter = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const res = await con.query(
+      `SELECT
+         ir.run_id, ir.checklist_id, ir.overall_status, ir.started_at, ir.completed_at,
+         c.title AS checklist_title,
+         a.asset_id, a.asset_code, a.name AS asset_name,
+         u.user_id AS inspector_id, u.name AS inspector_name, u.email AS inspector_email,
+         (SELECT COUNT(*) FROM inspection_results r2 WHERE r2.run_id = ir.run_id AND r2.is_passed = false) AS failed_count,
+         (SELECT COUNT(*) FROM inspection_results r3 WHERE r3.run_id = ir.run_id) AS total_count
+       FROM inspection_runs ir
+       JOIN checklists c ON ir.checklist_id = c.checklist_id
+       JOIN assets a ON c.asset_id = a.asset_id
+       LEFT JOIN users u ON ir.inspector_id = u.user_id
+       ${wsFilter}
+       ORDER BY COALESCE(ir.completed_at, ir.started_at) DESC
+       LIMIT $1`,
+      values
+    );
+    return res.rows;
   }
 }
 

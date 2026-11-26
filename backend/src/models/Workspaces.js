@@ -90,13 +90,21 @@ export const findWorkspaceMembers = async (workspace_id) => {
                 u.name, 
                 u.email, 
                 u.avatar_url,
-                r.role_name
+                u.department_id,
+                d.name AS department_name,
+                u.employee_code,
+                u.is_active,
+                wm.joined_at,
+                LOWER(r.role_name) AS role_name,
+                r.role_id
             FROM users u
             JOIN workspace_members wm ON u.user_id = wm.user_id
             LEFT JOIN roles r ON wm.role_id = r.role_id
+            LEFT JOIN departments d ON u.department_id = d.department_id
                         WHERE wm.workspace_id = $1
                             AND wm.deleted_at IS NULL
                             AND u.deleted_at IS NULL
+            ORDER BY r.role_id ASC, u.name ASC NULLS LAST, u.user_id ASC
         `;
         const values = [workspace_id];
         const result = await con.query(query, values);
@@ -105,6 +113,83 @@ export const findWorkspaceMembers = async (workspace_id) => {
         throw error;
     }
 }
+
+export const getRolePermissionMatrix = async () => {
+    const rolesRes = await con.query(`SELECT role_id, LOWER(role_name) AS role_name FROM roles ORDER BY role_id ASC`);
+    const permsRes = await con.query(`SELECT permission_id, permission_name, description, group_name FROM permissions ORDER BY group_name, permission_id`);
+    const mapRes = await con.query(`SELECT role_id, permission_id FROM role_permissions`);
+    return {
+        roles: rolesRes.rows,
+        permissions: permsRes.rows,
+        mappings: mapRes.rows,
+    };
+};
+
+export const updateWorkspaceMemberProfile = async (workspace_id, user_id, { role_name, department_id, is_active }) => {
+    const client = await con.connect();
+    try {
+        await client.query('BEGIN');
+        const memCheck = await client.query(
+            `SELECT wm.role_id, LOWER(r.role_name) AS current_role
+             FROM workspace_members wm
+             LEFT JOIN roles r ON wm.role_id = r.role_id
+             WHERE wm.workspace_id = $1 AND wm.user_id = $2 AND wm.deleted_at IS NULL`,
+            [workspace_id, user_id]
+        );
+        if (memCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return null;
+        }
+
+        if (role_name) {
+            const roleRes = await client.query(`SELECT role_id FROM roles WHERE LOWER(role_name) = LOWER($1) LIMIT 1`, [role_name]);
+            if (roleRes.rows.length === 0) {
+                throw new Error(`Vai trò không hợp lệ: ${role_name}`);
+            }
+            await client.query(
+                `UPDATE workspace_members SET role_id = $1 WHERE workspace_id = $2 AND user_id = $3 AND deleted_at IS NULL`,
+                [roleRes.rows[0].role_id, workspace_id, user_id]
+            );
+        }
+
+        if (department_id !== undefined) {
+            if (department_id !== null) {
+                const deptCheck = await client.query(`SELECT workspace_id FROM departments WHERE department_id = $1`, [department_id]);
+                if (deptCheck.rows.length === 0 || (deptCheck.rows[0].workspace_id && Number(deptCheck.rows[0].workspace_id) !== Number(workspace_id))) {
+                    throw new Error('Phòng ban không thuộc nơi làm việc này');
+                }
+            }
+            await client.query(`UPDATE users SET department_id = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`, [department_id, user_id]);
+        }
+
+        if (typeof is_active === 'boolean') {
+            if (is_active === false) {
+                const otherWsRes = await client.query(
+                    `SELECT COUNT(*)::int AS n
+                     FROM workspace_members wm
+                     JOIN workspaces w ON w.workspace_id = wm.workspace_id
+                     WHERE wm.user_id = $1 AND wm.workspace_id <> $2 AND wm.deleted_at IS NULL AND w.deleted_at IS NULL`,
+                    [user_id, workspace_id]
+                );
+                if (otherWsRes.rows[0]?.n > 0) {
+                    const err = new Error('Tài khoản này đang tham gia Workspace khác; hãy dùng thao tác Gỡ khỏi Workspace thay vì khóa tài khoản toàn hệ thống.');
+                    err.statusCode = 409;
+                    throw err;
+                }
+            }
+            await client.query(`UPDATE users SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`, [is_active, user_id]);
+        }
+
+        await client.query('COMMIT');
+        const updated = await findWorkspaceMembers(workspace_id);
+        return updated.find((m) => Number(m.user_id) === Number(user_id)) || null;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+};
 
 export const findWorkspaceInvitations = async (workspace_id) => {
     try {

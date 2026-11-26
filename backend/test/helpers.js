@@ -26,10 +26,10 @@ export async function stop() {
 export const tokenOf = (u) => jwt.sign({ user_id: u.id, email: u.email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 
 /** Gọi API với token của user `as` (hoặc `token` có sẵn); trả { status, body }. */
-export async function api(method, path, { as, token = as && tokenOf(as), body } = {}) {
+export async function api(method, path, { as, token = as && tokenOf(as), body, headers } = {}) {
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(headers || {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();

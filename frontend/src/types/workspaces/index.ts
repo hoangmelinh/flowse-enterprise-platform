@@ -14,6 +14,7 @@ export interface WorkspacesData {
     slug: string;
     description: string | null;
     plan?: string;
+    role_name?: string;
     created_by: number | null;
     created_at?: string;
     updated_at?: string;

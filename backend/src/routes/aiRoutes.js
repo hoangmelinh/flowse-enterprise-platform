@@ -9,12 +9,13 @@ import {
 } from "../controllers/aiController.js";
 import { applyAiAction, cancelAiAction, listAiActions, workWithAI } from "../controllers/aiWorkController.js";
 import { aiChatLimiter } from "../middlewares/rateLimitMiddleware.js";
+import { resolveWorkspaceMembership } from "../middlewares/roleMiddlewares.js";
 
 const router = express.Router();
 
 router.post("/chat", aiChatLimiter, chatWithAI);
 router.post("/query", aiChatLimiter, chatWithAI); // Alias cho API Contract Matrix 2.8
-router.post("/analytics-summary", aiChatLimiter, getAnalyticsSummary);
+router.post("/analytics-summary", aiChatLimiter, resolveWorkspaceMembership, getAnalyticsSummary);
 router.post("/draft-action", aiChatLimiter, draftAction);
 router.post("/summarize-incident", aiChatLimiter, summarizeIncident);
 router.post("/generate-description", aiChatLimiter, generateDescription);

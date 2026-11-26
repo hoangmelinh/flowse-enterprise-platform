@@ -4,15 +4,22 @@ import {
   getInspectionById,
   getAssetChecklist,
   submitInspection,
+  createInspectionTemplate,
+  updateInspectionTemplate,
+  getInspectionRuns,
 } from "../controllers/inspectionController.js";
+import { assetWorkspace, requireAdmin, requireWorkspaceGovernance, resolveWorkspaceMembership } from "../middlewares/roleMiddlewares.js";
 
 const router = Router();
 
-router.get("/templates", getInspectionTemplates);
-router.get("/asset/:assetId/checklist", getAssetChecklist);
-router.get("/assets/:assetId/checklist", getAssetChecklist);
-router.get("/:id", getInspectionById);
-router.post("/submit", submitInspection);
-router.post("/:id/submit", submitInspection);
+router.get("/templates", resolveWorkspaceMembership, getInspectionTemplates);
+router.post("/templates", requireAdmin((req) => assetWorkspace(req.body?.asset_id)), createInspectionTemplate);
+router.put("/templates/:id", requireWorkspaceGovernance(["admin"], { requireExplicitWorkspace: true }), updateInspectionTemplate);
+router.get("/runs", resolveWorkspaceMembership, requireWorkspaceGovernance(["admin", "manager"], { requireExplicitWorkspace: true }), getInspectionRuns);
+router.get("/asset/:assetId/checklist", resolveWorkspaceMembership, getAssetChecklist);
+router.get("/assets/:assetId/checklist", resolveWorkspaceMembership, getAssetChecklist);
+router.get("/:id", resolveWorkspaceMembership, getInspectionById);
+router.post("/submit", resolveWorkspaceMembership, submitInspection);
+router.post("/:id/submit", resolveWorkspaceMembership, submitInspection);
 
 export default router;

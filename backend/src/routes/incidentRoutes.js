@@ -11,11 +11,11 @@ import {
   assignTechnician,
   appendEvidence,
 } from "../controllers/incidentController.js";
-import { requireTaskManager, requireTaskMember, taskOfIncident } from "../middlewares/roleMiddlewares.js";
+import { requireTaskManager, requireTaskMember, resolveWorkspaceMembership, taskOfIncident } from "../middlewares/roleMiddlewares.js";
 
 const router = Router();
 
-router.get("/stats/downtime-mttr", getDowntimeStats);
+router.get("/stats/downtime-mttr", resolveWorkspaceMembership, getDowntimeStats);
 router.post("/analyze-evidence", analyzeEvidence);
 router.get("/", getIncidents);
 router.get("/:id", requireTaskMember(taskOfIncident), getIncidentById);
