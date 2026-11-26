@@ -8,26 +8,36 @@ import { AppError } from "../middlewares/errorMiddleware.js";
 import Department from "./Department.js";
 
 class Incident {
-  static async getAll(user) {
+  static async getAll(user = null, workspaceId = null) {
+    if (!user?.user_id) {
+      return [];
+    }
     // Luôn giới hạn trong workspace user là thành viên (việc → danh sách → không gian → workspace)
     const values = [user.user_id];
+    const wsMatch = workspaceId
+      ? (() => {
+          values.push(Number(workspaceId));
+          return `AND sp.workspace_id = $${values.length}`;
+        })()
+      : "";
     let whereClause = `WHERE EXISTS (
       SELECT 1 FROM lists l JOIN spaces sp ON sp.space_id = l.space_id
       JOIN workspace_members wm ON wm.workspace_id = sp.workspace_id AND wm.user_id = $1 AND wm.deleted_at IS NULL
-      WHERE l.list_id = t.list_id
+      WHERE l.list_id = t.list_id ${wsMatch}
     )`;
 
     // Xác định quyền hạn và phạm vi phòng ban/phân xưởng (Resource Scope)
-    const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role);
+    const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, user.role, workspaceId);
 
     // Nếu không phải Admin (accessibleDeptIds !== null) -> Áp dụng cô lập dữ liệu theo phân xưởng
     if (accessibleDeptIds !== null) {
       values.push(accessibleDeptIds);
+      const deptParam = `$${values.length}`;
       whereClause += `
         AND (
           inc.reported_by = $1 
           OR tech.assignee_id = $1 
-          OR a.department_id = ANY($2::int[])
+          OR a.department_id = ANY(${deptParam}::int[])
           OR a.department_id IS NULL
         )
       `;
@@ -703,8 +713,9 @@ class Incident {
   }
 
   /**
-   * Thống kê KPI Downtime và MTTR toàn phân xưởng (Giai đoạn 2 & Mở rộng Chu kỳ)
+   * Thống kê KPI Downtime & thời gian xử lý sự cố (cô lập theo Workspace và Department Scope)
    * @param {string} [period='month'] - 'today' | 'week' | 'month' | 'all'
+   * @param {object} [scope={}] - { workspaceId, allowedWorkspaceIds, userId, accessibleDeptIds }
    */
   static async getDowntimeAndMTTRStats(period = "month", userId = null) {
     // Chỉ tính trong các công ty user là thành viên (không có user thì không có số liệu)
@@ -713,12 +724,49 @@ class Incident {
       WHERE l.list_id = t.list_id)`;
     let timeCondition = "";
     if (period === "today") {
-      timeCondition = "AND inc.created_at >= CURRENT_DATE";
+      timeCondition = "AND inc.created_at >= DATE_TRUNC('day', CURRENT_TIMESTAMP)";
     } else if (period === "week") {
-      timeCondition = "AND inc.created_at >= DATE_TRUNC('week', CURRENT_DATE)";
+      timeCondition = "AND inc.created_at >= DATE_TRUNC('week', CURRENT_TIMESTAMP)";
     } else if (period === "month") {
-      timeCondition = "AND inc.created_at >= DATE_TRUNC('month', CURRENT_DATE)";
+      timeCondition = "AND inc.created_at >= DATE_TRUNC('month', CURRENT_TIMESTAMP)";
     }
+
+    const values = [];
+    const scopeFilters = [];
+
+    if (workspaceId) {
+      values.push(Number(workspaceId));
+      scopeFilters.push(`sp.workspace_id = $${values.length}`);
+    } else if (Array.isArray(allowedWorkspaceIds)) {
+      if (allowedWorkspaceIds.length === 0) {
+        return {
+          period,
+          totalIncidents: 0,
+          resolvedIncidents: 0,
+          openIncidents: 0,
+          totalDowntimeMinutes: 0,
+          formattedTotalDowntime: "0 phút",
+          mttrMinutes: 0,
+          slaMetCount: 0,
+          slaBreachedCount: 0,
+          topDowntimeAssets: [],
+        };
+      }
+      values.push(allowedWorkspaceIds.map(Number));
+      scopeFilters.push(`sp.workspace_id = ANY($${values.length}::int[])`);
+    }
+
+    if (accessibleDeptIds !== null && Array.isArray(accessibleDeptIds) && userId) {
+      values.push(Number(userId));
+      const uParam = `$${values.length}`;
+      values.push(accessibleDeptIds);
+      const dParam = `$${values.length}`;
+      scopeFilters.push(
+        `(inc.reported_by = ${uParam} OR EXISTS (SELECT 1 FROM task_assigns ta WHERE ta.task_id = t.task_id AND ta.user_id = ${uParam} AND ta.deleted_at IS NULL) OR a.department_id = ANY(${dParam}::int[]) OR t.department_id = ANY(${dParam}::int[]))`
+      );
+    }
+
+    const scopeWhere = scopeFilters.length > 0 ? `AND ${scopeFilters.join(" AND ")}` : "";
 
     const statsQuery = `
       SELECT 

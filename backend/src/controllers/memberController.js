@@ -23,7 +23,10 @@ export const InviteMember = async (req, res) => {
             return res.status(400).json({ message: "Email, workspace_id và role là bắt buộc", receivedBody: req.body });
         }
 
-        const trimmedRole = role.trim();
+        const trimmedRole = String(role).trim().toLowerCase();
+        if (!['admin', 'manager', 'member'].includes(trimmedRole)) {
+            return res.status(400).json({ message: "Vai trò khởi tạo không hợp lệ (chỉ chấp nhận admin, manager hoặc member)" });
+        }
 
         const existingInvitation = await checkExistingInvitation(workspace_id, email);
         if (existingInvitation) {

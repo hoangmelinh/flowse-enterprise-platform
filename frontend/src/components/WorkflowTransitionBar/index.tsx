@@ -25,6 +25,8 @@ import {
 import { getWorkspaceMembers } from "@/api/workspaces";
 import { uploadFile } from "@/api/upload";
 import { analyzeEvidence, type AIEvidenceAnalysis } from "@/api/incidents";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store/configureStore";
 import { getFileUrl } from "@/utils/imageUrl";
 
 interface WorkflowTransitionBarProps {
@@ -71,6 +73,7 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
   const [aiAnalysis, setAiAnalysis] = useState<AIEvidenceAnalysis | null>(null);
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const currentWorkspaceId = useSelector((s: RootState) => s.workspaces.currentWorkspaceId);
 
   const fetchTransitions = useCallback(async () => {
     if (!taskId) return;
@@ -95,28 +98,19 @@ export const WorkflowTransitionBar: React.FC<WorkflowTransitionBarProps> = ({
   }, [fetchTransitions, currentStateCode, taskId]);
 
   useEffect(() => {
-    getWorkspaceMembers(1)
+    if (!currentWorkspaceId) return;
+    getWorkspaceMembers(currentWorkspaceId)
       .then((res: any) => {
         if (Array.isArray(res) && res.length > 0) {
           setMembers(res);
         } else if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
           setMembers(res.data);
-        } else {
-          setMembers([
-            { user_id: 2, name: "Trần Văn Bình", role_name: "KTV Cơ Khí" },
-            { user_id: 3, name: "Lê Hoàng Nam", role_name: "KTV Điện" },
-            { user_id: 1, name: "nguyen van hien vinh", role_name: "Quản đốc" },
-          ]);
         }
       })
       .catch(() => {
-        setMembers([
-          { user_id: 2, name: "Trần Văn Bình", role_name: "KTV Cơ Khí" },
-          { user_id: 3, name: "Lê Hoàng Nam", role_name: "KTV Điện" },
-          { user_id: 1, name: "nguyen van hien vinh", role_name: "Quản đốc" },
-        ]);
+        setMembers([]);
       });
-  }, []);
+  }, [currentWorkspaceId]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

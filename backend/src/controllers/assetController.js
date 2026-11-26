@@ -29,7 +29,7 @@ export const explainAsset = async (req, res, next) => {
 
 export const getAssets = async (req, res, next) => {
   try {
-    const assets = await Asset.getAll(req.user);
+    const assets = await Asset.getAll(req.user, req.workspaceId || null, req.userWorkspaceIds || []);
     res.json({ success: true, data: assets });
   } catch (error) {
     next(error);
@@ -41,6 +41,9 @@ export const getAssetById = async (req, res, next) => {
     const asset = await Asset.getById(req.params.id);
     if (!asset) {
       return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+    if (!(await canReadAssetInScope(req, asset))) {
+      return res.status(403).json({ success: false, message: "Forbidden: Thiết bị không thuộc phạm vi Workspace/Phòng ban của bạn." });
     }
     res.json({ success: true, data: asset });
   } catch (error) {
@@ -58,6 +61,9 @@ export const resolveQrContext = async (req, res, next) => {
     const context = await Asset.resolveQrToken(token, code);
     if (!context) {
       return res.status(404).json({ success: false, message: "Không tìm thấy thiết bị." });
+    }
+    if (!(await canReadAssetInScope(req, context.asset))) {
+      return res.status(403).json({ success: false, message: "Forbidden: Mã QR thiết bị thuộc Workspace khác." });
     }
 
     res.json({
@@ -79,6 +85,18 @@ export const createAsset = async (req, res, next) => {
   }
 };
 
+export const updateAsset = async (req, res, next) => {
+  try {
+    const updated = await Asset.update(req.params.id, req.body || {});
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * Phase 4 – Digital Health Record
  * GET /assets/:id/health-record
@@ -86,10 +104,14 @@ export const createAsset = async (req, res, next) => {
 export const getAssetHealthRecord = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const record = await Asset.getHealthRecord(id);
-    if (!record) {
+    const asset = await Asset.getById(id);
+    if (!asset) {
       return res.status(404).json({ success: false, message: "Asset not found" });
     }
+    if (!(await canReadAssetInScope(req, asset))) {
+      return res.status(403).json({ success: false, message: "Forbidden: Thiết bị không thuộc phạm vi Workspace/Phòng ban của bạn." });
+    }
+    const record = await Asset.getHealthRecord(id);
     res.json({ success: true, data: record });
   } catch (error) {
     next(error);

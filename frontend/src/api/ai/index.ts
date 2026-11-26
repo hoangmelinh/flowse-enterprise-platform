@@ -40,3 +40,40 @@ export const summarizeIncidentAI = async (
 ): Promise<{ success: boolean; summary: string; incident_id: number; asset_code?: string }> => {
     return beApi.post('ai/summarize-incident', { incident_id: incidentId });
 };
+
+export interface AiWorkAction {
+    action_id: number;
+    action_type: 'CREATE_TASK' | 'UPDATE_TASK' | 'ASSIGN_TASK' | 'DELETE_TASK';
+    status: 'PENDING' | 'APPLYING' | 'APPLIED' | 'CANCELLED' | 'FAILED';
+    summary: {
+        title: string;
+        detail?: string;
+        space_name?: string;
+        list_name?: string;
+        assignees?: string[];
+        priority?: string;
+        due_date?: string;
+    };
+    result?: any;
+    created_at: string;
+    decided_at?: string | null;
+}
+
+export const workWithAI = async (
+    message: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+): Promise<{ data: { response: string; action: AiWorkAction | null } }> => {
+    return beApi.post('ai/work', { message, history });
+};
+
+export const listAiActions = async (): Promise<{ data: AiWorkAction[] }> => {
+    return beApi.get('ai/actions');
+};
+
+export const applyAiAction = async (id: number): Promise<{ data: AiWorkAction }> => {
+    return beApi.post(`ai/actions/${id}/apply`);
+};
+
+export const cancelAiAction = async (id: number): Promise<{ data: AiWorkAction }> => {
+    return beApi.post(`ai/actions/${id}/cancel`);
+};

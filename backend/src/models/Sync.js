@@ -170,6 +170,44 @@ class Sync {
 
     return results;
   }
+
+  static async getLogs({ workspaceId = null, limit = 50, accessibleDeptIds = null, viewerUserId = null } = {}) {
+    const values = [Number(limit) || 50];
+    let wsJoin = "";
+    const conditions = [];
+    if (workspaceId) {
+      values.push(Number(workspaceId));
+      wsJoin = `JOIN workspace_members wm ON wm.user_id = osl.user_id AND wm.workspace_id = $${values.length} AND wm.deleted_at IS NULL`;
+    }
+    if (accessibleDeptIds !== null && Array.isArray(accessibleDeptIds)) {
+      if (accessibleDeptIds.length === 0) {
+        if (!viewerUserId) return [];
+        values.push(Number(viewerUserId));
+        conditions.push(`osl.user_id = $${values.length}`);
+      } else {
+        values.push(accessibleDeptIds.map(Number));
+        const deptParam = `$${values.length}`;
+        if (viewerUserId) {
+          values.push(Number(viewerUserId));
+          conditions.push(`(u.department_id = ANY(${deptParam}::int[]) OR osl.user_id = $${values.length})`);
+        } else {
+          conditions.push(`u.department_id = ANY(${deptParam}::int[])`);
+        }
+      }
+    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const res = await con.query(
+      `SELECT osl.*, u.name AS user_name, u.email AS user_email
+       FROM offline_sync_logs osl
+       LEFT JOIN users u ON osl.user_id = u.user_id
+       ${wsJoin}
+       ${whereClause}
+       ORDER BY osl.applied_at DESC
+       LIMIT $1`,
+      values
+    );
+    return res.rows;
+  }
 }
 
 export default Sync;

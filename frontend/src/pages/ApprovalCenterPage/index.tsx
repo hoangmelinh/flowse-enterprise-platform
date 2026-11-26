@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, Input, message } from "antd";
-import { CheckCircle, XCircle, Clock, ShieldCheck, AlertCircle } from "lucide-react";
+import { Table, Tag, Button, Modal, Input, message, Tabs, Form, Select } from "antd";
+import { CheckCircle, XCircle, Clock, ShieldCheck, AlertCircle, Plus, FileText, Lock } from "lucide-react";
 import { getPendingApprovals, makeApprovalDecision, type ApprovalItem } from "@/api/approvals";
+import { createWorkItem, getMyWork, type WorkItemSummary } from "@/api/workItems";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 const ApprovalCenterPage: React.FC = () => {
+  const { capabilities, currentRole } = useCapabilities();
+  const canApprove = capabilities.can_approve;
+
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
+  const [myRequests, setMyRequests] = useState<WorkItemSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ApprovalItem | null>(null);
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
@@ -12,23 +18,36 @@ const ApprovalCenterPage: React.FC = () => {
   const [decisionNote, setDecisionNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchApprovals = async () => {
+  // Request submission modal (Mọi nhân viên đều có thể gửi đề xuất nội bộ)
+  const [createRequestOpen, setCreateRequestOpen] = useState(false);
+  const [creatingRequest, setCreatingRequest] = useState(false);
+  const [reqForm] = Form.useForm();
+
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await getPendingApprovals();
-      if (res?.data) {
-        setApprovals(res.data);
+      const [appRes, myWorkRes] = await Promise.all([
+        canApprove ? getPendingApprovals().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        getMyWork().catch(() => null),
+      ]);
+      if (appRes?.data) {
+        setApprovals(appRes.data);
+      }
+      if (myWorkRes?.data?.buckets) {
+        const b = myWorkRes.data.buckets;
+        const all = [...b.overdue, ...b.today, ...b.in_progress, ...b.waiting, ...b.completed];
+        setMyRequests(all.filter((item) => item.type === "REQUEST"));
       }
     } catch (err: any) {
-      message.error(err?.message || "Không thể tải danh sách phê duyệt");
+      message.error(err?.message || "Không thể tải dữ liệu phê duyệt & yêu cầu");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchApprovals();
-  }, []);
+    fetchData();
+  }, [canApprove]);
 
   const handleOpenDecision = (item: ApprovalItem, type: "APPROVED" | "REJECTED") => {
     setSelectedItem(item);
@@ -49,27 +68,52 @@ const ApprovalCenterPage: React.FC = () => {
         decisionType === "APPROVED" ? "Đã phê duyệt yêu cầu thành công" : "Đã từ chối yêu cầu"
       );
       setDecisionModalOpen(false);
-      fetchApprovals();
+      fetchData();
     } catch (err: any) {
-      message.error(err?.message || "Xử lý thất bại");
+      if (err?.status === 409) {
+        message.warning(err?.message || "Phiếu này đã được người khác xử lý trước đó.");
+        setDecisionModalOpen(false);
+        fetchData();
+      } else {
+        message.error(err?.message || "Xử lý thất bại");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns = [
+  const handleCreateRequest = async (values: any) => {
+    try {
+      setCreatingRequest(true);
+      await createWorkItem({
+        title: values.title,
+        description: values.description,
+        work_item_type: "REQUEST",
+        priority: values.priority || "Normal",
+      });
+      message.success("Đã gửi đề xuất nội bộ thành công!");
+      setCreateRequestOpen(false);
+      reqForm.resetFields();
+      fetchData();
+    } catch (err: any) {
+      message.error(err?.message || "Không thể gửi đề xuất");
+    } finally {
+      setCreatingRequest(false);
+    }
+  };
+
+  const approvalColumns = [
     {
       title: "Yêu cầu / Work Item",
       key: "task_name",
       render: (_: any, record: ApprovalItem) => (
         <div>
-          <div className="font-semibold text-gray-900 dark:text-gray-100">{record.task_name}</div>
+          <div className="font-semibold text-gray-900">{record.task_name}</div>
           <div className="text-xs text-gray-500 line-clamp-1">{record.task_description || "Không có mô tả"}</div>
-          
           {record.incident_id && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Tag color="volcano" className="font-medium">
-                🔗 Sự cố #{record.incident_id}
+                Sự cố #{record.incident_id}
               </Tag>
               {(record.asset_name || record.asset_code) && (
                 <Tag color="cyan">
@@ -78,20 +122,14 @@ const ApprovalCenterPage: React.FC = () => {
               )}
             </div>
           )}
-
           {record.request_note && (
-            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded mt-1.5 border border-amber-200 dark:border-amber-900/30">
-              📝 {record.request_note}
+            <div className="text-xs text-amber-800 bg-amber-50 px-2 py-1 rounded mt-1.5 border border-amber-200">
+              {record.request_note}
             </div>
           )}
-
           <div className="mt-1 flex items-center gap-1.5">
-            <Tag color={record.work_item_type === "INCIDENT" ? "red" : "blue"}>
-              {record.work_item_type}
-            </Tag>
-            <Tag color={record.priority === "Urgent" ? "error" : "default"}>
-              {record.priority}
-            </Tag>
+            <Tag color={record.work_item_type === "INCIDENT" ? "red" : "blue"}>{record.work_item_type}</Tag>
+            <Tag color={record.priority === "Urgent" ? "error" : "default"}>{record.priority}</Tag>
           </div>
         </div>
       ),
@@ -104,12 +142,12 @@ const ApprovalCenterPage: React.FC = () => {
           {record.requester_avatar ? (
             <img src={record.requester_avatar} alt="avatar" className="w-7 h-7 rounded-full object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
+            <div className="w-7 h-7 rounded-full bg-[#0058be] text-white flex items-center justify-center text-xs font-semibold">
               {record.requester_name?.charAt(0) || "U"}
             </div>
           )}
           <div>
-            <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{record.requester_name}</div>
+            <div className="text-sm font-medium text-gray-800">{record.requester_name}</div>
             <div className="text-xs text-gray-400">{record.requester_email}</div>
           </div>
         </div>
@@ -153,53 +191,140 @@ const ApprovalCenterPage: React.FC = () => {
     },
   ];
 
+  const requestColumns = [
+    {
+      title: "Tiêu đề đề xuất",
+      key: "title",
+      render: (_: any, item: WorkItemSummary) => (
+        <div>
+          <div className="font-semibold text-gray-900">{item.title}</div>
+          <div className="text-xs text-gray-500 line-clamp-1">{item.description || "Không có mô tả"}</div>
+        </div>
+      ),
+    },
+    {
+      title: "Ưu tiên",
+      dataIndex: "priority",
+      key: "priority",
+      render: (p: string) => <Tag color={p === "Urgent" ? "red" : p === "High" ? "orange" : "blue"}>{p}</Tag>,
+    },
+    {
+      title: "Trạng thái",
+      key: "state",
+      render: (_: any, item: WorkItemSummary) => (
+        <Tag color={item.state_color || "blue"}>{item.current_state_name || "Đang xử lý"}</Tag>
+      ),
+    },
+    {
+      title: "Ngày tạo",
+      dataIndex: "created_at",
+      key: "created_at",
+      render: (v: string) => <span className="text-xs text-gray-500">{new Date(v).toLocaleString("vi-VN")}</span>,
+    },
+  ];
+
+  const tabItems = [
+    ...(canApprove
+      ? [
+          {
+            key: "pending",
+            label: (
+              <span className="flex items-center gap-1.5 font-semibold">
+                <ShieldCheck className="w-4 h-4" />
+                Chờ tôi phê duyệt ({approvals.length})
+              </span>
+            ),
+            children: (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    Các đề xuất cấp phát vật tư, tạm ứng và bước nghiệm thu sự cố đều được kiểm tra phân quyền &amp; chống duyệt trùng (409 Conflict) ở máy chủ.
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <Table
+                    dataSource={approvals}
+                    columns={approvalColumns}
+                    rowKey="approval_id"
+                    loading={loading}
+                    pagination={{ pageSize: 10 }}
+                    locale={{ emptyText: "Hiện không có yêu cầu nào chờ bạn phê duyệt." }}
+                  />
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    {
+      key: "my-requests",
+      label: (
+        <span className="flex items-center gap-1.5 font-semibold">
+          <FileText className="w-4 h-4" />
+          Đề xuất nội bộ của tôi ({myRequests.length})
+        </span>
+      ),
+      children: (
+        <div className="space-y-4">
+          {!canApprove && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+              <Lock className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
+              <div className="text-sm text-slate-700">
+                Vai trò hiện tại của bạn là <strong className="uppercase">{currentRole}</strong>. Bạn có thể tạo và theo dõi đề xuất của mình; quyền Phê duyệt / Từ chối dành cho Quản lý hoặc Trưởng bộ phận.
+              </div>
+            </div>
+          )}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <Table
+              dataSource={myRequests}
+              columns={requestColumns}
+              rowKey="id"
+              loading={loading}
+              pagination={{ pageSize: 10 }}
+              locale={{ emptyText: "Bạn chưa gửi đề xuất nội bộ nào." }}
+            />
+          </div>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-                Approval Center (Trung Tâm Phê Duyệt)
-              </h1>
-              <p className="text-sm text-gray-500">
-                Quản lý các yêu cầu công việc, đề xuất và sự cố đang chờ cấp thẩm quyền phê duyệt
-              </p>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-50 text-[#0058be]">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              {canApprove ? "Yêu cầu & Trung Tâm Phê Duyệt" : "Đề Xuất & Yêu Cầu Nội Bộ"}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {canApprove
+                ? "Phê duyệt đề xuất cấp vật tư, yêu cầu nội bộ và theo dõi các phiếu đã gửi"
+                : "Tạo đề xuất cấp thiết bị, vật tư hoặc yêu cầu nội bộ gửi lên Quản lý"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchApprovals} loading={loading}>
+          <Button onClick={fetchData} loading={loading}>
             Làm mới
+          </Button>
+          <Button
+            type="primary"
+            icon={<Plus className="w-4 h-4 inline mr-1" />}
+            className="bg-[#0058be]"
+            onClick={() => setCreateRequestOpen(true)}
+          >
+            Tạo đề xuất mới
           </Button>
         </div>
       </div>
 
-      {/* Info Alert */}
-      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <div className="text-sm text-amber-800 dark:text-amber-300">
-          Các bước chuyển trạng thái nhạy cảm (Sự cố nghiêm trọng, Mua sắm linh kiện, Hoàn tất bảo trì) cần có sự xác nhận của Quản lý trước khi được chuyển tiếp trong quy trình.
-        </div>
-      </div>
+      <Tabs defaultActiveKey={canApprove ? "pending" : "my-requests"} items={tabItems} />
 
-      {/* Table */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <Table
-          dataSource={approvals}
-          columns={columns}
-          rowKey="approval_id"
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-          locale={{ emptyText: "Hiện không có yêu cầu nào chờ bạn phê duyệt." }}
-        />
-      </div>
-
-      {/* Decision Modal */}
       <Modal
         title={decisionType === "APPROVED" ? "Xác nhận Phê duyệt" : "Xác nhận Từ chối"}
         open={decisionModalOpen}
@@ -213,21 +338,16 @@ const ApprovalCenterPage: React.FC = () => {
         }}
       >
         <div className="space-y-4 py-2">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
+          <p className="text-sm text-gray-600">
             Bạn đang {decisionType === "APPROVED" ? "phê duyệt" : "từ chối"} yêu cầu:{" "}
-            <span className="font-semibold text-gray-900 dark:text-gray-100">
-              {selectedItem?.task_name}
-            </span>
+            <span className="font-semibold text-gray-900">{selectedItem?.task_name}</span>
           </p>
-
           {selectedItem?.incident_id && (
-            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
-              <span className="text-base leading-none">⚡</span>
-              <div>
-                <strong>Liên thông sự cố #{selectedItem.incident_id}:</strong> Khi bấm{" "}
-                <span className="underline font-semibold">{decisionType === "APPROVED" ? "Phê duyệt" : "Từ chối"}</span>, hệ thống sẽ{" "}
-                {decisionType === "APPROVED" ? "tự động chuyển Sự cố về trạng thái Đang khắc phục và dời hạn chót SLA tương ứng số phút đã chờ duyệt." : "kích hoạt lại tiến độ và ghi nhận từ chối linh kiện."}
-              </div>
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
+              <strong>Liên thông sự cố #{selectedItem.incident_id}:</strong>{" "}
+              {decisionType === "APPROVED"
+                ? "Hệ thống sẽ tự động chuyển Sự cố về trạng thái Đang khắc phục và bù giờ SLA tương ứng thời gian chờ duyệt."
+                : "Hệ thống sẽ kích hoạt lại tiến độ và ghi nhận từ chối cấp linh kiện."}
             </div>
           )}
           <div>
@@ -242,6 +362,33 @@ const ApprovalCenterPage: React.FC = () => {
             />
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        title="Tạo Đề xuất / Yêu cầu Nội bộ mới"
+        open={createRequestOpen}
+        onCancel={() => setCreateRequestOpen(false)}
+        onOk={() => reqForm.submit()}
+        confirmLoading={creatingRequest}
+        okText="Gửi đề xuất"
+        cancelText="Hủy"
+      >
+        <Form form={reqForm} layout="vertical" onFinish={handleCreateRequest} initialValues={{ priority: "Normal" }}>
+          <Form.Item name="title" label="Tiêu đề đề xuất" rules={[{ required: true, message: "Vui lòng nhập tiêu đề" }]}>
+            <Input placeholder="Vd: Xin cấp laptop cho nhân sự mới, Tạm ứng công tác..." />
+          </Form.Item>
+          <Form.Item name="priority" label="Mức độ ưu tiên">
+            <Select>
+              <Select.Option value="Low">Thấp (Low)</Select.Option>
+              <Select.Option value="Normal">Bình thường (Normal)</Select.Option>
+              <Select.Option value="High">Cao (High)</Select.Option>
+              <Select.Option value="Urgent">Khẩn cấp (Urgent)</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="description" label="Nội dung chi tiết & Lý do">
+            <Input.TextArea rows={3} placeholder="Nhập thông số, chi phí dự kiến, thời hạn cần..." />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

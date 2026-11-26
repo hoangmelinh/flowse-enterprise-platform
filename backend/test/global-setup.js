@@ -11,6 +11,10 @@ export async function globalSetup() {
     await c.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     await c.query(`CREATE SCHEMA ${SCHEMA}`);
     await c.query(`SET search_path TO ${SCHEMA}, extensions`);
+    const pgc = await c.query(`SELECT n.nspname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE p.proname = 'gen_random_bytes' LIMIT 1`);
+    if (pgc.rows[0]?.nspname === 'public') {
+      await c.query(`CREATE FUNCTION ${SCHEMA}.gen_random_bytes(int) RETURNS bytea LANGUAGE sql IMMUTABLE STRICT AS $$ SELECT public.gen_random_bytes($1); $$`);
+    }
     await applySchema(c);
 
     const hash = await bcrypt.hash(PASSWORD, 4);

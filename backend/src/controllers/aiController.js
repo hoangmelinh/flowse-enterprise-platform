@@ -11,6 +11,7 @@ import { AppError } from "../middlewares/errorMiddleware.js";
 import { getWorkspaceRolesForTask } from "../models/Permission.js";
 import Incident from "../models/Incident.js";
 import Asset from "../models/Asset.js";
+import Department from "../models/Department.js";
 import dotenv from "dotenv";
 
 // Model Groq cho Flowse AI. llama-3.3-70b-versatile đã ngừng; gpt-oss suy nghĩ trước khi trả lời nên dùng reasoning_effort thấp
@@ -668,116 +669,98 @@ CHỈ trả về JSON, KHÔNG giải thích thêm.`
 // ═══════════════════════════════════════════════
 
 /**
- * Thuật toán tổng hợp báo cáo điều hành và Action Card nội bộ (Fallback chuẩn)
+ * Tổng hợp dữ kiện thực tế từ DB khi không dùng hoặc lỗi LLM (không suy đoán nguyên nhân kỹ thuật).
  */
 export const generateLocalAnalyticsSummary = (stats, openIncidents, criticalIncidents, allAssets, period) => {
     const downtimeMins = stats.totalDowntimeMinutes || 0;
-    const mttr = stats.mttrMinutes || 0;
+    const avgElapsed = stats.mttrMinutes || 0;
     const breached = stats.slaBreachedCount || 0;
-    
-    // Thuật toán chấm điểm sức khỏe vận hành nhà máy (Plant Health Score 0-100)
-    let score = 96;
-    if (downtimeMins > 600) score -= 25;
-    else if (downtimeMins > 240) score -= 15;
-    else if (downtimeMins > 60) score -= 8;
-    
-    score -= (criticalIncidents.length * 10);
-    score -= (breached * 6);
-    score = Math.max(30, Math.min(98, score));
-    
+    const met = stats.slaMetCount || 0;
+    const totalIncs = stats.totalIncidents || 0;
+    const slaDenom = met + breached;
+    const slaRate = slaDenom > 0 ? Math.round((met / slaDenom) * 100) : null;
+
+    // Health score transparent calculation only when operational incident/SLA data exists
     let healthStatus = "HEALTHY";
-    if (score < 60) healthStatus = "CRITICAL";
-    else if (score < 80) healthStatus = "WARNING";
+    let score = 100;
+    if (criticalIncidents.length > 0 || breached > 0 || downtimeMins > 0) {
+        score = Math.max(0, Math.min(100, 100 - criticalIncidents.length * 15 - breached * 10 - (downtimeMins > 480 ? 15 : downtimeMins > 120 ? 8 : 0)));
+        if (score < 60) healthStatus = "CRITICAL";
+        else if (score < 85) healthStatus = "WARNING";
+    }
 
     const topAsset = stats.topDowntimeAssets && stats.topDowntimeAssets[0];
-    const topAssetCode = topAsset ? topAsset.asset_code : (allAssets[0]?.asset_code || "CNC-024");
-    const topAssetName = topAsset ? topAsset.asset_name : (allAssets[0]?.name || "Máy phay CNC 5 trục");
-    
     const periodText = period === "today" ? "hôm nay" : period === "week" ? "tuần này" : period === "all" ? "toàn thời gian" : "tháng này";
 
-    const executiveSummary = `### 📊 Báo Cáo Tổng Hợp Điều Hành Độ Tin Cậy & Downtime (${periodText.toUpperCase()})
-
-Toàn phân xưởng ghi nhận tổng thời gian dừng máy là **${stats.formattedTotalDowntime || `${downtimeMins} phút`}** trên tổng số **${stats.totalIncidents || 0}** sự cố phát sinh. Chỉ số MTTR (Thời gian trung bình khắc phục sự cố) hiện duy trì ở mức **${mttr} phút/sự cố**, với tỉ lệ tuân thủ cam kết SLA đạt **${stats.totalIncidents > 0 ? Math.round(((stats.slaMetCount || 0) / stats.totalIncidents) * 100) : 100}%**.
-
-Hiện tại có **${openIncidents.length}** sự cố đang mở (trong đó có **${criticalIncidents.length}** sự cố ở mức độ nguy cấp). ${topAsset ? `Thiết bị **${topAssetCode} (${topAssetName})** là điểm nghẽn chính gây gián đoạn dây chuyền với tổng cộng **${topAsset.total_downtime_minutes} phút** dừng máy.` : 'Các dây chuyền sản xuất đang duy trì trạng thái vận hành tương đối ổn định.'}`;
-
-    const keyFindings = [
-        `Chỉ số MTTR đạt ${mttr} phút/sự cố, ${mttr > 120 ? 'vượt ngưỡng cảnh báo an toàn kỹ thuật (> 120p)' : 'nằm trong ngưỡng kiểm soát kỹ thuật chấp nhận được'}.`,
-        `Ghi nhận ${criticalIncidents.length} sự cố nguy cấp (CRITICAL / HIGH) đang mở cần sự giám sát trực tiếp từ kỹ sư trưởng.`,
-        topAsset ? `Thiết bị ${topAssetCode} chiếm tỉ trọng lớn nhất trong tổng thời gian gián đoạn vận hành.` : `Không ghi nhận sự cố dồn tích trên một thiết bị đơn lẻ.`,
-        `Tỉ lệ vi phạm SLA thời gian thực: ${breached} trường hợp, cần rà soát lại chuỗi cung ứng vật tư cơ điện.`
+    const observedFacts = [
+        `Trong kỳ ${periodText}, hệ thống ghi nhận ${totalIncs} sự cố (${stats.resolvedIncidents || 0} đã đóng, ${openIncidents.length} đang mở, trong đó ${criticalIncidents.length} mức CRITICAL/HIGH).`,
+        slaRate !== null
+            ? `Tỷ lệ tuân thủ SLA trên các sự cố đã kết thúc/vi phạm đạt ${slaRate}% (${met} đạt, ${breached} vi phạm).`
+            : `Chưa có bản ghi SLA hoàn tất hoặc vi phạm trong kỳ ${periodText}.`,
+        stats.resolvedIncidents > 0
+            ? `Tổng thời gian xử lý cộng dồn các sự cố đã đóng là ${stats.formattedTotalDowntime || `${downtimeMins} phút`} (trung bình ${avgElapsed} phút/sự cố từ lúc báo cáo đến khi đóng).`
+            : `Chưa có sự cố đã đóng trong kỳ ${periodText} để tính thời gian xử lý trung bình.`,
+        `Tổng số thiết bị thuộc phạm vi hiện tại: ${allAssets.length} thiết bị.`,
     ];
 
-    const rootCauses = [
-        `Hiện tượng quá nhiệt và kẹt phoi cơ khí tại các cụm trục quay chính của máy công cụ CNC.`,
-        `Hao mòn gioăng phớt thủy lực do chu kỳ bảo dưỡng định kỳ bị trễ ca sản xuất.`,
-        `Thời gian chờ phê duyệt linh kiện đặc chủng kéo dài ảnh hưởng trực tiếp đến SLA thời gian thực.`
-    ];
+    if (topAsset && topAsset.total_downtime_minutes > 0) {
+        observedFacts.push(
+            `Thiết bị có thời gian gián đoạn cao nhất: ${topAsset.asset_code} (${topAsset.asset_name}) với ${topAsset.incident_count} sự cố và ${topAsset.total_downtime_minutes} phút.`
+        );
+    }
 
-    const prescriptiveRecommendations = [
-        `Thiết lập lịch bảo dưỡng phòng ngừa (PM) đột xuất ngay trong ca nghỉ cho máy ${topAssetCode}.`,
-        `Cấu hình ngưỡng cảnh báo sớm nhiệt độ và rung chấn trên cảm biến IoT trạm bơm thủy lực.`,
-        `Chuẩn hóa cơ chế phê duyệt vật tư tự động đối với các linh kiện khẩn cấp nhóm P1/P2.`
-    ];
+    const possibleCauses = [];
+    const recommendations = [];
+    if (criticalIncidents.length > 0) {
+        recommendations.push(`Ưu tiên phân công và theo dõi ${criticalIncidents.length} sự cố mức CRITICAL/HIGH đang mở.`);
+    }
+    if (breached > 0) {
+        recommendations.push(`Rà soát ${breached} trường hợp vi phạm SLA để xác định điểm nghẽn phê duyệt vật tư hoặc điều phối.`);
+    }
+    if (topAsset && topAsset.total_downtime_minutes > 0) {
+        recommendations.push(`Kiểm tra lịch bảo dưỡng và nhật ký kiểm tra gần nhất của thiết bị ${topAsset.asset_code} (${topAsset.asset_name}).`);
+    }
+    if (recommendations.length === 0) {
+        recommendations.push("Duy trì lịch kiểm tra định kỳ và theo dõi hàng đợi phê duyệt theo kế hoạch.");
+    }
+
+    const executiveSummary = observedFacts.join(" ");
 
     const actionCards = [];
-    
-    // Thẻ Hành Động 1: Bảo dưỡng thiết bị có downtime lớn nhất
-    actionCards.push({
-        card_id: `card_act_pm_${Date.now()}`,
-        action_type: "CREATE_INCIDENT",
-        title: `Lập phiếu bảo trì đột xuất: ${topAssetCode}`,
-        subtitle: `Tối ưu hóa trục chính và hệ thống bôi trơn nhằm triệt tiêu rủi ro downtime`,
-        severity: "HIGH",
-        asset_id: topAsset?.asset_id || allAssets[0]?.asset_id || null,
-        asset_code: topAssetCode,
-        asset_name: topAssetName,
-        confidence: 0.94,
-        payload: {
-            title: `Bảo trì phòng ngừa khẩn cấp cho ${topAssetCode}`,
-            symptom: `Rà soát bạc đạn trục chính, bổ sung dầu bôi trơn và kiểm tra cảm biến hành trình`,
-            asset_id: topAsset?.asset_id || allAssets[0]?.asset_id || null,
-            severity: "HIGH",
-            priority: "High"
-        },
-        status: "PENDING"
-    });
-
-    // Thẻ Hành Động 2: Nhiệm vụ điều động kỹ thuật viên
     if (criticalIncidents.length > 0) {
         const topCrit = criticalIncidents[0];
         actionCards.push({
             card_id: `card_act_esc_${Date.now()}`,
             action_type: "CREATE_TASK",
-            title: `Điều động tổ đặc nhiệm: Xử lý sự cố ${topCrit.task_name || 'Khẩn cấp'}`,
-            subtitle: `Tập trung nguồn lực hiện trường đưa máy trở lại vận hành trước khi vượt SLA`,
-            severity: "CRITICAL",
-            asset_code: topCrit.asset_code || "HOTLINE",
-            confidence: 0.97,
+            title: `Theo dõi xử lý sự cố: ${topCrit.task_name || `#${topCrit.incident_id}`}`,
+            subtitle: `Sự cố mức ${topCrit.severity}${topCrit.asset_code ? ` trên ${topCrit.asset_code}` : ""}`,
+            severity: topCrit.severity === "CRITICAL" ? "CRITICAL" : "HIGH",
+            asset_code: topCrit.asset_code || undefined,
+            confidence: 0.9,
             payload: {
-                title: `Nhiệm vụ đặc nhiệm: Khắc phục sự cố ${topCrit.task_name}`,
+                title: `Kiểm tra tiến độ xử lý: ${topCrit.task_name || `#${topCrit.incident_id}`}`,
                 priority: "Urgent",
-                space_name: "Bảo trì & Cơ điện",
-                description: `Tập trung kỹ thuật viên xử lý sự cố ${topCrit.task_name} trên thiết bị ${topCrit.asset_code}. Triệu chứng: ${topCrit.symptom}`
+                description: topCrit.symptom ? `Triệu chứng ghi nhận: ${topCrit.symptom}` : undefined,
             },
-            status: "PENDING"
+            status: "PENDING",
         });
-    } else {
+    } else if (topAsset && topAsset.total_downtime_minutes > 0) {
         actionCards.push({
-            card_id: `card_act_check_${Date.now()}`,
+            card_id: `card_act_pm_${Date.now()}`,
             action_type: "CREATE_TASK",
-            title: `Khảo sát định kỳ hệ thống cảm biến & áp lực máy ${topAssetCode}`,
-            subtitle: `Đo đạc kiểm tra nhiệt độ trục quay và độ rung cơ khí theo tiêu chuẩn OEE`,
+            title: `Rà soát định kỳ thiết bị ${topAsset.asset_code}`,
+            subtitle: `${topAsset.asset_name} (${topAsset.total_downtime_minutes} phút gián đoạn trong kỳ)`,
             severity: "MEDIUM",
-            asset_code: topAssetCode,
-            confidence: 0.91,
+            asset_id: topAsset.asset_id,
+            asset_code: topAsset.asset_code,
+            asset_name: topAsset.asset_name,
+            confidence: 0.85,
             payload: {
-                title: `Khảo sát định kỳ hệ thống cảm biến ${topAssetCode}`,
+                title: `Kiểm tra kỹ thuật thiết bị ${topAsset.asset_code}`,
                 priority: "Normal",
-                space_name: "Bảo trì & Cơ điện",
-                description: `Kiểm tra nhiệt độ làm việc, áp suất dầu và rung động trục chính máy ${topAssetCode}.`
+                asset_id: topAsset.asset_id,
             },
-            status: "PENDING"
+            status: "PENDING",
         });
     }
 
@@ -785,17 +768,21 @@ Hiện tại có **${openIncidents.length}** sự cố đang mở (trong đó c�
         healthScore: score,
         healthStatus,
         executiveSummary,
-        keyFindings,
-        rootCauses,
-        prescriptiveRecommendations,
-        actionCards
+        observedFacts,
+        possibleCauses,
+        recommendations,
+        analysisSource: "factual_fallback",
+        llmConfigured: Boolean(groq),
+        keyFindings: observedFacts,
+        rootCauses: possibleCauses,
+        prescriptiveRecommendations: recommendations,
+        actionCards,
     };
 };
 
 /**
  * POST /api/v1/ai/analytics-summary
- * Body: { period?: 'today' | 'week' | 'month' | 'all' }
- * Tóm tắt điều hành AI & sinh Thẻ Hành Động (Action Cards) dựa trên Groq Llama 3.3
+ * Body: { period?: 'today' | 'week' | 'month' | 'all', workspaceId?: number }
  */
 export const getAnalyticsSummary = async (req, res) => {
     try {
@@ -806,68 +793,89 @@ export const getAnalyticsSummary = async (req, res) => {
         const allIncidents = await Incident.getAll(req.user);
         const allAssets = await Asset.getAll(req.user);
 
-        const openIncidents = allIncidents.filter(i => i.state_code !== 'RESOLVED' && i.state_code !== 'CLOSED');
-        const criticalIncidents = openIncidents.filter(i => i.severity === 'CRITICAL' || i.severity === 'HIGH');
+        const accessibleDeptIds = await Department.getAccessibleDepartmentIds(req.user.user_id, null, workspaceId);
+
+        // 1. Lấy dữ liệu thực tế cô lập theo đúng Workspace & Department Scope
+        const stats = await Incident.getDowntimeAndMTTRStats(period, {
+            workspaceId,
+            allowedWorkspaceIds: userWsIds,
+            userId: req.user.user_id,
+            accessibleDeptIds,
+        });
+        const allAssets = await Asset.getAll(req.user, workspaceId, userWsIds);
+        const scopedIncidents = await Incident.getAll(req.user, workspaceId);
+        const openIncidents = scopedIncidents.filter((i) => i.state_code !== "RESOLVED" && i.state_code !== "CLOSED");
+        const criticalIncidents = openIncidents.filter((i) => i.severity === "CRITICAL" || i.severity === "HIGH");
 
         let aiResult = null;
 
-        // 2. Tận dụng Groq Llama 3.3 để phân tích chuyên sâu nếu có cấu hình
-        if (groq) {
+        // 2. Chỉ gọi LLM khi có cấu hình Groq và có dữ liệu sự cố thực tế để tránh bịa đặt trên dữ liệu rỗng
+        if (groq && (stats.totalIncidents > 0 || openIncidents.length > 0)) {
             try {
-                const prompt = `Dữ liệu vận hành phân xưởng chu kỳ "${period}":
-- Tổng Downtime: ${stats.formattedTotalDowntime} (${stats.totalDowntimeMinutes} phút)
-- Chỉ số MTTR: ${stats.mttrMinutes} phút/sự cố
-- Sự cố đã đóng: ${stats.resolvedIncidents}, Sự cố đang mở: ${stats.openIncidents} (trong đó ${criticalIncidents.length} sự cố CRITICAL/HIGH)
-- SLA đạt: ${stats.slaMetCount}, SLA vi phạm: ${stats.slaBreachedCount}
-- Top máy dừng lâu nhất: ${stats.topDowntimeAssets.map(a => `${a.asset_code} (${a.asset_name}): ${a.total_downtime_minutes}p`).join(", ") || "Không có"}
+                const symptomsDigest = openIncidents
+                    .slice(0, 8)
+                    .map((i) => `- [${i.severity}] ${i.asset_code || "Không gắn thiết bị"}: ${i.symptom || i.task_name}`)
+                    .join("\n");
 
-Hãy đóng vai trò Giám đốc Kỹ thuật & Độ tin cậy AI (Chief Reliability Engineer) để phân tích báo cáo này.
-Trả về định dạng JSON thuần túy (không kèm giải thích) đúng cấu trúc sau:
+                const prompt = `Dữ liệu vận hành thực tế tại Workspace chu kỳ "${period}":
+- Sự cố trong kỳ: ${stats.totalIncidents} (Đã đóng: ${stats.resolvedIncidents}, Đang mở: ${openIncidents.length}, CRITICAL/HIGH đang mở: ${criticalIncidents.length})
+- Tổng thời gian sự cố đã đóng: ${stats.formattedTotalDowntime} (${stats.totalDowntimeMinutes} phút)
+- Thời gian xử lý trung bình (báo cáo -> đóng): ${stats.mttrMinutes} phút
+- SLA: ${stats.slaMetCount} đạt, ${stats.slaBreachedCount} vi phạm
+- Thiết bị gián đoạn nhiều nhất: ${stats.topDowntimeAssets.map((a) => `${a.asset_code} (${a.asset_name}): ${a.total_downtime_minutes}p`).join(", ") || "Không có"}
+- Triệu chứng sự cố đang mở:
+${symptomsDigest || "Không có"}
+
+Yêu cầu nghiêm ngặt:
+- KHÔNG tự bịa tên thiết bị, mã máy hoặc nguyên nhân cơ khí không có trong triệu chứng trên.
+- Tách bạch rõ: observedFacts (chỉ nêu số liệu thực), possibleCauses (các giả thuyết kỹ thuật dựa trên triệu chứng thực, nếu không có triệu chứng hãy trả mảng rỗng []), recommendations (khuyến nghị cụ thể).
+- Không dùng ký tự Markdown (#, **) trong executiveSummary.
+Trả về JSON thuần túy:
 {
-  "healthScore": 82, // Điểm số 0-100 dựa trên downtime và SLA
+  "healthScore": 80,
   "healthStatus": "HEALTHY" | "WARNING" | "CRITICAL",
-  "executiveSummary": "Đoạn văn Markdown phân tích sâu sắc về độ tin cậy thiết bị, nguyên nhân downtime...",
-  "keyFindings": ["Phát hiện 1...", "Phát hiện 2...", "Phát hiện 3..."],
-  "rootCauses": ["Nguyên nhân gốc rễ 1...", "Nguyên nhân gốc rễ 2..."],
-  "prescriptiveRecommendations": ["Khuyến nghị khắc phục 1...", "Khuyến nghị khắc phục 2..."],
-  "actionCards": [
-    {
-      "card_id": "card_ai_1",
-      "action_type": "CREATE_INCIDENT",
-      "title": "Tiêu đề hành động",
-      "subtitle": "Mô tả mục đích",
-      "severity": "HIGH",
-      "asset_code": "CNC-024",
-      "confidence": 0.95,
-      "payload": {
-        "title": "Bảo trì khẩn cấp CNC-024",
-        "symptom": "Rà soát trục chính và hệ thống bôi trơn",
-        "severity": "HIGH"
-      }
-    }
-  ]
+  "executiveSummary": "Tóm tắt ngắn gọn bằng văn xuôi sạch",
+  "observedFacts": ["..."],
+  "possibleCauses": ["..."],
+  "recommendations": ["..."]
 }`;
 
                 const completion = await groq.chat.completions.create({
                     messages: [
-                        { role: "system", content: "Bạn là AI phân tích vận hành công nghiệp cấp Enterprise. Luôn phản hồi JSON hợp lệ, không giải thích ngoài JSON." },
-                        { role: "user", content: prompt }
+                        { role: "system", content: "Bạn là chuyên gia phân tích vận hành. Chỉ phản hồi JSON hợp lệ, tuyệt đối không bịa đặt số liệu hoặc tên thiết bị." },
+                        { role: "user", content: prompt },
                     ],
                     model: GROQ_MODEL,
                     reasoning_effort: "low",
                     response_format: { type: "json_object" },
-                    temperature: 0.3,
-                    max_tokens: 1400
+                    temperature: 0.2,
+                    max_tokens: 1200,
                 });
 
-                const raw = completion.choices[0].message.content?.trim();
-                aiResult = JSON.parse(raw);
+                const raw = completion.choices[0]?.message?.content?.trim();
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (parsed && Array.isArray(parsed.observedFacts) && typeof parsed.executiveSummary === "string") {
+                    const fallbackBase = generateLocalAnalyticsSummary(stats, openIncidents, criticalIncidents, allAssets, period);
+                    aiResult = {
+                        ...fallbackBase,
+                        healthScore: typeof parsed.healthScore === "number" ? parsed.healthScore : fallbackBase.healthScore,
+                        healthStatus: ["HEALTHY", "WARNING", "CRITICAL"].includes(parsed.healthStatus) ? parsed.healthStatus : fallbackBase.healthStatus,
+                        executiveSummary: parsed.executiveSummary,
+                        observedFacts: parsed.observedFacts,
+                        possibleCauses: Array.isArray(parsed.possibleCauses) ? parsed.possibleCauses : [],
+                        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : fallbackBase.recommendations,
+                        analysisSource: "llm",
+                        llmConfigured: true,
+                        keyFindings: parsed.observedFacts,
+                        rootCauses: Array.isArray(parsed.possibleCauses) ? parsed.possibleCauses : [],
+                        prescriptiveRecommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : fallbackBase.recommendations,
+                    };
+                }
             } catch (groqErr) {
-                console.warn("Groq Analytics Summary API call failed, switching to local synthesis engine:", groqErr.message);
+                console.warn("Groq Analytics Summary API call failed, switching to factual fallback:", groqErr.message);
             }
         }
 
-        // 3. Fallback sang thuật toán cục bộ nếu Groq chưa cấu hình hoặc lỗi mạng
         if (!aiResult) {
             aiResult = generateLocalAnalyticsSummary(stats, openIncidents, criticalIncidents, allAssets, period);
         }
@@ -880,8 +888,8 @@ Trả về định dạng JSON thuần túy (không kèm giải thích) đúng c
                 openIncidentsCount: openIncidents.length,
                 criticalIncidentsCount: criticalIncidents.length,
                 period,
-                generatedAt: new Date().toISOString()
-            }
+                generatedAt: new Date().toISOString(),
+            },
         });
     } catch (error) {
         console.error("AI Analytics Summary Error:", error);
@@ -959,6 +967,11 @@ export const summarizeIncident = async (req, res) => {
         // Sự cố của công ty khác: trả như không có
         if (!incident || !(await getWorkspaceRolesForTask(req.user.user_id, incident.task_id)).length)
             return res.status(404).json({ message: "Không tìm thấy sự cố" });
+
+        const roles = await getWorkspaceRolesForTask(req.user.user_id, incident.task_id);
+        if (!roles || roles.length === 0) {
+            return res.status(403).json({ message: "Forbidden: Sự cố không thuộc nơi làm việc của bạn." });
+        }
 
         let summaryText = "";
         if (groq) {

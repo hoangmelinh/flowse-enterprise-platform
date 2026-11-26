@@ -22,6 +22,9 @@ export const protectedRoute = async (req, res, next) => {
         if (!user) {
             return res.status(404).json({ message: 'Nguoi dung khong ton tai' });
         }
+        if (user.is_active === false) {
+            return res.status(403).json({ message: 'Tai khoan da bi khoa. Vui long lien he Quan tri vien.' });
+        }
         // trả user về trong req
         req.user = user;
         next();

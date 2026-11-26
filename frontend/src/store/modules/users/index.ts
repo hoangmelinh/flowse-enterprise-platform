@@ -1,8 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { requestPasswordOtp, verifyChangePassword, getProfile, updateProfile } from "@/api/users";
-import type { ChangePasswordPayload, UserProfileData, UpdateProfilePayload } from "@/api/users";
+import { requestPasswordOtp, verifyChangePassword, getProfile, updateProfile, getUserContexts } from "@/api/users";
+import type { ChangePasswordPayload, UserProfileData, UpdateProfilePayload, UserContextData } from "@/api/users";
 
 export interface UsersState {
+    // Context & RBAC
+    context: UserContextData | null;
+    isLoadingContext: boolean;
+    contextError: string | null;
     // Profile
     profile: UserProfileData | null;
     isLoadingProfile: boolean;
@@ -22,6 +26,26 @@ export interface UsersState {
     isVerifyingOtp: boolean;
     errorVerifyOtp: string | null;
 }
+
+export const fetchUserContexts = createAsyncThunk<
+    UserContextData,
+    number | null | undefined,
+    { rejectValue: string }
+>(
+    "users/getContexts",
+    async (workspaceId, { rejectWithValue }) => {
+        try {
+            const response = await getUserContexts(workspaceId);
+            return response.data;
+        } catch (error: unknown) {
+            const message =
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+                (error as { message?: string }).message ||
+                "Không thể tải ngữ cảnh phân quyền";
+            return rejectWithValue(message);
+        }
+    }
+);
 
 export const fetchGetProfile = createAsyncThunk<
     UserProfileData,
@@ -107,6 +131,9 @@ export const fetchVerifyChangePassword = createAsyncThunk<
 );
 
 const initialState: UsersState = {
+    context: null,
+    isLoadingContext: false,
+    contextError: null,
     profile: null,
     isLoadingProfile: false,
     profileError: null,
@@ -205,6 +232,20 @@ const usersSlice = createSlice({
         builder.addCase(fetchVerifyChangePassword.rejected, (state, action) => {
             state.isVerifyingOtp = false;
             state.errorVerifyOtp = typeof action.payload === "string" ? action.payload : "Xác thực OTP thất bại";
+        });
+
+        // User Contexts & Capabilities
+        builder.addCase(fetchUserContexts.pending, (state) => {
+            state.isLoadingContext = true;
+            state.contextError = null;
+        });
+        builder.addCase(fetchUserContexts.fulfilled, (state, action) => {
+            state.isLoadingContext = false;
+            state.context = action.payload;
+        });
+        builder.addCase(fetchUserContexts.rejected, (state, action) => {
+            state.isLoadingContext = false;
+            state.contextError = typeof action.payload === "string" ? action.payload : "Không thể tải ngữ cảnh phân quyền";
         });
     },
 });

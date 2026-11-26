@@ -4,6 +4,9 @@ import {
   getInspectionById,
   getAssetChecklist,
   submitInspection,
+  createInspectionTemplate,
+  updateInspectionTemplate,
+  getInspectionRuns,
 } from "../controllers/inspectionController.js";
 import { assetWorkspace, requireAssetMember } from "../middlewares/roleMiddlewares.js";
 

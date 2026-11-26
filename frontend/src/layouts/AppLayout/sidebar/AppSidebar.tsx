@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Home, MessageSquare, Clock, Plus, Settings, Users, LogOut,
     Sparkles, Grid3X3, ChevronDown, ChevronRight, RefreshCcw,
-    PanelLeftOpen, X, ShieldCheck, AlertTriangle, Cpu, Activity
+    PanelLeftOpen, X, ShieldCheck, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import WorkspaceSwitcher from '../workspace/WorkspaceSwitcher';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -14,11 +14,11 @@ import type { AppDispatch, RootState } from '@/store/configureStore';
 import { useSpaceTree } from '../SpaceTreeContext';
 import { SpaceNode } from './components/nodes/SpaceNode';
 import { fetchSpacesForWorkspace } from '@/store/modules/spaces';
-import { fetchWorkspaces } from '@/store/modules/workspaces';
-import { fetchWorkspaceMembers } from '@/store/modules/workspaces';
+import { fetchWorkspaces, fetchWorkspaceMembers } from '@/store/modules/workspaces';
+import { fetchUserContexts } from '@/store/modules/users';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
-import { Modal } from 'antd';
-import { getOfflineQueue } from '@/services/offlineQueue';
+const CMS_URL = import.meta.env.VITE_CMS_URL || 'http://localhost:5174';
 
 export default function AppSidebar() {
     const { t } = useTranslation();
@@ -31,6 +31,7 @@ export default function AppSidebar() {
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const currentWorkspaceId = useSelector((s: RootState) => s.workspaces.currentWorkspaceId);
     const access_token = useSelector((s: RootState) => s.auth.access_token);
+    const { currentRole, isAdmin, canAccessCms, capabilities, context } = useCapabilities();
 
     const handleRefreshSpaces = async () => {
         if (currentWorkspaceId != null) {
@@ -41,28 +42,6 @@ export default function AppSidebar() {
     };
 
     const handleLogout = () => {
-        const pendingActions = getOfflineQueue().filter(
-            (a) => a.status === 'PENDING' || a.status === 'FAILED'
-        );
-        if (pendingActions.length > 0) {
-            Modal.confirm({
-                title: 'Cảnh Báo Bàn Giao Ca (Shift Handover Guard)',
-                content: `Bạn đang có ${pendingActions.length} thao tác ngoại tuyến chưa đồng bộ lên máy chủ. Nếu đăng xuất bây giờ, các thao tác này chưa được ghi nhận vào hệ thống ca trực. Bạn có chắc chắn muốn đăng xuất không?`,
-                okText: 'Vẫn đăng xuất',
-                cancelText: 'Ở lại đồng bộ',
-                okButtonProps: { danger: true },
-                onOk: () => {
-                    try {
-                        dispatch(fetchSignOut());
-                        navigate('/login');
-                    } catch (error) {
-                        console.error('Logout failed:', error);
-                    }
-                },
-            });
-            return;
-        }
-
         try {
             dispatch(fetchSignOut());
             navigate('/login');
@@ -98,8 +77,9 @@ export default function AppSidebar() {
     useEffect(() => {
         if (access_token) {
             dispatch(fetchWorkspaces());
+            dispatch(fetchUserContexts(currentWorkspaceId));
         }
-    }, [access_token, dispatch]);
+    }, [access_token, currentWorkspaceId, dispatch]);
 
     useEffect(() => {
         if (currentWorkspaceId != null) {
@@ -129,7 +109,12 @@ export default function AppSidebar() {
             </button>
 
             <div className="flex items-center justify-between gap-2.5 rounded-lg px-2 pb-3 pt-1 text-body font-bold text-[var(--color-on-surface)]">
-                <span>{t('sidebar.brand')}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                    <span>{t('sidebar.brand')}</span>
+                    <span className="rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0058be]">
+                        Workspace
+                    </span>
+                </div>
                 <NotificationCenter />
             </div>
             <div
@@ -141,6 +126,12 @@ export default function AppSidebar() {
                 </div>
                 <div className="min-w-0 flex-1">
                     <WorkspaceSwitcher onOpenCreate={() => tree.setIsWorkspaceDialogOpen(true)} />
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)] truncate">
+                        <span className="uppercase font-semibold text-[var(--color-text-secondary)]">{currentRole}</span>
+                        {context?.user?.department_name && (
+                            <span className="truncate">· {context.user.department_name}</span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -151,16 +142,18 @@ export default function AppSidebar() {
                     <MessageSquare size={18} strokeWidth={1.8} />,
                     t('sidebar.inbox')
                 )}
-                {navItem('/approvals', <ShieldCheck size={18} strokeWidth={1.8} />, 'Phê duyệt')}
-                {navItem('/incidents', <AlertTriangle size={18} strokeWidth={1.8} />, 'Sự cố (Field)')}
-                {navItem('/assets', <Cpu size={18} strokeWidth={1.8} />, 'Thiết bị & QR')}
-                {navItem('/analytics', <Activity size={18} strokeWidth={1.8} />, 'Điều hành CMMS')}
+                {navItem(
+                    '/approvals',
+                    <ShieldCheck size={18} strokeWidth={1.8} />,
+                    capabilities.can_approve ? 'Yêu cầu & Phê duyệt' : 'Đề xuất của tôi'
+                )}
+                {navItem('/incidents', <AlertTriangle size={18} strokeWidth={1.8} />, 'Sự cố hiện trường')}
                 {navItem('/time-tracking', <Clock size={18} strokeWidth={1.8} />, t('sidebar.timeTracking'))}
 
                 <div
                     id="sidebar-ai"
                     className={`flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.75 text-body-sm font-medium transition-all ${location.pathname === '/ai'
-                        ? 'bg-linear-to-r from-[#7c5cfc] to-[#e84393] text-white shadow-sm'
+                        ? 'bg-[var(--color-primary)] text-white shadow-xs'
                         : 'text-[var(--color-on-surface)] hover:bg-[var(--color-surface-hover)]'
                         }`}
                     onClick={() => navigate('/ai')}
@@ -204,13 +197,26 @@ export default function AppSidebar() {
             </div>
 
             <div className="mt-auto flex flex-col gap-0.5 border-t border-[var(--color-border-light)] pt-2">
-                <div
-                    className="flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.75 text-body-sm font-medium text-[var(--color-on-surface)] transition-all hover:bg-[var(--color-surface-hover)]"
-                    onClick={() => tree.setIsInviteModalOpen(true)}
-                >
-                    <Users size={18} strokeWidth={1.8} />
-                    <span>{t('sidebar.invitePeople')}</span>
-                </div>
+                {canAccessCms && (
+                    <a
+                        href={currentWorkspaceId ? `${CMS_URL}/?workspaceId=${currentWorkspaceId}` : CMS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.75 text-body-sm font-semibold text-[#0058be] bg-[#f0f4ff] hover:bg-[#dce6ff] transition-all no-underline mb-1"
+                    >
+                        <ExternalLink size={16} strokeWidth={2} />
+                        <span className="flex-1">Mở CMS Quản trị</span>
+                    </a>
+                )}
+                {isAdmin && (
+                    <div
+                        className="flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.75 text-body-sm font-medium text-[var(--color-on-surface)] transition-all hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => tree.setIsInviteModalOpen(true)}
+                    >
+                        <Users size={18} strokeWidth={1.8} />
+                        <span>{t('sidebar.invitePeople')}</span>
+                    </div>
+                )}
                 <div
                     id="sidebar-settings"
                     className="flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.75 text-body-sm font-medium text-[var(--color-on-surface)] transition-all hover:bg-[var(--color-surface-hover)]"

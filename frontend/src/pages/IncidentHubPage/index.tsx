@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Modal, Form, Input, Select, message, Image, Tooltip, Segmented, Drawer } from "antd";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, Activity } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, Plus, Clock, Wrench, CheckCircle2, PackagePlus, UserCheck, Timer, Gauge, Sparkles, ExternalLink } from "lucide-react";
 import { getIncidents, reportIncident, getDowntimeStats, type IncidentItem, type DowntimeStats } from "@/api/incidents";
 import { getAssets, type Asset } from "@/api/assets";
 import { SLABadge } from "@/components/SLABadge";
@@ -10,10 +10,13 @@ import { RequestPartsModal } from "./components/RequestPartsModal";
 import { AIAnalyticsModal } from "./components/AIAnalyticsModal";
 import { getFileUrl } from "@/utils/imageUrl";
 import { useRealtimeEvents } from "@/hooks/useRealtimeEvents";
+import { useCapabilities } from "@/hooks/useCapabilities";
+
+const CMS_URL = import.meta.env.VITE_CMS_URL || "http://localhost:5174";
 
 const IncidentHubPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { capabilities, canAccessCms, context } = useCapabilities();
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [downtimeStats, setDowntimeStats] = useState<DowntimeStats | null>(null);
@@ -49,9 +52,17 @@ const IncidentHubPage: React.FC = () => {
     fetchData(period);
   }, [period]);
 
-  // Tự động nhận diện query param incidentId hoặc taskId để mở pop-up chi tiết sự cố (Deeplink)
+  // Tự động nhận diện query param incidentId / taskId / severity / sla để lọc & mở chi tiết (Deeplink)
   const targetIncidentId = searchParams.get("incidentId");
   const targetTaskId = searchParams.get("taskId");
+  const severityFilter = searchParams.get("severity");
+  const slaFilter = searchParams.get("sla");
+
+  const filteredIncidents = incidents.filter((item) => {
+    if (severityFilter && item.severity !== severityFilter) return false;
+    if (slaFilter && item.sla_status !== slaFilter) return false;
+    return true;
+  });
 
   useEffect(() => {
     if (incidents.length > 0) {
@@ -120,52 +131,6 @@ const IncidentHubPage: React.FC = () => {
   const handleCreateIncident = async (values: any) => {
     try {
       setSubmitting(true);
-
-      // --- XỬ LÝ NGOẠI TUYẾN KHI MẤT MẠNG (OFFLINE INTERCEPT) ---
-      if (!navigator.onLine) {
-        const { enqueueAction } = await import("@/services/offlineQueue");
-        const tempId = `temp_${Date.now()}`;
-        const selectedAsset = assets.find((a) => a.asset_id === values.asset_id);
-
-        enqueueAction({
-          action_type: "REPORT_INCIDENT",
-          payload: {
-            title: values.title,
-            symptom: values.symptom,
-            asset_id: values.asset_id,
-            severity: values.severity,
-            temp_id: tempId,
-          },
-        });
-
-        // Cập nhật lạc quan (Optimistic UI) hiển thị ngay lập tức trên bảng
-        const optimisticIncident: IncidentItem = {
-          incident_id: tempId as any,
-          task_id: tempId as any,
-          task_name: values.title,
-          task_description: values.symptom || "",
-          symptom: values.symptom,
-          evidence_urls: [],
-          severity: values.severity,
-          asset_name: selectedAsset?.name || "Thiết bị ngoại tuyến",
-          asset_code: selectedAsset?.asset_code || "OFFLINE",
-          asset_location: selectedAsset?.location || "Chưa rõ",
-          state_name: "Chờ đồng bộ (Offline)",
-          state_code: "OFFLINE_PENDING",
-          state_color: "orange",
-          reported_at: new Date().toISOString(),
-          reporter_name: "Bạn (Offline)",
-          downtime_minutes: 0,
-          sla_status: "IN_SLA",
-        };
-
-        setIncidents((prev) => [optimisticIncident, ...prev]);
-        message.warning("⚡ Đang ngoại tuyến! Sự cố đã được lưu vào máy và sẽ tự động đồng bộ khi có mạng.");
-        setCreateModalOpen(false);
-        form.resetFields();
-        return;
-      }
-
       await reportIncident({
         title: values.title,
         symptom: values.symptom,
@@ -341,7 +306,7 @@ const IncidentHubPage: React.FC = () => {
       key: "actions",
       width: 320,
       render: (_: any, record: IncidentItem) => {
-        const canRequestParts = record.state_code === "IN_PROGRESS";
+        const canRequestParts = record.state_code === "IN_PROGRESS" && capabilities.can_execute_repair;
         return (
           <div className="space-y-2">
             <WorkflowTransitionBar
@@ -392,25 +357,36 @@ const IncidentHubPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            type="primary"
-            icon={<Activity className="w-4 h-4 inline mr-1 text-yellow-300" />}
-            onClick={() => navigate('/analytics')}
-            className="bg-linear-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-indigo-500 border-none shadow-sm font-semibold text-white"
-          >
-            Điều Hành CMMS & AI Hub
-          </Button>
+          {canAccessCms && (
+            <Button
+              icon={<ExternalLink className="w-4 h-4 inline mr-1" />}
+              onClick={() =>
+                window.open(
+                  context?.current_workspace_id
+                    ? `${CMS_URL}/?workspaceId=${context.current_workspace_id}`
+                    : CMS_URL,
+                  "_blank",
+                  "noopener,noreferrer"
+                )
+              }
+              className="border-blue-200 text-[#0058be] bg-[#f0f4ff] hover:bg-[#dce6ff] font-medium"
+            >
+              Phân tích CMMS (CMS)
+            </Button>
+          )}
           <Button onClick={() => fetchData(period)} loading={loading}>
             Làm mới
           </Button>
-          <Button
-            type="primary"
-            danger
-            icon={<Plus className="w-4 h-4 inline mr-1" />}
-            onClick={() => setCreateModalOpen(true)}
-          >
-            Báo cáo sự cố mới
-          </Button>
+          {capabilities.can_report_incident && (
+            <Button
+              type="primary"
+              danger
+              icon={<Plus className="w-4 h-4 inline mr-1" />}
+              onClick={() => setCreateModalOpen(true)}
+            >
+              Báo cáo sự cố mới
+            </Button>
+          )}
         </div>
       </div>
 
@@ -505,9 +481,30 @@ const IncidentHubPage: React.FC = () => {
       </div>
 
       {/* Table */}
+      {(severityFilter || slaFilter) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2 text-xs text-[#0058be]">
+          <span>
+            Đang lọc danh sách sự cố:
+            {severityFilter ? <strong> Mức độ = {severityFilter}</strong> : null}
+            {slaFilter ? <strong> SLA = {slaFilter}</strong> : null}
+            {" "}({filteredIncidents.length} sự cố)
+          </span>
+          <Button
+            size="small"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("severity");
+              next.delete("sla");
+              setSearchParams(next, { replace: true });
+            }}
+          >
+            Hiển thị tất cả sự cố
+          </Button>
+        </div>
+      )}
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         <Table
-          dataSource={incidents}
+          dataSource={filteredIncidents}
           columns={columns}
           rowKey="incident_id"
           loading={loading}
@@ -672,7 +669,7 @@ const IncidentHubPage: React.FC = () => {
                   }
                 }}
               />
-              {focusedIncident.state_code === "IN_PROGRESS" && (
+              {focusedIncident.state_code === "IN_PROGRESS" && capabilities.can_execute_repair && (
                 <div className="pt-2 border-t border-purple-100 dark:border-purple-900/30">
                   <Button
                     className="w-full text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-300 font-semibold"

@@ -103,6 +103,9 @@ export const signIn = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Sai email hoac password" });
     }
+    if (user.is_active === false) {
+      return res.status(403).json({ message: "Tai khoan da bi khoa. Vui long lien he Quan tri vien." });
+    }
 
     // so sánh password với hash password
     const passwordCorrect = await bcrypt.compare(password, user.password_hash);
@@ -290,6 +293,9 @@ export const refreshToken = async (req, res) => {
     const user = await findUserById(session.user_id);
     if (!user) {
       return res.status(403).json({ message: "User khong ton tai" });
+    }
+    if (user.is_active === false) {
+      return res.status(403).json({ message: "Tai khoan da bi khoa" });
     }
 
     const access_token = jwt.sign(

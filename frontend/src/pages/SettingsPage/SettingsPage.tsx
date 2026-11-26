@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Settings, User, Bell, Shield, Palette, Globe,
-    ChevronRight
+    ChevronRight, ExternalLink, ShieldCheck
 } from 'lucide-react';
 import type { SettingsTab } from '../../types/app';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import Notifications from './components/Notifications';
 import Theme from './components/Theme';
 import Profile from './components/Profile';
 import Security from './components/Security';
-import Workspace from './components/Workspace';
 
 export default function SettingsPage() {
     const { t } = useTranslation('settings');
+    const { canAccessCms } = useCapabilities();
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
     const tabs = [
@@ -20,7 +21,9 @@ export default function SettingsPage() {
         { id: 'notifications' as SettingsTab, label: t('tabs.notifications'), icon: <Bell size={16} /> },
         { id: 'theme' as SettingsTab, label: t('tabs.appearance'), icon: <Palette size={16} /> },
         { id: 'security' as SettingsTab, label: t('tabs.security'), icon: <Shield size={16} /> },
-        { id: 'workspace' as SettingsTab, label: t('tabs.workspace'), icon: <Globe size={16} /> },
+        ...(canAccessCms
+            ? [{ id: 'workspace' as SettingsTab, label: t('tabs.workspace'), icon: <Globe size={16} /> }]
+            : []),
     ];
 
     return (
@@ -71,9 +74,28 @@ export default function SettingsPage() {
                         <Security />
                     )}
 
-                    {/* Workspace */}
+                    {/* Workspace -> governed in separate CMS cluster */}
                     {activeTab === 'workspace' && (
-                        <Workspace />
+                        <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#0058be]">
+                                <ShieldCheck size={20} />
+                            </div>
+                            <h2 className="m-0 text-lg font-extrabold text-slate-900">
+                                Quản trị Workspace đã tách sang cụm CMS riêng biệt
+                            </h2>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Để tránh thao tác nhầm giữa môi trường làm việc hàng ngày và cấu hình hệ thống, việc đổi tên/xóa Workspace, phân quyền thành viên, cây phòng ban và cấu hình Workflow/SLA được thực hiện tập trung tại CMS Quản trị.
+                            </p>
+                            <a
+                                href={`${import.meta.env.VITE_CMS_URL || 'http://localhost:5174'}/workspace-settings`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#0058be] px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-[#00469b]"
+                            >
+                                <span>Mở Cài đặt Workspace trên CMS (:5174)</span>
+                                <ExternalLink size={14} />
+                            </a>
+                        </div>
                     )}
                 </div>
             </div>

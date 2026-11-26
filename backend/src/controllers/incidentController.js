@@ -1,5 +1,6 @@
 import Incident from "../models/Incident.js";
 import AIVisionService from "../services/aiVisionService.js";
+import Department from "../models/Department.js";
 
 export const getIncidents = async (req, res, next) => {
   try {

@@ -45,6 +45,7 @@ services:
       HOST: 0.0.0.0
       NODE_ENV: ${NODE_ENV:-development}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      CMS_URL: ${CMS_URL:-http://localhost:5174}
     ports:
       - "${BACKEND_PORT:-5001}:5001"
     volumes:
@@ -66,6 +67,17 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  cms:
+    build:
+      context: ./cms
+    container_name: flowse_cms
+    restart: unless-stopped
+    ports:
+      - "${CMS_PORT:-5174}:80"
     depends_on:
       backend:
         condition: service_healthy

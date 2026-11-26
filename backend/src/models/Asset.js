@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import con from "../config/connect.js";
 import Department from "./Department.js";
+import { AppError } from "../middlewares/errorMiddleware.js";
+
+const VALID_ASSET_STATUSES = ["OPERATIONAL", "MAINTENANCE", "FAULTY", "DECOMMISSIONED"];
 
 class Asset {
   /** Thiết bị `user` được xem: chỉ trong các công ty user là thành viên (không có user thì rỗng), rồi lọc theo phòng ban. */
@@ -8,13 +11,29 @@ class Asset {
     const values = [user?.user_id ?? null];
     let scopeClause = `WHERE a.workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = $1 AND deleted_at IS NULL)`;
 
+    if (workspaceId) {
+      values.push(Number(workspaceId));
+      conditions.push(`a.workspace_id = $${values.length}`);
+    } else if (Array.isArray(allowedWorkspaceIds)) {
+      if (allowedWorkspaceIds.length === 0) return [];
+      values.push(allowedWorkspaceIds.map(Number));
+      conditions.push(`a.workspace_id = ANY($${values.length}::int[])`);
+    } else if (user?.user_id) {
+      values.push(Number(user.user_id));
+      conditions.push(
+        `a.workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = $${values.length} AND deleted_at IS NULL)`
+      );
+    }
+
     if (user?.user_id) {
-      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id);
+      const accessibleDeptIds = await Department.getAccessibleDepartmentIds(user.user_id, null, workspaceId);
       if (accessibleDeptIds !== null) {
         values.push(accessibleDeptIds);
         scopeClause += ` AND (a.department_id = ANY($2::int[]) OR a.department_id IS NULL)`;
       }
     }
+
+    const scopeClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const res = await con.query(`
       SELECT 
@@ -408,11 +427,58 @@ class Asset {
     // Mã in trên tem phải không đoán được (trước đây là QR-<mã>-<thời gian>)
     const token = qr_token || `flw_tok_${crypto.randomBytes(12).toString("hex")}`;
     const res = await con.query(
-      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, specs, health_score, workspace_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 100, $7) RETURNING *`,
-      [asset_code, name, location, department_id, token, JSON.stringify(specs), workspace_id]
+      `INSERT INTO assets (asset_code, name, location, department_id, qr_token, status, specs, health_score, workspace_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 100, $8) RETURNING *`,
+      [asset_code, name, location, department_id || null, token, normalizedStatus, JSON.stringify(mergedSpecs), workspace_id]
     );
     return res.rows[0];
+  }
+
+  static async update(assetId, { asset_code, name, location, department_id, status, specs, manufacturer, model, serial_number, description }) {
+    let normalizedStatus = null;
+    if (status !== undefined && status !== null) {
+      normalizedStatus = String(status).toUpperCase();
+      if (!VALID_ASSET_STATUSES.includes(normalizedStatus)) {
+        throw new AppError(`Trạng thái thiết bị không hợp lệ (${normalizedStatus}). Chỉ chấp nhận: ${VALID_ASSET_STATUSES.join(", ")}`, 400, "INVALID_ASSET_STATUS");
+      }
+    }
+
+    let nextSpecsJson = null;
+    if (specs !== undefined || manufacturer !== undefined || model !== undefined || serial_number !== undefined || description !== undefined) {
+      const cur = await this.getById(assetId);
+      const baseSpecs = cur?.specs && typeof cur.specs === "object" ? cur.specs : {};
+      nextSpecsJson = JSON.stringify({
+        ...baseSpecs,
+        ...(specs && typeof specs === "object" ? specs : {}),
+        ...(manufacturer !== undefined ? { manufacturer } : {}),
+        ...(model !== undefined ? { model } : {}),
+        ...(serial_number !== undefined ? { serial_number } : {}),
+        ...(description !== undefined ? { notes: description } : {}),
+      });
+    }
+
+    const res = await con.query(
+      `UPDATE assets
+       SET asset_code = COALESCE($1, asset_code),
+           name = COALESCE($2, name),
+           location = COALESCE($3, location),
+           department_id = CASE WHEN $4::boolean THEN $5 ELSE department_id END,
+           status = COALESCE($6, status),
+           specs = COALESCE($7::jsonb, specs)
+       WHERE asset_id = $8
+       RETURNING *`,
+      [
+        asset_code ?? null,
+        name ?? null,
+        location ?? null,
+        department_id !== undefined,
+        department_id ?? null,
+        normalizedStatus,
+        nextSpecsJson,
+        assetId,
+      ]
+    );
+    return res.rows[0] || null;
   }
 }
 

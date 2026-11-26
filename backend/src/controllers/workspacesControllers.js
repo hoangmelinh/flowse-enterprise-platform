@@ -12,7 +12,11 @@ import {
   addWorkspaceMember,
   removeWorkspaceMember,
   updateMemberRole,
+  getRolePermissionMatrix,
+  updateWorkspaceMemberProfile,
 } from "../models/Workspaces.js";
+import OperationsAnalytics from "../models/OperationsAnalytics.js";
+import { getWorkspaceMemberRole } from "../middlewares/roleMiddlewares.js";
 
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -170,6 +174,85 @@ export const getWorkspaceMembers = async (req, res) => {
     res.status(200).json(members);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+export const getRolesMatrix = async (_req, res) => {
+  try {
+    const matrix = await getRolePermissionMatrix();
+    res.status(200).json({ success: true, data: matrix });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getWorkspaceInvitations = async (req, res) => {
+  try {
+    const workspace_id = parseInt(req.params.workspaceId);
+    if (isNaN(workspace_id)) {
+      return res.status(400).json({ error: "ID Workspace không hợp lệ" });
+    }
+    const invitations = await findWorkspaceInvitations(workspace_id);
+    res.status(200).json({ success: true, data: invitations });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const patchWorkspaceMember = async (req, res) => {
+  try {
+    const workspace_id = parseInt(req.params.workspaceId);
+    const targetUserId = parseInt(req.params.userId);
+    if (isNaN(workspace_id) || isNaN(targetUserId)) {
+      return res.status(400).json({ message: "workspaceId hoặc userId không hợp lệ" });
+    }
+
+    const { role_name, department_id, is_active } = req.body || {};
+    if (Number(targetUserId) === Number(req.user?.user_id)) {
+      if (role_name && String(role_name).toLowerCase() !== "admin") {
+        return res.status(400).json({ message: "Không thể tự hạ quyền Quản trị viên của chính bạn" });
+      }
+      if (is_active === false) {
+        return res.status(400).json({ message: "Không thể tự khóa tài khoản của chính bạn" });
+      }
+    }
+
+    const updated = await updateWorkspaceMemberProfile(workspace_id, targetUserId, {
+      role_name,
+      department_id,
+      is_active,
+    });
+    if (!updated) {
+      return res.status(404).json({ message: "Không tìm thấy thành viên trong Workspace" });
+    }
+    res.status(200).json({ success: true, message: "Cập nhật phân quyền thành viên thành công", data: updated });
+  } catch (error) {
+    const status =
+      error.statusCode ||
+      (error.message?.includes("không hợp lệ") || error.message?.includes("Phòng ban") ? 400 : 500);
+    res.status(status).json({ message: error.message });
+  }
+};
+
+export const getWorkspaceOperationsOverview = async (req, res, next) => {
+  try {
+    const workspaceId = parseInt(req.params.workspaceId, 10);
+    if (isNaN(workspaceId)) {
+      return res.status(400).json({ success: false, message: "workspaceId không hợp lệ" });
+    }
+    const { period = "month", scope = "all", departmentId = null } = req.query;
+    const role = req.workspaceRole || (await getWorkspaceMemberRole(req.user.user_id, workspaceId)) || "member";
+    const data = await OperationsAnalytics.getWorkspaceOverview({
+      workspaceId,
+      userId: req.user.user_id,
+      userRole: role,
+      period: String(period),
+      scope: String(scope),
+      departmentId: departmentId ? String(departmentId) : null,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
   }
 };
 
