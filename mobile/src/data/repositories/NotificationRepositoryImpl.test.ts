@@ -61,6 +61,12 @@ test('PATCH đánh dấu tất cả đọc và lấy count', async () => {
   assert.deepEqual(calls, [['patch', '/notifications/read-all']]);
 });
 
+test('giữ metadata khi backend trả kèm đối tượng liên kết', async () => {
+  response = { notifications: [{ ...row, entity_type: 'APPROVAL', entity_id: 19, metadata: { approvalId: 19, taskId: 47 } }], unreadCount: 1 };
+  const n = (await repo.getNotifications()).notifications[0];
+  assert.deepEqual(n.metadata, { approvalId: 19, taskId: 47 });
+});
+
 for (const [name, error, message] of [
   ['mất mạng', new errors.NetworkError('Network Error'), 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.'],
   ['401', new errors.AuthError('User not authenticated'), 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'],

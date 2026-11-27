@@ -7,6 +7,7 @@ export { ScreenHeader } from './ScreenHeader';
 export { Banner, EmptyState } from './Feedback';
 export { FlowseMark, FlowseWordmark, GoogleLogo, AISparkle, AIButton, SpaceMark } from './Brand';
 export { Screen } from './Screen';
+export { KeyboardAvoidView } from './KeyboardAvoidView';
 export { PressableScale } from './PressableScale';
 export {
   Chips,

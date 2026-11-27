@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Platform, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Routes } from '../../../core/constants/routes';
 import { usePrefs } from '../../state/prefsStore';
@@ -7,7 +7,7 @@ import { AtSign, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { space, Colors, makeStyles, useColors } from '../../../core/theme';
 import config from '../../../core/config';
 import { useAuthStore } from '../../state/authStore';
-import { AppText, Button, Field, Banner, FlowseWordmark, GoogleLogo, Screen } from '../../components/ui';
+import { AppText, Button, Field, Banner, FlowseWordmark, GoogleLogo, KeyboardAvoidView, Screen } from '../../components/ui';
 
 /** A02 / A03 — Đăng nhập (Flowse 2.0). */
 export const LoginScreen: React.FC = () => {
@@ -36,8 +36,8 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidView style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
           <FlowseWordmark />
           <View style={styles.titles}>
             <AppText variant="title" accessibilityRole="header">
@@ -106,7 +106,7 @@ export const LoginScreen: React.FC = () => {
             onPress={() => nav.navigate(Routes.GOOGLE_SIGNIN)}
           />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidView>
     </Screen>
   );
 };

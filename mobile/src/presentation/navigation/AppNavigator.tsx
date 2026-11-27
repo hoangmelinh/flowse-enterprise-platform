@@ -19,6 +19,7 @@ import { HomeRole, usePrefs } from '../state/prefsStore';
 import { useHomeRole } from '../state/useHomeRole';
 import { useNotifications } from '../state/useNotifications';
 import { useApprovals } from '../state/useApprovals';
+import { useRealtimeSync } from '../state/useChat';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ContextSelectScreen } from '../screens/auth/ContextSelectScreen';
@@ -172,6 +173,7 @@ export const AppNavigator: React.FC = () => {
   const c = useColors();
   const { token, checkAuth, isInitialized, logout } = useAuthStore();
   const expired = usePrefs((p) => p.sessionExpired);
+  useRealtimeSync();
 
   useEffect(() => {
     checkAuth();

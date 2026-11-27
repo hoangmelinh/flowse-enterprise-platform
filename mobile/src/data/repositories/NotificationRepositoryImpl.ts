@@ -11,6 +11,7 @@ interface NotificationResponse {
   is_read: boolean;
   entity_type: string | null;
   entity_id: number | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -50,7 +51,9 @@ export class NotificationRepositoryImpl {
     return {
       id: n.notification_id, who, title: n.content, sub: who,
       kind: n.type === 'task_assigned' || n.type === 'task_deadline' ? 'task' : n.type,
-      unread: !n.is_read, entityType: n.entity_type, entityId: n.entity_id, createdAt: n.created_at,
+      unread: !n.is_read, entityType: n.entity_type, entityId: n.entity_id,
+      ...(n.metadata && typeof n.metadata === 'object' ? { metadata: n.metadata } : {}),
+      createdAt: n.created_at,
     };
   }
 

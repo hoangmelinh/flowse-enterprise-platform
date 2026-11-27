@@ -30,6 +30,7 @@ const mocks: Record<string, unknown> = {
   '../state/useHomeRole': { useHomeRole: () => role },
   '../state/useNotifications': { useNotifications: () => ({ unreadCount }) },
   '../state/useApprovals': { useApprovals: () => ({ data: Array.from({ length: approvalCount }, (_, id) => ({ id, status: 'PENDING' })) }) },
+  '../state/useChat': { useRealtimeSync: () => ({ connected: true }) },
 };
 // Không nạp module native hoặc các màn ngoài phạm vi vào test thanh tab.
 for (const match of readFileSync(filename, 'utf8').matchAll(/from '(\.\.\/screens\/[^']+)'/g)) {

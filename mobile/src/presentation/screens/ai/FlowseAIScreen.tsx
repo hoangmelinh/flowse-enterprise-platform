@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, Keyboard, StyleSheet, Platform } from 'react-native';
 import { FileText, LayoutGrid, TriangleAlert, Plus, History, CloudOff, Lock, CircleHelp } from 'lucide-react-native';
 import { radius, space, Colors, ColorToken, makeStyles, useColors } from '../../../core/theme';
 import { Routes } from '../../../core/constants/routes';
 import { aiSuggestions } from '../../../data/demo/fixtures';
 import {
-  AppText, Banner, BottomBar, Bubble, TypingBubble, Button, Chips, Composer, Field, Group, IconButton, KV, Row, Screen, ScreenHeader, ScrollPage, Segmented, Stat, StatRow, Tag,
+  AppText, Banner, BottomBar, Bubble, TypingBubble, Button, Chips, Composer, Field, Group, IconButton, KeyboardAvoidView, KV, Row, Screen, ScreenHeader, ScrollPage, Segmented, Stat, StatRow, Tag,
 } from '../../components/ui';
 import { ScreenProps } from '../../navigation/types';
 import * as Clipboard from 'expo-clipboard';
@@ -103,6 +103,12 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
   };
   const ask = (q: string) => run(q, mode === 1);
 
+  useEffect(() => {
+    const ev = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(ev, () => setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80));
+    return () => sub.remove();
+  }, []);
+
   return (
     <Screen edges={['top', 'bottom']}>
       <ScreenHeader
@@ -111,12 +117,14 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
         onBack={navigation.goBack}
         right={<IconButton icon={History} label="Lịch sử thao tác" onPress={() => navigation.navigate(Routes.AI_HISTORY)} />}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidView>
         <FlatList
           ref={listRef}
           onContentSizeChange={toEnd}
           data={msgs}
           keyExtractor={(m) => String(m.id)}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentContainerStyle={s.page}
           ListHeaderComponent={
             <View style={{ gap: space.xl }}>
@@ -163,7 +171,7 @@ export const FlowseAIScreen: React.FC<ScreenProps<typeof Routes.FLOWSE_AI>> = ({
           )}
         />
         <Composer placeholder={msgs.length ? 'Hỏi tiếp' : mode === 0 ? 'Hỏi hoặc giao việc' : 'Giao việc như nhắn tin'} onSend={ask} attach={false} />
-      </KeyboardAvoidingView>
+      </KeyboardAvoidView>
       {launching ? <AILaunch onDone={launched} /> : null}
     </Screen>
   );

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, FlatList, SectionList, ScrollView, ActivityIndicator, Alert, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, SectionList, ScrollView, ActivityIndicator, Alert, Pressable, StyleSheet, Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import {
@@ -29,7 +29,7 @@ import { WorkItemRepositoryImpl } from '../../../data/repositories/WorkItemRepos
 import { aiErrorText } from '../../../data/repositories/AiRepositoryImpl';
 import { comments, people, spaces, spaceTree } from '../../../data/demo/fixtures';
 import {
-  AppText, Avatar, Banner, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KV, Row,
+  AppText, Avatar, Banner, BottomBar, Button, Chips, Composer, EmptyState, Fab, Field, Group, IconButton, KeyboardAvoidView, KV, Row,
   Screen, ScreenHeader, ScrollPage, Segmented, SectionHeader, Stat, StatRow, Tag, TaskRow, TaskStatus, SpaceMark,
 } from '../../components/ui';
 import { useAuthStore } from '../../state/authStore';
@@ -296,35 +296,33 @@ export const CreateWorkItemScreen: React.FC<ScreenProps<typeof Routes.CREATE_WOR
     ]);
   });
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollPage
-        title="Công việc mới"
-        caption="Kế hoạch sản xuất"
-        onBack={navigation.goBack}
-        footer={
-          <BottomBar>
-            {/* shortcut: API tạo việc cần listId thật; nối khi có màn chọn Danh sách từ backend */}
-            <Button
-              title="Tạo và giao việc"
-              disabled={!title.trim()}
-              onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã tạo công việc', body: `"${title.trim()}" đã được giao.`, kind: 'Công việc', code: 'VP-2610-052' })}
-            />
-          </BottomBar>
-        }
-      >
-        <Field label="Tên công việc" value={title} onChangeText={setTitle} placeholder="Ví dụ: Xác nhận định mức chỉ may lô 2" />
-        <Field label="Mô tả" value={desc} onChangeText={setDesc} placeholder="Thêm chi tiết (không bắt buộc)" multiline />
-        <Group>
-          <Row icon={Folder} title="Danh sách" subtitle="Đơn hàng AP-1126" onPress={() => navigation.navigate(Routes.PICK_PROJECT)} />
-          <Row icon={UserPlus} title="Người làm" subtitle="Chưa chọn" onPress={() => navigation.navigate(Routes.ASSIGN_SHEET)} />
-          <Row icon={Calendar} title="Hạn" subtitle="31/10 · 12:00" />
-          <Row icon={Flag} title="Ưu tiên" subtitle="Cao" />
-        </Group>
-        <AppText variant="caption" tone="muted">
-          Chỉ người trong không gian Kế hoạch sản xuất được chọn làm người nhận.
-        </AppText>
-      </ScrollPage>
-    </KeyboardAvoidingView>
+    <ScrollPage
+      title="Công việc mới"
+      caption="Kế hoạch sản xuất"
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          {/* shortcut: API tạo việc cần listId thật; nối khi có màn chọn Danh sách từ backend */}
+          <Button
+            title="Tạo và giao việc"
+            disabled={!title.trim()}
+            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã tạo công việc', body: `"${title.trim()}" đã được giao.`, kind: 'Công việc', code: 'VP-2610-052' })}
+          />
+        </BottomBar>
+      }
+    >
+      <Field label="Tên công việc" value={title} onChangeText={setTitle} placeholder="Ví dụ: Xác nhận định mức chỉ may lô 2" />
+      <Field label="Mô tả" value={desc} onChangeText={setDesc} placeholder="Thêm chi tiết (không bắt buộc)" multiline />
+      <Group>
+        <Row icon={Folder} title="Danh sách" subtitle="Đơn hàng AP-1126" onPress={() => navigation.navigate(Routes.PICK_PROJECT)} />
+        <Row icon={UserPlus} title="Người làm" subtitle="Chưa chọn" onPress={() => navigation.navigate(Routes.ASSIGN_SHEET)} />
+        <Row icon={Calendar} title="Hạn" subtitle="31/10 · 12:00" />
+        <Row icon={Flag} title="Ưu tiên" subtitle="Cao" />
+      </Group>
+      <AppText variant="caption" tone="muted">
+        Chỉ người trong không gian Kế hoạch sản xuất được chọn làm người nhận.
+      </AppText>
+    </ScrollPage>
   );
 };
 
@@ -372,10 +370,12 @@ export const CommentsScreen: React.FC<ScreenProps<typeof Routes.COMMENTS>> = ({ 
   return (
     <Screen edges={['top', 'bottom']}>
       <ScreenHeader title="Trao đổi" caption={route.params.code} onBack={navigation.goBack} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidView>
         <FlatList
           data={items}
           keyExtractor={(_, i) => String(i)}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentContainerStyle={s.thread}
           renderItem={({ item }) => (
             <View style={s.msg}>
@@ -390,7 +390,7 @@ export const CommentsScreen: React.FC<ScreenProps<typeof Routes.COMMENTS>> = ({ 
           )}
         />
         <Composer placeholder="Nhắn, gõ @ để nhắc tên" onSend={(t) => setItems((x) => [...x, { who: 'Nguyễn Minh Anh', at: 'Vừa xong', text: t }])} />
-      </KeyboardAvoidingView>
+      </KeyboardAvoidView>
     </Screen>
   );
 };

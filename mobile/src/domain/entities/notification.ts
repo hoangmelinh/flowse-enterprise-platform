@@ -7,6 +7,7 @@ export interface Notification {
   unread: boolean;
   entityType: string | null;
   entityId: number | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
 }
 

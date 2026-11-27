@@ -1,6 +1,7 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Routes } from '../../core/constants/routes';
+import type { ConversationType } from '../../domain/entities/message';
 import type { FigmaAnimKind } from '../components/anim/FigmaAnim';
 import type { StateKey } from '../screens/common/StateScreen';
 
@@ -59,7 +60,7 @@ export type RootStackParamList = {
   [Routes.MATERIALS]: undefined;
   [Routes.HANDOVER]: undefined;
   [Routes.SYNC_QUEUE]: undefined;
-  [Routes.CHAT]: { conversationId: number; name: string };
+  [Routes.CHAT]: { conversationId: number; name: string; type?: ConversationType };
   [Routes.NOTIFICATION_SETTINGS]: undefined;
   [Routes.FLOWSE_AI]: { applied?: boolean } | undefined;
   [Routes.SUCCESS]: SuccessParams;
@@ -111,7 +112,7 @@ export type RootStackParamList = {
   [Routes.HANDOVER_DETAIL]: undefined;
   [Routes.APPEARANCE]: undefined;
   [Routes.NEW_MESSAGE]: undefined;
-  [Routes.CHANNEL_MEMBERS]: { name: string };
+  [Routes.CHANNEL_MEMBERS]: { conversationId?: number; name: string };
   [Routes.STATE]: { k: StateKey };
   [Routes.SCAN]: undefined;
   [Routes.AI_REVIEW]: undefined;

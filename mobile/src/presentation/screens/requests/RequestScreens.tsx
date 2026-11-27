@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Circle, CircleCheck, CircleCheckBig, Clock, ClipboardCheck, FileText, CircleX, Check, X, Search } from 'lucide-react-native';
 import { space, radius, Colors, makeStyles, useColors } from '../../../core/theme';
@@ -254,28 +254,26 @@ export const RequestFormScreen: React.FC<ScreenProps<typeof Routes.REQUEST_FORM>
   const [values, setValues] = useState<Record<string, string>>({});
   const ready = form.fields.every((f) => values[f.label]?.trim());
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollPage
-        title={form.title}
-        caption="Yêu cầu mới"
-        onBack={navigation.goBack}
-        footer={
-          <BottomBar>
-            <Button
-              title="Gửi yêu cầu"
-              disabled={!ready}
-              onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã gửi yêu cầu', body: form.note, kind: form.title, code: 'YC-2610-052' })}
-            />
-            <Button title="Lưu nháp" variant="secondary" onPress={navigation.goBack} />
-          </BottomBar>
-        }
-      >
-        {form.fields.map((f) => (
-          <Field key={f.label} label={f.label} placeholder={f.placeholder} value={values[f.label] ?? ''} onChangeText={(v) => setValues((x) => ({ ...x, [f.label]: v }))} />
-        ))}
-        <AppText variant="caption" tone="muted">{form.note}</AppText>
-      </ScrollPage>
-    </KeyboardAvoidingView>
+    <ScrollPage
+      title={form.title}
+      caption="Yêu cầu mới"
+      onBack={navigation.goBack}
+      footer={
+        <BottomBar>
+          <Button
+            title="Gửi yêu cầu"
+            disabled={!ready}
+            onPress={() => navigation.replace(Routes.SUCCESS, { title: 'Đã gửi yêu cầu', body: form.note, kind: form.title, code: 'YC-2610-052' })}
+          />
+          <Button title="Lưu nháp" variant="secondary" onPress={navigation.goBack} />
+        </BottomBar>
+      }
+    >
+      {form.fields.map((f) => (
+        <Field key={f.label} label={f.label} placeholder={f.placeholder} value={values[f.label] ?? ''} onChangeText={(v) => setValues((x) => ({ ...x, [f.label]: v }))} />
+      ))}
+      <AppText variant="caption" tone="muted">{form.note}</AppText>
+    </ScrollPage>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TextInput, StyleSheet, StyleProp, ViewStyle, LayoutChangeEvent, RefreshControl } from 'react-native';
+import { View, ScrollView, TextInput, StyleSheet, StyleProp, ViewStyle, LayoutChangeEvent, RefreshControl, Platform } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, withDelay, withRepeat, withSequence, useReducedMotion, Easing } from 'react-native-reanimated';
 import { Plus, Send, Paperclip, LucideIcon } from 'lucide-react-native';
 import { radius, space, text, Colors, ColorToken, makeStyles, useColors } from '../../../core/theme';
@@ -7,6 +7,7 @@ import { AppText } from './AppText';
 import { PressableScale } from './PressableScale';
 import { Screen } from './Screen';
 import { ScreenHeader } from './ScreenHeader';
+import { KeyboardAvoidView } from './KeyboardAvoidView';
 
 /** Bộ lọc dạng chip (D01, J01...). Chip đang chọn nền m/ink. */
 export const Chips: React.FC<{ items: string[]; value: string; onChange: (v: string) => void }> = ({ items, value, onChange }) => {
@@ -294,14 +295,17 @@ export const ScrollPage: React.FC<{
   return (
     <Screen>
       <ScreenHeader title={title} caption={caption} onBack={onBack} right={right} titleRight={titleRight} />
-      <ScrollView
-        contentContainerStyle={[s.page, contentStyle]}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.muted} /> : undefined}
-      >
-        {children}
-      </ScrollView>
-      {footer}
+      <KeyboardAvoidView>
+        <ScrollView
+          contentContainerStyle={[s.page, contentStyle]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.muted} /> : undefined}
+        >
+          {children}
+        </ScrollView>
+        {footer}
+      </KeyboardAvoidView>
     </Screen>
   );
 };
